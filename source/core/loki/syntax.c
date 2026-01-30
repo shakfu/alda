@@ -24,6 +24,7 @@
 
 #ifdef LOKI_USE_LINENOISE
 #include <syntax/theme.h>
+#include "treesitter.h"
 #endif
 
 /* ====================== Syntax highlight color scheme  ==================== */
@@ -72,6 +73,14 @@ void syntax_update_row(editor_ctx_t *ctx, t_erow *row) {
     if (new_hl == NULL) return; /* Out of memory, keep old highlighting */
     row->hl = new_hl;
     memset(row->hl,HL_NORMAL,row->rsize);
+
+#ifdef LOKI_USE_LINENOISE
+    /* Use tree-sitter highlighting when available */
+    if (ctx->model.ts_state != NULL) {
+        treesitter_update_row(ctx, row, ctx->model.ts_state);
+        return;
+    }
+#endif
 
     int default_ran = 0;
 
@@ -237,6 +246,21 @@ int syntax_format_color(editor_ctx_t *ctx, int hl, char *buf, size_t bufsize) {
 
 /* Select the syntax highlight scheme depending on the filename. */
 void syntax_select_for_filename(editor_ctx_t *ctx, char *filename) {
+#ifdef LOKI_USE_LINENOISE
+    /* Free any existing tree-sitter state */
+    if (ctx->model.ts_state != NULL) {
+        treesitter_free(ctx->model.ts_state);
+        ctx->model.ts_state = NULL;
+    }
+
+    /* Try to initialize tree-sitter for this file */
+    const char *ts_lang = treesitter_lang_from_filename(filename);
+    if (ts_lang != NULL) {
+        ctx->model.ts_state = treesitter_init(ts_lang);
+        /* If tree-sitter succeeded, we still set view.syntax for fallback */
+    }
+#endif
+
     for (unsigned int j = 0; j < HLDB_ENTRIES; j++) {
         struct t_editor_syntax *s = HLDB+j;
         if (!s->filematch) continue;

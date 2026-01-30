@@ -179,6 +179,10 @@ typedef struct EditorModel {
     struct undo_state *undo_state;        /* Undo/redo state (NULL if disabled) */
     struct indent_config *indent_config;  /* Auto-indent settings */
 
+#ifdef LOKI_USE_LINENOISE
+    struct TreeSitterState *ts_state;     /* Tree-sitter syntax highlighting */
+#endif
+
     /* Shared audio/MIDI/Link context - single instance for all languages.
      * Owned by the editor, shared by all language subsystems.
      * See shared/context.h for details. */

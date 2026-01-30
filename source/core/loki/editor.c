@@ -28,6 +28,9 @@
 #include "terminal.h"
 #include "buffers.h"
 #include "syntax.h"
+#ifdef LOKI_USE_LINENOISE
+#include "treesitter.h"
+#endif
 #include "lang_bridge.h"
 #include "loki/link.h"
 #include "live_loop.h"
@@ -623,6 +626,14 @@ void editor_cleanup_resources(editor_ctx_t *ctx) {
         free(ctx->model.shared);
         ctx->model.shared = NULL;
     }
+
+#ifdef LOKI_USE_LINENOISE
+    /* Clean up tree-sitter state */
+    if (ctx->model.ts_state) {
+        treesitter_free(ctx->model.ts_state);
+        ctx->model.ts_state = NULL;
+    }
+#endif
 
     /* Clean up async event queue */
     async_queue_cleanup();

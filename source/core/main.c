@@ -147,6 +147,14 @@ int main(int argc, char **argv) {
     /* Check if first arg is a language command (e.g., "alda", "joy", "tr7") */
     const LangDispatchEntry *lang = lang_dispatch_find_by_command(first_arg);
     if (lang && lang->repl_main) {
+        /* If a file with a supported extension is provided, open editor instead of REPL */
+        for (int i = 2; i < argc; i++) {
+            if (argv[i][0] != '-' &&
+                (lang_dispatch_has_supported_extension(argv[i]) || has_csd_extension(argv[i]))) {
+                /* Found a file - open editor with remaining args */
+                return loki_editor_main(argc - 1, argv + 1);
+            }
+        }
         return lang->repl_main(argc - 1, argv + 1);
     }
 
