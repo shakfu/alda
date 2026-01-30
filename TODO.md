@@ -120,42 +120,7 @@ The web host is functional with xterm.js terminal emulator. Remaining work:
 
 ## Medium Priority
 
-### MHS (Micro Haskell) REPL Enhancements
-
-The MHS language now has full REPL feature parity with Joy/TR7/Bog via PTY-based stdin interposition.
-See `docs/LANG_IMPL_COMPARISON.md` for architecture details.
-
-**Implementation:** MicroHs REPL runs in a forked child process with a pseudo-terminal (PTY).
-The parent process runs psnd's `repl_readline()` for input with syntax highlighting,
-tab completion, and history. psnd commands are handled locally; Haskell code is
-forwarded to MicroHs via the PTY. MIDI is initialized in the child process after fork
-to ensure proper handle inheritance (libremidi handles don't survive fork).
-
-Completed:
-
-- [x] Implement PTY-based stdin interposition in `mhs_repl_main()`
-  - Detects interactive mode with `isatty(STDIN_FILENO)`
-  - Creates PTY with `forkpty()`, runs MicroHs in child process
-  - Parent uses psnd's REPL loop with syntax-highlighted input
-  - Filters commands with `shared_process_command()`
-  - MIDI initialized in child after fork for proper handle inheritance
-
-- [x] Add tab completion for Haskell keywords
-  - 80+ keywords including MIDI primitives
-  - Uses `repl_set_completion()` callback pattern
-
-- [x] Add history persistence
-  - Path: `~/.psnd/mhs_history`
-
-- [x] Integrate Ableton Link callbacks
-  - Polls `shared_repl_link_check()` in REPL loop
-
 ### Testing
-
-- [x] Add synthesis backend tests
-  - `test_tsf_backend.c` - 19 tests (init, cleanup, loading, enable/disable, MIDI messages, boundaries)
-  - `test_csound_backend.c` - 31 tests (availability, init, loading, enable/disable, MIDI, render, playback)
-  - Tests verify API behavior without crashing; full audio testing requires manual verification
 
 - [ ] Add scanner/lexer unit tests for all languages
   - Alda scanner vulnerable to malformed input
@@ -166,12 +131,6 @@ Completed:
   - Consider AFL or libFuzzer integration
 
 ### Ableton Link Integration
-
-- [x] **Beat-Aligned Start** - Playback quantizes to Link beat grid
-  - Added `shared_link_ms_to_next_beat(quantum)` function
-  - Added `launch_quantize` field to SharedContext and SharedAsyncSchedule
-  - Added `loki.link.launch_quantize(quantum)` Lua API (0=immediate, 1=beat, 4=bar)
-  - Alda and Joy async playback now respects launch quantization
 
 - [ ] **Full Transport Sync** - Start/stop from any Link peer controls all
   - Wire transport callbacks to actually start/stop playback
@@ -184,31 +143,10 @@ Completed:
   - Highlight currently playing region
   - Show playback progress in status bar
 
-- [x] MIDI port selection from editor
-  - Added `loki.midi.list_ports()`, `loki.midi.port_count()`, `loki.midi.port_name(index)`
-  - Added `loki.midi.open_port(index)`, `loki.midi.open_by_name(name)`
-  - Added `loki.midi.open_virtual(name)`, `loki.midi.close()`, `loki.midi.is_open()`
-
 - [ ] Tempo tap
   - Tap key to set tempo
 
 - [ ] Metronome toggle
-
-### Refactoring
-
-### Build System
-
-- [x] Add AddressSanitizer build target
-  - `cmake -B build -DPSND_ENABLE_ASAN=ON .`
-
-- [x] Add code coverage target
-  - `cmake -B build -DPSND_ENABLE_COVERAGE=ON .`
-  - Use lcov/gcov to generate reports
-
-- [x] Add install target
-  - `cmake --install build [--prefix /usr/local]`
-  - Installs binary to `bin/psnd`
-  - Installs config to `share/psnd/`
 
 ### Test Framework
 
@@ -253,11 +191,6 @@ Completed:
   - Already designed for in `editor_ctx_t`
   - Requires screen rendering changes
 
-- [x] Tree-sitter integration
-  - Basic integration complete: editor uses tree-sitter for Lua, Alda, Csound, Joy, Haskell, Scheme
-  - REPLs use tree-sitter via linenoise with full theme support
-  - `:theme` command switches color themes in both REPL and editor
-
 - [ ] Expand editor highlight vocabulary for full tree-sitter support
   - Currently maps ~40 tree-sitter token types to only 9 HL_* constants
   - Missing distinctions:
@@ -283,10 +216,6 @@ Completed:
 
 ### Documentation
 
-- [x] Architecture diagram
-  - Created `docs/architecture.d2` using D2 language
-  - Renders to SVG/PNG: `d2 architecture.d2 architecture.svg`
-
 - [ ] API reference generation
   - Consider Doxygen for generated docs
 
@@ -297,54 +226,10 @@ Completed:
 
 ### Future Architecture
 
-- [x] Lua-to-language primitive callbacks (Joy implemented)
-  - Allow registering Lua functions as language primitives
-  - Enables extending languages with Lua's ecosystem (HTTP, JSON, etc.)
-
-  **Joy** (stack-based) - IMPLEMENTED:
-  - API: `loki.joy.register_primitive("name", lua_callback)`
-  - Callback receives: `function(stack) ... return modified_stack end`
-  - Stack is a Lua array (index 1 = bottom, #stack = top)
-  - Values: integers, floats, booleans, strings, tables (for lists/quotations)
-  - Quotations represented as `{type="quotation", value={...tokens...}}`
-  - Return modified stack or `nil, "error message"` on failure
-  - Example:
-
-    ```lua
-    loki.joy.register_primitive("double", function(stack)
-        if #stack < 1 then return nil, "stack underflow" end
-        local top = table.remove(stack)
-        table.insert(stack, top * 2)
-        return stack
-    end)
-    ```
-
-  - Files: `source/langs/joy/register.c` (lua_joy_register_primitive, joy_lua_primitive_wrapper)
-
-  **TR7** (Scheme) - NOT YET IMPLEMENTED:
-  - API: `loki.tr7.register_primitive("name", lua_callback, min_args, max_args)`
-  - Callback receives: `function(arg1, arg2, ...) return result end`
-  - Uses TR7's `tr7_C_func_def_t` registration with Lua state as closure
-  - Type conversion via `TR7_FROM_*`/`TR7_TO_*` macros
-  - Return value becomes Scheme result; `nil, "error"` raises exception
-  - Implementation requires:
-    - C wrapper `lua_proc_wrapper(tr7_engine_t, int nvalues, tr7_t* values, void* L)`
-    - Convert `tr7_t` args to Lua values, call Lua function, convert result back
-    - Register via `tr7_register_C_func(engine, &def)`
-  - Complexity: Moderate (value conversion, error handling)
-
-  **Bog** (Prolog) - NOT YET IMPLEMENTED:
-  - API: `loki.bog.register_predicate("name", arity, lua_callback)`
-  - Callback receives: `function(args_table, env_table) return solutions end`
-  - `args_table`: array of terms (numbers, atoms, compounds, lists)
-  - `env_table`: current variable bindings `{X = value, Y = value}`
-  - Return: array of solution environments `{{X=1, Y=2}, {X=3, Y=4}}` or empty for failure
-  - Implementation requires:
-    - Extend `BogBuiltins` to support dynamic registration
-    - C wrapper converting `BogTerm**` to Lua tables and back
-    - Thread `lua_State*` through `BogContext` or scheduler
-    - Handle non-determinism (multiple solutions)
-  - Complexity: High (unification semantics, backtracking, term conversion)
+- [ ] Lua-to-language primitive callbacks for TR7/Bog
+  - Joy already implemented (`loki.joy.register_primitive`)
+  - TR7 (Scheme): Moderate complexity (value conversion, error handling)
+  - Bog (Prolog): High complexity (unification, backtracking, term conversion)
 
 - [ ] Plugin architecture for language modules
   - Dynamic loading of language support
@@ -438,67 +323,3 @@ Future features for the tracker sequencer (`tracker_demo`):
 - [ ] Expose playback state in loki status bar or via OSC/WebSocket
   - Current measure, active voices, CPU load
   - Visual confirmation when multiple asynchronous schedulers are active
-
----
-
-## Recently Completed
-
-### MHS Language Improvements
-
-- Added syntax highlighting for Haskell/MHS (`.hs`, `.mhs`, `.lhs` files)
-  - Keywords, types, MIDI primitives, Music module functions
-  - Created `source/core/loki/syntax/lang_haskell.h`
-- Added syntax highlighting for Bog (`.bog` files)
-  - Predicates, scales, chords, voice names
-  - Created `source/core/loki/syntax/lang_bog.h`
-- Added CLI flags for MHS REPL: `--virtual`, `-sf`, `-p`, `-l`, `-v`
-- Added SharedContext integration for MHS REPL
-  - Routes MIDI through SharedContext for TSF/Csound/Link support
-  - Proper initialization and cleanup of MIDI/audio backends
-- Created `docs/LANG_IMPL_COMPARISON.md` documenting feature parity across languages
-
-### Parameter Binding System
-
-- Added parameter system for binding named parameters to MIDI CC and OSC
-- Thread-safe atomic floats for lock-free access from MIDI/OSC threads
-- MIDI input support with CC-to-parameter routing
-- OSC endpoints: `/psnd/param/set`, `/psnd/param/get`, `/psnd/param/list`
-- Lua API: `loki.param` / `param` module
-- Joy primitives: `param`, `param!`, `param-list`
-- Files: `source/core/shared/param/param.c`, `source/core/shared/midi/midi_input.c`
-
-### Web Editor Implementation (Phases 1-7)
-
-- Eliminated global state and singletons
-- Split model from view in `editor_ctx_t`
-- Abstracted input handling with `EditorEvent` struct
-- Introduced renderer interface with `EditorViewModel`
-- Created host-agnostic `EditorSession` API
-- Added event queue for async tasks
-- Built web front-end with xterm.js terminal emulator
-- Embedded xterm.js in binary (optional, via `LOKI_EMBED_XTERM`)
-- Added mouse click-to-position support
-- Added language switching commands (`:alda`, `:joy`, `:langs`)
-- Added first-line directive support (`#alda`, `#joy`)
-
-### SharedContext Centralization
-
-- EditorModel now owns single SharedContext for all languages
-- Languages share context instead of creating separate instances
-- Prevents conflicts on singleton backends (TSF, Csound, Link)
-- REPLs still own their own SharedContext for standalone mode
-
-### REPL Enhancements
-
-- Added `:lang NAME` command to switch between language REPLs
-- Added `:langs` command to list available languages
-- Unified MIDI port name to `PSND_MIDI` across all languages
-
-### Other Completed Items
-
-- Standardized error return conventions
-- Unified Lua binding pattern across languages
-- Extracted shared REPL helper utilities
-- Implemented `:play` command with file-type dispatch
-- Wired Ableton Link callbacks for tempo sync
-- Added TR7 test suite (38 tests)
