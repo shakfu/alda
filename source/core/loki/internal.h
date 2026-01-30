@@ -107,6 +107,11 @@ struct undo_state;
 /* Shared audio/MIDI/Link context - see shared/context.h */
 struct SharedContext;
 
+/* Tree-sitter state - used when LOKI_USE_LINENOISE is defined */
+#ifdef LOKI_USE_LINENOISE
+struct TreeSitterState;
+#endif
+
 /* Language state forward declarations - see src/lang_config.h */
 #include "../lang_config.h"
 

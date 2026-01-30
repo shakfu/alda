@@ -175,6 +175,15 @@ function(psnd_build_loki)
         )
     endif()
 
+    # Linenoise REPL sources (tree-sitter syntax highlighting)
+    if(WITH_LINENOISE)
+        list(APPEND LOKI_CORE_SOURCES
+            ${PSND_CORE_DIR}/loki/repl_line_editor.c
+            ${PSND_CORE_DIR}/loki/repl_linenoise.c
+            ${PSND_CORE_DIR}/loki/treesitter.c
+        )
+    endif()
+
     # Collect language-specific register sources
     psnd_collect_lang_sources()
 
@@ -269,6 +278,22 @@ function(psnd_build_loki)
         target_compile_definitions(libloki PUBLIC BUILD_PLUGIN_SQLITE)
         target_include_directories(libloki PRIVATE ${PSND_FTS_INCLUDE_DIR})
         target_link_libraries(libloki PUBLIC ${PSND_FTS_LIBRARY})
+    endif()
+
+    # Linenoise REPL support (tree-sitter syntax highlighting)
+    if(WITH_LINENOISE)
+        target_compile_definitions(libloki PUBLIC LOKI_USE_LINENOISE=1)
+        target_include_directories(libloki PUBLIC
+            ${PSND_ROOT_DIR}/source/thirdparty/linenoise/include
+            ${PSND_ROOT_DIR}/source/thirdparty/linenoise/thirdparty/tree-sitter/lib/include
+        )
+        target_link_libraries(libloki PUBLIC
+            linenoise
+            linenoise-theme
+            linenoise-highlight-lua
+            tree-sitter
+            tree-sitter-lua
+        )
     endif()
 
     psnd_apply_lang_definitions(libloki)

@@ -177,6 +177,16 @@ else()
     message(STATUS "FluidSynth backend disabled (use -DBUILD_FLUID_BACKEND=ON to enable)")
 endif()
 
+# Linenoise - Enhanced line editing with tree-sitter syntax highlighting (optional)
+# Provides improved REPL experience with syntax highlighting for Lua
+option(WITH_LINENOISE "Build with linenoise REPL support" OFF)
+if(WITH_LINENOISE)
+    message(STATUS "Building with linenoise REPL support (Lua syntax highlighting)")
+    add_subdirectory(linenoise)
+else()
+    message(STATUS "Linenoise REPL support disabled (use -DWITH_LINENOISE=ON to enable)")
+endif()
+
 # Webview - Cross-platform webview library (optional)
 # Uses amalgamated single-header version at webview/webview_amalgamation.h
 option(BUILD_WEBVIEW_HOST "Build with native webview host" OFF)
