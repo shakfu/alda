@@ -15,6 +15,7 @@ All are practical for daily live-coding, REPL sketches, and headless playback. T
 ## Features
 
 - **Vim-style editor** with INSERT/NORMAL modes, live evaluation shortcuts, and Lua scripting (built on [loki](https://github.com/shakfu/loki), a fork of [kilo](https://github.com/antirez/kilo))
+- **Tree-sitter syntax highlighting** in REPLs with 15 color themes (monokai, dracula, nord, gruvbox, solarized, catppuccin, tokyo-night, and more)
 - **MIDI tracker/step sequencer** with terminal UI, plugin-based cell notation, and pattern looping
 - **Native webview mode** for a self-contained GUI window without requiring a browser (optional)
 - **Web-based editor** accessible via browser using xterm.js terminal emulator (optional)
@@ -213,6 +214,8 @@ mhs> :quit
 | `:csound` | Enable Csound backend |
 | `:cs-disable` | Disable Csound |
 | `:cs-status` | Show Csound status |
+| `:theme` | List available color themes |
+| `:theme NAME` | Switch to a color theme |
 
 **Alda-specific commands**:
 
@@ -286,6 +289,8 @@ Ex Commands (press `:` in NORMAL mode):
 | `:link` | Toggle Ableton Link |
 | `:csd` | Toggle Csound synthesis |
 | `:export FILE` | Export to MIDI file |
+| `:theme` | List color themes |
+| `:theme NAME` | Switch color theme |
 
 ### Play Mode
 

@@ -19,6 +19,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 
+- **Tree-sitter Syntax Highlighting**: Real-time syntax highlighting in REPLs and editor
+  - Language-specific grammars: Alda, Joy, Scheme, Haskell, Lua, Csound
+  - 15 built-in color themes (monokai, dracula, nord, gruvbox-dark, solarized-dark, one-dark, catppuccin, tokyo-night, everforest, kanagawa, rose-pine, palenight, ayu-dark, basic16)
+  - `:theme` command to list and switch themes in all REPLs
+  - `:theme NAME` to switch to a specific theme
+  - Theme colors apply to REPL input highlighting
+  - Build with `-DWITH_LINENOISE=ON` (enabled by default)
+
 - **SQLite FTS5 Search Plugin**: Full-text search index for `.psnd/` configuration files
   - Fast content search across Lua modules, themes, scales, and compositions
   - Path glob search for finding files by name pattern

@@ -37,6 +37,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/ioctl.h>
+#include <sys/select.h>
 #include <termios.h>
 #include <fcntl.h>
 #if defined(__APPLE__) || defined(__FreeBSD__)
@@ -57,6 +58,9 @@
 #include "loki/syntax.h"
 #include "loki/repl_helpers.h"
 #include "shared/repl_commands.h"
+
+/* Delay before REPL starts */
+#define MHS_REPL_DELAY 30000
 
 /* SharedContext integration for TSF/Csound/Link support */
 #ifdef PSND_SHARED_CONTEXT
@@ -649,9 +653,32 @@ static int run_mhs_interactive_repl(int mhs_argc, char **mhs_argv, MhsReplArgs *
         printf("MHS REPL %s (type :help for psnd commands)\n", PSND_VERSION);
     }
 
-    /* Give MicroHs time to start and print welcome message */
-    usleep(200000); /* 200ms */
-    mhs_read_output();
+    /* Wait for MicroHs to start and print welcome message.
+     * MicroHs needs time to load cache (~2s) before printing welcome.
+     * Poll the PTY until we get output, with a reasonable timeout. */
+    {
+        int got_output = 0;
+        for (int i = 0; i < 100; i++) {  /* Up to 5 seconds */
+            usleep(MHS_REPL_DELAY); /* 50ms */
+
+            mhs_read_output();
+
+            /* After first output, wait a bit more for the rest */
+            if (!got_output) {
+                /* Use select to check for data */
+                fd_set fds;
+                struct timeval tv = {0, 0};
+                FD_ZERO(&fds);
+                FD_SET(g_mhs_pty_master, &fds);
+                if (select(g_mhs_pty_master + 1, &fds, NULL, NULL, &tv) > 0) {
+                    got_output = 1;
+                }
+            } else if (i > 10) {
+                /* Got output, waited 500ms more, proceed */
+                break;
+            }
+        }
+    }
 
     /* Enable raw mode for syntax-highlighted input */
     repl_enable_raw_mode();
