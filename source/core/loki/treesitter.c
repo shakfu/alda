@@ -153,11 +153,82 @@ static const char *SCHEME_HIGHLIGHT_QUERY =
 
 /**
  * Map capture name to HL_* constant.
+ * Supports hierarchical capture names (e.g., "function.builtin", "keyword.control").
  */
 static int capture_to_hl(const char *capture_name, uint32_t len) {
-    /* Keywords */
+    /* Keywords - check subtypes first for specificity */
     if (len >= 7 && strncmp(capture_name, "keyword", 7) == 0) {
-        return HL_KEYWORD1;
+        if (len > 8) {
+            const char *subtype = capture_name + 8;  /* Skip "keyword." */
+            uint32_t sublen = len - 8;
+            /* Control flow keywords */
+            if ((sublen >= 7 && strncmp(subtype, "control", 7) == 0) ||
+                (sublen >= 11 && strncmp(subtype, "conditional", 11) == 0) ||
+                (sublen >= 6 && strncmp(subtype, "repeat", 6) == 0)) {
+                return HL_KEYWORD_CONTROL;
+            }
+            /* Function definition keywords */
+            if (sublen >= 8 && strncmp(subtype, "function", 8) == 0) {
+                return HL_KEYWORD_FUNCTION;
+            }
+            /* Return keywords */
+            if (sublen >= 6 && strncmp(subtype, "return", 6) == 0) {
+                return HL_KEYWORD_RETURN;
+            }
+            /* Operator keywords (and, or, not) - use generic keyword */
+            if (sublen >= 8 && strncmp(subtype, "operator", 8) == 0) {
+                return HL_KEYWORD1;
+            }
+        }
+        return HL_KEYWORD1;  /* Generic keyword */
+    }
+
+    /* Functions - check subtypes for builtin/call */
+    if (len >= 8 && strncmp(capture_name, "function", 8) == 0) {
+        if (len > 9) {
+            const char *subtype = capture_name + 9;  /* Skip "function." */
+            uint32_t sublen = len - 9;
+            if (sublen >= 7 && strncmp(subtype, "builtin", 7) == 0) {
+                return HL_FUNCTION_BUILTIN;
+            }
+            if (sublen >= 4 && strncmp(subtype, "call", 4) == 0) {
+                return HL_FUNCTION_CALL;
+            }
+            if (sublen >= 6 && strncmp(subtype, "method", 6) == 0) {
+                return HL_FUNCTION_CALL;  /* Methods treated as calls */
+            }
+            if (sublen >= 5 && strncmp(subtype, "macro", 5) == 0) {
+                return HL_FUNCTION_BUILTIN;  /* Macros treated as builtins */
+            }
+        }
+        return HL_FUNCTION;  /* Function definition */
+    }
+
+    /* Variables - check for builtin and parameter */
+    if (len >= 8 && strncmp(capture_name, "variable", 8) == 0) {
+        if (len > 9) {
+            const char *subtype = capture_name + 9;  /* Skip "variable." */
+            uint32_t sublen = len - 9;
+            if (sublen >= 7 && strncmp(subtype, "builtin", 7) == 0) {
+                return HL_VARIABLE_BUILTIN;
+            }
+            if (sublen >= 9 && strncmp(subtype, "parameter", 9) == 0) {
+                return HL_VARIABLE_PARAMETER;
+            }
+        }
+        return HL_NORMAL;  /* Regular variables */
+    }
+
+    /* Constants - check for builtin (nil, null, etc.) */
+    if (len >= 8 && strncmp(capture_name, "constant", 8) == 0) {
+        if (len > 9) {
+            const char *subtype = capture_name + 9;  /* Skip "constant." */
+            uint32_t sublen = len - 9;
+            if (sublen >= 7 && strncmp(subtype, "builtin", 7) == 0) {
+                return HL_CONSTANT_BUILTIN;
+            }
+        }
+        return HL_KEYWORD2;  /* Other constants */
     }
 
     /* Comments */
@@ -175,25 +246,47 @@ static int capture_to_hl(const char *capture_name, uint32_t len) {
         return HL_NUMBER;
     }
 
-    /* Types and type-like keywords */
+    /* Booleans */
+    if (len >= 7 && strncmp(capture_name, "boolean", 7) == 0) {
+        return HL_KEYWORD2;
+    }
+
+    /* Types */
     if (len >= 4 && strncmp(capture_name, "type", 4) == 0) {
         return HL_KEYWORD2;
     }
 
-    /* Booleans and constants */
-    if ((len >= 7 && strncmp(capture_name, "boolean", 7) == 0) ||
-        (len >= 8 && strncmp(capture_name, "constant", 8) == 0)) {
-        return HL_KEYWORD2;
+    /* Operators */
+    if (len >= 8 && strncmp(capture_name, "operator", 8) == 0) {
+        return HL_OPERATOR;
     }
 
-    /* Functions */
-    if (len >= 8 && strncmp(capture_name, "function", 8) == 0) {
-        return HL_KEYWORD1;
+    /* Punctuation - brackets and delimiters */
+    if (len >= 11 && strncmp(capture_name, "punctuation", 11) == 0) {
+        return HL_PUNCTUATION;
     }
 
-    /* Variables - use normal highlighting */
-    if (len >= 8 && strncmp(capture_name, "variable", 8) == 0) {
-        return HL_NORMAL;
+    /* Constructors */
+    if (len >= 11 && strncmp(capture_name, "constructor", 11) == 0) {
+        return HL_CONSTRUCTOR;
+    }
+
+    /* Namespaces/modules */
+    if (len >= 9 && strncmp(capture_name, "namespace", 9) == 0) {
+        return HL_NAMESPACE;
+    }
+    if (len >= 6 && strncmp(capture_name, "module", 6) == 0) {
+        return HL_NAMESPACE;
+    }
+
+    /* Labels */
+    if (len >= 5 && strncmp(capture_name, "label", 5) == 0) {
+        return HL_LABEL;
+    }
+
+    /* Tags (HTML, XML) */
+    if (len >= 3 && strncmp(capture_name, "tag", 3) == 0) {
+        return HL_TAG;
     }
 
     return HL_NORMAL;

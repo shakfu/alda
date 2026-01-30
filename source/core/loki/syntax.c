@@ -49,6 +49,7 @@ void editor_update_syntax_markdown(editor_ctx_t *ctx, t_erow *row);
 /* Map human-readable style names to HL_* constants */
 int syntax_name_to_code(const char *name) {
     if (name == NULL) return -1;
+    /* Base types (0-8) */
     if (strcasecmp(name, "normal") == 0) return HL_NORMAL;
     if (strcasecmp(name, "nonprint") == 0) return HL_NONPRINT;
     if (strcasecmp(name, "comment") == 0) return HL_COMMENT;
@@ -58,6 +59,22 @@ int syntax_name_to_code(const char *name) {
     if (strcasecmp(name, "string") == 0) return HL_STRING;
     if (strcasecmp(name, "number") == 0) return HL_NUMBER;
     if (strcasecmp(name, "match") == 0) return HL_MATCH;
+    /* Extended types (9-23) */
+    if (strcasecmp(name, "function") == 0) return HL_FUNCTION;
+    if (strcasecmp(name, "function_builtin") == 0) return HL_FUNCTION_BUILTIN;
+    if (strcasecmp(name, "function_call") == 0) return HL_FUNCTION_CALL;
+    if (strcasecmp(name, "variable_builtin") == 0) return HL_VARIABLE_BUILTIN;
+    if (strcasecmp(name, "variable_parameter") == 0) return HL_VARIABLE_PARAMETER;
+    if (strcasecmp(name, "operator") == 0) return HL_OPERATOR;
+    if (strcasecmp(name, "punctuation") == 0) return HL_PUNCTUATION;
+    if (strcasecmp(name, "constructor") == 0) return HL_CONSTRUCTOR;
+    if (strcasecmp(name, "namespace") == 0) return HL_NAMESPACE;
+    if (strcasecmp(name, "label") == 0) return HL_LABEL;
+    if (strcasecmp(name, "tag") == 0) return HL_TAG;
+    if (strcasecmp(name, "keyword_control") == 0) return HL_KEYWORD_CONTROL;
+    if (strcasecmp(name, "keyword_function") == 0) return HL_KEYWORD_FUNCTION;
+    if (strcasecmp(name, "keyword_return") == 0) return HL_KEYWORD_RETURN;
+    if (strcasecmp(name, "constant_builtin") == 0) return HL_CONSTANT_BUILTIN;
     return -1;
 }
 
@@ -238,7 +255,7 @@ void syntax_update_row(editor_ctx_t *ctx, t_erow *row) {
  * Uses true color (24-bit) escape codes: ESC[38;2;R;G;Bm
  * Returns the length of the formatted string. */
 int syntax_format_color(editor_ctx_t *ctx, int hl, char *buf, size_t bufsize) {
-    if (hl < 0 || hl >= 9) hl = 0;  /* Default to HL_NORMAL */
+    if (hl < 0 || hl >= HL_TYPE_COUNT) hl = 0;  /* Default to HL_NORMAL */
     t_hlcolor *color = &ctx->view.colors[hl];
     return snprintf(buf, bufsize, "\x1b[38;2;%d;%d;%dm",
                     color->r, color->g, color->b);
@@ -342,15 +359,23 @@ static void color256_to_rgb(unsigned char c, int *r, int *g, int *b) {
     }
 }
 
+/* Helper to set a color entry from a TOK_* value */
+static void set_color_from_tok(editor_ctx_t *ctx, int hl_type, syntax_token_t tok) {
+    int r, g, b;
+    color256_to_rgb(theme_color(tok), &r, &g, &b);
+    ctx->view.colors[hl_type].r = r;
+    ctx->view.colors[hl_type].g = g;
+    ctx->view.colors[hl_type].b = b;
+}
+
 /* Apply current theme colors to the editor's color array */
 void syntax_apply_theme_colors(editor_ctx_t *ctx) {
     int r, g, b;
 
+    /* Base types (0-8) */
+
     /* HL_NORMAL - default foreground */
-    color256_to_rgb(theme_color(TOK_DEFAULT), &r, &g, &b);
-    ctx->view.colors[HL_NORMAL].r = r;
-    ctx->view.colors[HL_NORMAL].g = g;
-    ctx->view.colors[HL_NORMAL].b = b;
+    set_color_from_tok(ctx, HL_NORMAL, TOK_DEFAULT);
 
     /* HL_NONPRINT - use muted color */
     color256_to_rgb(theme_color(TOK_COMMENT), &r, &g, &b);
@@ -359,45 +384,54 @@ void syntax_apply_theme_colors(editor_ctx_t *ctx) {
     ctx->view.colors[HL_NONPRINT].b = b / 2;
 
     /* HL_COMMENT */
-    color256_to_rgb(theme_color(TOK_COMMENT), &r, &g, &b);
-    ctx->view.colors[HL_COMMENT].r = r;
-    ctx->view.colors[HL_COMMENT].g = g;
-    ctx->view.colors[HL_COMMENT].b = b;
+    set_color_from_tok(ctx, HL_COMMENT, TOK_COMMENT);
 
     /* HL_MLCOMMENT - same as comment */
-    ctx->view.colors[HL_MLCOMMENT].r = r;
-    ctx->view.colors[HL_MLCOMMENT].g = g;
-    ctx->view.colors[HL_MLCOMMENT].b = b;
+    set_color_from_tok(ctx, HL_MLCOMMENT, TOK_COMMENT);
 
     /* HL_KEYWORD1 - primary keywords */
-    color256_to_rgb(theme_color(TOK_KEYWORD), &r, &g, &b);
-    ctx->view.colors[HL_KEYWORD1].r = r;
-    ctx->view.colors[HL_KEYWORD1].g = g;
-    ctx->view.colors[HL_KEYWORD1].b = b;
+    set_color_from_tok(ctx, HL_KEYWORD1, TOK_KEYWORD);
 
     /* HL_KEYWORD2 - type keywords */
-    color256_to_rgb(theme_color(TOK_TYPE), &r, &g, &b);
-    ctx->view.colors[HL_KEYWORD2].r = r;
-    ctx->view.colors[HL_KEYWORD2].g = g;
-    ctx->view.colors[HL_KEYWORD2].b = b;
+    set_color_from_tok(ctx, HL_KEYWORD2, TOK_TYPE);
 
     /* HL_STRING */
-    color256_to_rgb(theme_color(TOK_STRING), &r, &g, &b);
-    ctx->view.colors[HL_STRING].r = r;
-    ctx->view.colors[HL_STRING].g = g;
-    ctx->view.colors[HL_STRING].b = b;
+    set_color_from_tok(ctx, HL_STRING, TOK_STRING);
 
     /* HL_NUMBER */
-    color256_to_rgb(theme_color(TOK_NUMBER), &r, &g, &b);
-    ctx->view.colors[HL_NUMBER].r = r;
-    ctx->view.colors[HL_NUMBER].g = g;
-    ctx->view.colors[HL_NUMBER].b = b;
+    set_color_from_tok(ctx, HL_NUMBER, TOK_NUMBER);
 
     /* HL_MATCH - search match highlight (use function color for visibility) */
-    color256_to_rgb(theme_color(TOK_FUNCTION), &r, &g, &b);
-    ctx->view.colors[HL_MATCH].r = r;
-    ctx->view.colors[HL_MATCH].g = g;
-    ctx->view.colors[HL_MATCH].b = b;
+    set_color_from_tok(ctx, HL_MATCH, TOK_FUNCTION);
+
+    /* Extended types (9-23) */
+
+    /* Functions */
+    set_color_from_tok(ctx, HL_FUNCTION, TOK_FUNCTION);
+    set_color_from_tok(ctx, HL_FUNCTION_BUILTIN, TOK_FUNCTION_BUILTIN);
+    set_color_from_tok(ctx, HL_FUNCTION_CALL, TOK_FUNCTION_CALL);
+
+    /* Variables */
+    set_color_from_tok(ctx, HL_VARIABLE_BUILTIN, TOK_VARIABLE_BUILTIN);
+    set_color_from_tok(ctx, HL_VARIABLE_PARAMETER, TOK_VARIABLE_PARAMETER);
+
+    /* Operators and punctuation */
+    set_color_from_tok(ctx, HL_OPERATOR, TOK_OPERATOR);
+    set_color_from_tok(ctx, HL_PUNCTUATION, TOK_PUNCTUATION);
+
+    /* Special types */
+    set_color_from_tok(ctx, HL_CONSTRUCTOR, TOK_CONSTRUCTOR);
+    set_color_from_tok(ctx, HL_NAMESPACE, TOK_NAMESPACE);
+    set_color_from_tok(ctx, HL_LABEL, TOK_LABEL);
+    set_color_from_tok(ctx, HL_TAG, TOK_TAG);
+
+    /* Keyword subtypes */
+    set_color_from_tok(ctx, HL_KEYWORD_CONTROL, TOK_KEYWORD_CONTROL);
+    set_color_from_tok(ctx, HL_KEYWORD_FUNCTION, TOK_KEYWORD_FUNCTION);
+    set_color_from_tok(ctx, HL_KEYWORD_RETURN, TOK_KEYWORD_RETURN);
+
+    /* Constants */
+    set_color_from_tok(ctx, HL_CONSTANT_BUILTIN, TOK_CONSTANT_BUILTIN);
 }
 #endif
 
@@ -410,6 +444,7 @@ void syntax_init_default_colors(editor_ctx_t *ctx) {
     syntax_apply_theme_colors(ctx);
 #else
     /* Fallback: hardcoded colors matching original appearance */
+    /* Base types (0-8) */
     /* HL_NORMAL */
     ctx->view.colors[0].r = 200; ctx->view.colors[0].g = 200; ctx->view.colors[0].b = 200;
     /* HL_NONPRINT */
@@ -428,5 +463,37 @@ void syntax_init_default_colors(editor_ctx_t *ctx) {
     ctx->view.colors[7].r = 200; ctx->view.colors[7].g = 100; ctx->view.colors[7].b = 200;
     /* HL_MATCH */
     ctx->view.colors[8].r = 100; ctx->view.colors[8].g = 150; ctx->view.colors[8].b = 220;
+
+    /* Extended types (9-23) - fallback colors */
+    /* HL_FUNCTION - blue/cyan */
+    ctx->view.colors[9].r = 80; ctx->view.colors[9].g = 180; ctx->view.colors[9].b = 220;
+    /* HL_FUNCTION_BUILTIN - brighter cyan */
+    ctx->view.colors[10].r = 100; ctx->view.colors[10].g = 200; ctx->view.colors[10].b = 240;
+    /* HL_FUNCTION_CALL - slightly muted cyan */
+    ctx->view.colors[11].r = 120; ctx->view.colors[11].g = 180; ctx->view.colors[11].b = 200;
+    /* HL_VARIABLE_BUILTIN - orange/red for self/this */
+    ctx->view.colors[12].r = 220; ctx->view.colors[12].g = 120; ctx->view.colors[12].b = 100;
+    /* HL_VARIABLE_PARAMETER - light orange */
+    ctx->view.colors[13].r = 220; ctx->view.colors[13].g = 160; ctx->view.colors[13].b = 100;
+    /* HL_OPERATOR - white/light gray */
+    ctx->view.colors[14].r = 220; ctx->view.colors[14].g = 220; ctx->view.colors[14].b = 220;
+    /* HL_PUNCTUATION - dimmer gray */
+    ctx->view.colors[15].r = 150; ctx->view.colors[15].g = 150; ctx->view.colors[15].b = 150;
+    /* HL_CONSTRUCTOR - green/teal */
+    ctx->view.colors[16].r = 100; ctx->view.colors[16].g = 220; ctx->view.colors[16].b = 180;
+    /* HL_NAMESPACE - purple */
+    ctx->view.colors[17].r = 180; ctx->view.colors[17].g = 120; ctx->view.colors[17].b = 220;
+    /* HL_LABEL - yellow/gold */
+    ctx->view.colors[18].r = 220; ctx->view.colors[18].g = 200; ctx->view.colors[18].b = 100;
+    /* HL_TAG - blue */
+    ctx->view.colors[19].r = 100; ctx->view.colors[19].g = 150; ctx->view.colors[19].b = 220;
+    /* HL_KEYWORD_CONTROL - magenta (like keyword1) */
+    ctx->view.colors[20].r = 220; ctx->view.colors[20].g = 100; ctx->view.colors[20].b = 220;
+    /* HL_KEYWORD_FUNCTION - magenta variant */
+    ctx->view.colors[21].r = 200; ctx->view.colors[21].g = 100; ctx->view.colors[21].b = 200;
+    /* HL_KEYWORD_RETURN - bright magenta */
+    ctx->view.colors[22].r = 240; ctx->view.colors[22].g = 120; ctx->view.colors[22].b = 240;
+    /* HL_CONSTANT_BUILTIN - cyan (like keyword2) */
+    ctx->view.colors[23].r = 100; ctx->view.colors[23].g = 220; ctx->view.colors[23].b = 220;
 #endif
 }

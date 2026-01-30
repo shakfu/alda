@@ -18,15 +18,35 @@
 
 /* ======================= Syntax Highlighting Constants ==================== */
 
+/* Base highlight types (0-8) - original vocabulary */
 #define HL_NORMAL 0
 #define HL_NONPRINT 1
 #define HL_COMMENT 2   /* Single line comment. */
 #define HL_MLCOMMENT 3 /* Multi-line comment. */
-#define HL_KEYWORD1 4
-#define HL_KEYWORD2 5
+#define HL_KEYWORD1 4  /* Generic keywords */
+#define HL_KEYWORD2 5  /* Type keywords */
 #define HL_STRING 6
 #define HL_NUMBER 7
-#define HL_MATCH 8      /* Search match. */
+#define HL_MATCH 8     /* Search match. */
+
+/* Extended highlight types (9-23) - tree-sitter vocabulary */
+#define HL_FUNCTION 9           /* Function definitions */
+#define HL_FUNCTION_BUILTIN 10  /* Built-in functions (print, len, etc.) */
+#define HL_FUNCTION_CALL 11     /* Function calls */
+#define HL_VARIABLE_BUILTIN 12  /* Built-in variables (self, this) */
+#define HL_VARIABLE_PARAMETER 13 /* Function parameters */
+#define HL_OPERATOR 14          /* Operators (+, -, *, /, etc.) */
+#define HL_PUNCTUATION 15       /* Punctuation (brackets, delimiters) */
+#define HL_CONSTRUCTOR 16       /* Constructors */
+#define HL_NAMESPACE 17         /* Namespaces/modules */
+#define HL_LABEL 18             /* Labels (goto targets, markers) */
+#define HL_TAG 19               /* Tags (HTML, XML) */
+#define HL_KEYWORD_CONTROL 20   /* Control flow (if, else, for, while) */
+#define HL_KEYWORD_FUNCTION 21  /* Function keywords (function, def, fn) */
+#define HL_KEYWORD_RETURN 22    /* Return keywords (return, yield) */
+#define HL_CONSTANT_BUILTIN 23  /* Built-in constants (nil, null, None) */
+
+#define HL_TYPE_COUNT 24        /* Total number of highlight types */
 
 #define HL_HIGHLIGHT_STRINGS (1<<0)
 #define HL_HIGHLIGHT_NUMBERS (1<<1)
@@ -216,7 +236,7 @@ typedef struct EditorView {
 
     /* Display settings */
     struct t_editor_syntax *syntax;  /* Current syntax highlight, or NULL */
-    t_hlcolor colors[9];      /* Syntax highlight colors: indexed by HL_* constants */
+    t_hlcolor colors[HL_TYPE_COUNT];  /* Syntax highlight colors: indexed by HL_* constants */
     int line_numbers;         /* Line numbers display flag */
     int word_wrap;            /* Word wrap enabled flag */
 
