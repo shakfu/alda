@@ -253,9 +253,25 @@ Completed:
   - Already designed for in `editor_ctx_t`
   - Requires screen rendering changes
 
-- [ ] Tree-sitter integration
-  - Would improve syntax highlighting, code handling
-  - Significantly more complex than current system
+- [x] Tree-sitter integration
+  - Basic integration complete: editor uses tree-sitter for Lua, Alda, Csound, Joy, Haskell, Scheme
+  - REPLs use tree-sitter via linenoise with full theme support
+  - `:theme` command switches color themes in both REPL and editor
+
+- [ ] Expand editor highlight vocabulary for full tree-sitter support
+  - Currently maps ~40 tree-sitter token types to only 9 HL_* constants
+  - Missing distinctions:
+    - `function` vs `function.builtin` vs `function.call` (all map to HL_KEYWORD1)
+    - `variable.builtin` (self/this) vs regular variables (both map to HL_NORMAL)
+    - `operator` and `punctuation.*` (map to HL_NORMAL, no color)
+    - `constructor`, `namespace`, `label`, `tag` (all map to HL_NORMAL)
+    - `keyword.control` vs `keyword.function` vs `keyword.return` (all map to HL_KEYWORD1)
+  - Implementation:
+    - Expand HL_* constants (add HL_FUNCTION, HL_OPERATOR, HL_PUNCTUATION, HL_VARIABLE_BUILTIN, etc.)
+    - Expand `ctx->view.colors[]` array to match
+    - Update `capture_to_hl()` in `treesitter.c` for finer mapping
+    - Update `syntax_apply_theme_colors()` to map more TOK_* to new HL_* types
+  - Files: `internal.h`, `treesitter.c`, `syntax.c`
 
 - [ ] LSP client integration
   - Would provide IDE-like features
