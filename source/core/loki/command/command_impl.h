@@ -108,6 +108,11 @@ int cmd_unloop(editor_ctx_t *ctx, const char *args);
 /* :plugin - Plugin preset control */
 int cmd_plugin(editor_ctx_t *ctx, const char *args);
 
+/* ======================== Theme Commands (theme.c) ======================== */
+
+/* :theme [name] - List or switch syntax highlighting themes */
+int cmd_theme(editor_ctx_t *ctx, const char *args);
+
 /* ======================== Helper for find_command (used by cmd_help) ======================== */
 
 /* Find a command by name (defined in command.c) */

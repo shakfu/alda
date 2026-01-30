@@ -623,7 +623,11 @@ static int run_mhs_interactive_repl(int mhs_argc, char **mhs_argv, MhsReplArgs *
 
     /* Initialize REPL editor */
     ReplLineEditor ed;
+#ifdef LOKI_USE_LINENOISE
+    repl_editor_init_with_language(&ed, REPL_LANG_HASKELL);
+#else
     repl_editor_init(&ed);
+#endif
 
     /* Set up syntax highlighting context */
     editor_ctx_t syntax_ctx;

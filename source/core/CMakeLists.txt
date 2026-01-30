@@ -103,6 +103,15 @@ elseif(UNIX AND NOT APPLE)
     target_link_libraries(shared PUBLIC pthread dl m)
 endif()
 
+# Linenoise support for shared library (theme command in REPL)
+if(WITH_LINENOISE)
+    target_compile_definitions(shared PUBLIC LOKI_USE_LINENOISE=1)
+    target_include_directories(shared PUBLIC
+        ${PSND_ROOT_DIR}/source/thirdparty/linenoise/include
+    )
+    target_link_libraries(shared PUBLIC linenoise-theme)
+endif()
+
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(shared PRIVATE -Wall -Wextra -Wpedantic)
 endif()
@@ -140,6 +149,7 @@ function(psnd_build_loki)
         ${PSND_CORE_DIR}/loki/command/export.c
         ${PSND_CORE_DIR}/loki/command/loop.c
         ${PSND_CORE_DIR}/loki/command/plugin.c
+        ${PSND_CORE_DIR}/loki/command/theme.c
         ${PSND_CORE_DIR}/loki/terminal.c
         ${PSND_CORE_DIR}/loki/undo.c
         ${PSND_CORE_DIR}/loki/buffers.c
@@ -285,14 +295,24 @@ function(psnd_build_loki)
         target_compile_definitions(libloki PUBLIC LOKI_USE_LINENOISE=1)
         target_include_directories(libloki PUBLIC
             ${PSND_ROOT_DIR}/source/thirdparty/linenoise/include
-            ${PSND_ROOT_DIR}/source/thirdparty/linenoise/thirdparty/tree-sitter/lib/include
+            ${PSND_ROOT_DIR}/source/thirdparty/tree-sitter/lib/include
         )
         target_link_libraries(libloki PUBLIC
             linenoise
             linenoise-theme
             linenoise-highlight-lua
+            linenoise-highlight-alda
+            linenoise-highlight-csound
+            linenoise-highlight-joy
+            linenoise-highlight-haskell
+            linenoise-highlight-scheme
             tree-sitter
             tree-sitter-lua
+            tree-sitter-alda
+            tree-sitter-csound
+            tree-sitter-joy
+            tree-sitter-haskell
+            tree-sitter-scheme
         )
     endif()
 
@@ -310,10 +330,17 @@ endfunction()
 function(psnd_build_binary)
     psnd_collect_lang_sources()
 
+    # REPL implementation: use linenoise from libloki when enabled,
+    # otherwise use the fallback repl.c
+    set(PSND_BIN_REPL_SOURCES)
+    if(NOT WITH_LINENOISE)
+        list(APPEND PSND_BIN_REPL_SOURCES ${PSND_CORE_DIR}/repl.c)
+    endif()
+
     add_executable(psnd_bin
         ${PSND_CORE_DIR}/main.c
         ${PSND_CORE_DIR}/lang_dispatch.c
-        ${PSND_CORE_DIR}/repl.c
+        ${PSND_BIN_REPL_SOURCES}
         ${PSND_ALL_LANG_REPL_SOURCES}
     )
 

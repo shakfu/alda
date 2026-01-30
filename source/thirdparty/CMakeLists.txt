@@ -177,14 +177,15 @@ else()
     message(STATUS "FluidSynth backend disabled (use -DBUILD_FLUID_BACKEND=ON to enable)")
 endif()
 
-# Linenoise - Enhanced line editing with tree-sitter syntax highlighting (optional)
-# Provides improved REPL experience with syntax highlighting for Lua
-option(WITH_LINENOISE "Build with linenoise REPL support" OFF)
+# Linenoise - Cross-platform line editing with tree-sitter syntax highlighting
+# Provides REPL line editing with syntax highlighting for Lua
+# This is the default REPL implementation (replaces readline/editline)
+option(WITH_LINENOISE "Build with linenoise REPL support" ON)
 if(WITH_LINENOISE)
-    message(STATUS "Building with linenoise REPL support (Lua syntax highlighting)")
+    message(STATUS "Building with linenoise REPL (Lua syntax highlighting)")
     add_subdirectory(linenoise)
 else()
-    message(STATUS "Linenoise REPL support disabled (use -DWITH_LINENOISE=ON to enable)")
+    message(STATUS "Linenoise disabled - REPL will have no line editing")
 endif()
 
 # Webview - Cross-platform webview library (optional)

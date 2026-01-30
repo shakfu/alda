@@ -17,11 +17,15 @@
 
 /**
  * Supported languages for REPL syntax highlighting.
- * Note: Only Lua is included in this build to minimize binary size.
  */
 typedef enum {
     REPL_LANG_NONE = 0,
-    REPL_LANG_LUA
+    REPL_LANG_LUA,
+    REPL_LANG_ALDA,
+    REPL_LANG_CSOUND,
+    REPL_LANG_JOY,
+    REPL_LANG_HASKELL,
+    REPL_LANG_SCHEME
 } ReplLanguage;
 
 /**

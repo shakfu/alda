@@ -1,0 +1,27 @@
+[package]
+name = "tree-sitter-scheme"
+description = "Scheme parser for tree-sitter"
+version = "0.24.7"
+authors = ["6cdh"]
+license = "MIT"
+readme = "README.md"
+keywords = ["incremental", "parsing", "tree-sitter", "scheme"]
+categories = ["parsing", "text-editors"]
+repository = "https://github.com/6cdh/tree-sitter-scheme"
+edition = "2021"
+autoexamples = false
+
+build = "bindings/rust/build.rs"
+include = ["LICENSE", "bindings/rust/*", "grammar.js", "queries/*", "src/*", "tree-sitter.json"]
+
+[lib]
+path = "bindings/rust/lib.rs"
+
+[dependencies]
+tree-sitter-language = "0.1"
+
+[build-dependencies]
+cc = "1.1.22"
+
+[dev-dependencies]
+tree-sitter = "0.24.7"

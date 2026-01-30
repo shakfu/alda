@@ -196,7 +196,11 @@ static void repl_loop(AldaContext *ctx, editor_ctx_t *syntax_ctx) {
         return;
     }
 
+#ifdef LOKI_USE_LINENOISE
+    repl_editor_init_with_language(&ed, REPL_LANG_ALDA);
+#else
     repl_editor_init(&ed);
+#endif
 
     /* Set up tab completion for instrument names */
     repl_set_completion(&ed, alda_completion_callback, NULL);

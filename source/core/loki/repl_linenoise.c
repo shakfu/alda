@@ -1,8 +1,6 @@
 /**
  * @file repl_linenoise.c
  * @brief Linenoise integration layer for REPL with tree-sitter syntax highlighting.
- *
- * Lua-only version for psnd.
  */
 
 #include "repl_linenoise.h"
@@ -10,6 +8,11 @@
 #ifdef LOKI_USE_LINENOISE
 
 #include <syntax/lua.h>
+#include <syntax/alda.h>
+#include <syntax/csound.h>
+#include <syntax/joy.h>
+#include <syntax/haskell.h>
+#include <syntax/scheme.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -22,6 +25,16 @@ static int init_highlighter(ReplLanguage lang) {
     switch (lang) {
         case REPL_LANG_LUA:
             return lua_highlight_init();
+        case REPL_LANG_ALDA:
+            return alda_highlight_init();
+        case REPL_LANG_CSOUND:
+            return csound_highlight_init();
+        case REPL_LANG_JOY:
+            return joy_highlight_init();
+        case REPL_LANG_HASKELL:
+            return haskell_highlight_init();
+        case REPL_LANG_SCHEME:
+            return scheme_highlight_init();
         case REPL_LANG_NONE:
         default:
             return 0;
@@ -34,6 +47,21 @@ static void free_highlighter(ReplLanguage lang) {
         case REPL_LANG_LUA:
             lua_highlight_free();
             break;
+        case REPL_LANG_ALDA:
+            alda_highlight_free();
+            break;
+        case REPL_LANG_CSOUND:
+            csound_highlight_free();
+            break;
+        case REPL_LANG_JOY:
+            joy_highlight_free();
+            break;
+        case REPL_LANG_HASKELL:
+            haskell_highlight_free();
+            break;
+        case REPL_LANG_SCHEME:
+            scheme_highlight_free();
+            break;
         case REPL_LANG_NONE:
         default:
             break;
@@ -45,6 +73,16 @@ static linenoise_highlight_cb_t *get_highlight_callback(ReplLanguage lang) {
     switch (lang) {
         case REPL_LANG_LUA:
             return lua_highlight_callback;
+        case REPL_LANG_ALDA:
+            return alda_highlight_callback;
+        case REPL_LANG_CSOUND:
+            return csound_highlight_callback;
+        case REPL_LANG_JOY:
+            return joy_highlight_callback;
+        case REPL_LANG_HASKELL:
+            return haskell_highlight_callback;
+        case REPL_LANG_SCHEME:
+            return scheme_highlight_callback;
         case REPL_LANG_NONE:
         default:
             return NULL;

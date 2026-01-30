@@ -1,0 +1,17 @@
+{
+  "name": "tree-sitter-csound",
+  "version": "0.1.0",
+  "description": "Tree-sitter grammar for Csound CSD files",
+  "main": "bindings/node",
+  "keywords": ["parser", "csound", "csd", "music"],
+  "tree-sitter": [
+    {
+      "scope": "source.csound",
+      "file-types": ["csd", "orc", "sco"],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "devDependencies": {
+    "tree-sitter-cli": "^0.20.0"
+  }
+}

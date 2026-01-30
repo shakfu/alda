@@ -12,6 +12,10 @@
 #include "midi/midi.h"
 #include "link/link.h"
 
+#ifdef LOKI_USE_LINENOISE
+#include <syntax/theme.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -86,6 +90,12 @@ void shared_print_command_help(void) {
     printf("MIDI Port Commands:\n");
     printf("  :virtual [NAME]   Create virtual MIDI port\n");
     printf("\n");
+#ifdef LOKI_USE_LINENOISE
+    printf("Theme Commands:\n");
+    printf("  :theme            List available themes\n");
+    printf("  :theme NAME       Switch to a theme\n");
+    printf("\n");
+#endif
 }
 
 int shared_process_command(SharedContext* ctx, const char* input,
@@ -396,6 +406,42 @@ int shared_process_command(SharedContext* ctx, const char* input,
         printf("Unknown file type: %s\n", ext);
         return REPL_CMD_HANDLED;
     }
+
+#ifdef LOKI_USE_LINENOISE
+    /* Theme command: :theme [NAME] */
+    if (strcmp(cmd, "theme") == 0 || strcmp(cmd, "themes") == 0) {
+        /* List available themes */
+        printf("Available themes:\n");
+        const char** themes = theme_list();
+        const syntax_theme_t* current = theme_get();
+        const char* current_name = current ? current->name : NULL;
+        for (int i = 0; themes[i] != NULL; i++) {
+            if (current_name && strcmp(themes[i], current_name) == 0) {
+                printf("  [%s]\n", themes[i]);
+            } else {
+                printf("   %s\n", themes[i]);
+            }
+        }
+        return REPL_CMD_HANDLED;
+    }
+
+    if (starts_with(cmd, "theme ")) {
+        const char* name = skip_whitespace(cmd + 6);
+        if (*name == '\0') {
+            printf("Usage: :theme NAME\n");
+        } else {
+            const syntax_theme_t* theme = theme_find(name);
+            if (theme) {
+                theme_set(theme);
+                printf("Switched to theme: %s\n", name);
+            } else {
+                printf("Unknown theme: %s\n", name);
+                printf("Use ':theme' to list available themes.\n");
+            }
+        }
+        return REPL_CMD_HANDLED;
+    }
+#endif
 
     /* Not a recognized command */
     return REPL_CMD_NOT_CMD;

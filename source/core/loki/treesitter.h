@@ -4,7 +4,7 @@
  *
  * This module provides tree-sitter based syntax highlighting that replaces
  * the old lexical analysis code with proper AST-based highlighting.
- * Only Lua is supported in this build to minimize binary size.
+ * Supported languages: Lua, Alda, Csound, Joy, Haskell, Scheme.
  */
 
 #ifndef LOKI_TREESITTER_H

@@ -77,6 +77,9 @@ static command_def_t builtin_commands[] = {
     /* Plugin control (plugin.c) */
     {"plugin", cmd_plugin,      "Plugin preset control",          0, -1},
 
+    /* Theme switching (theme.c) */
+    {"theme",  cmd_theme,       "List or switch themes",          0, 1},
+
     {NULL, NULL, NULL, 0, 0}  /* Sentinel */
 };
 

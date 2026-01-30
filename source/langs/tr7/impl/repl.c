@@ -671,7 +671,11 @@ static void tr7_repl_loop(editor_ctx_t *syntax_ctx) {
         return;
     }
 
+#ifdef LOKI_USE_LINENOISE
+    repl_editor_init_with_language(&ed, REPL_LANG_SCHEME);
+#else
     repl_editor_init(&ed);
+#endif
 
     /* Set up tab completion for TR7 music primitives */
     repl_set_completion_words(&ed, tr7_completion_words, TR7_COMPLETION_WORD_COUNT);

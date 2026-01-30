@@ -1,0 +1,17 @@
+{
+  "name": "tree-sitter-alda",
+  "version": "0.1.0",
+  "description": "Tree-sitter grammar for Alda music notation language",
+  "main": "bindings/node",
+  "keywords": ["parser", "alda", "music"],
+  "tree-sitter": [
+    {
+      "scope": "source.alda",
+      "file-types": ["alda"],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "devDependencies": {
+    "tree-sitter-cli": "^0.20.0"
+  }
+}

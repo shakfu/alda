@@ -3,7 +3,7 @@
  * @brief Tree-sitter syntax highlighting for editor buffers.
  *
  * This module provides tree-sitter based syntax highlighting for the editor.
- * Only Lua is supported in this build to minimize binary size.
+ * Supported languages: Lua, Alda, Csound, Joy, Haskell, Scheme.
  */
 
 #include "treesitter.h"
@@ -15,8 +15,13 @@
 #include <string.h>
 #include <ctype.h>
 
-/* External tree-sitter language function */
+/* External tree-sitter language functions */
 extern const TSLanguage *tree_sitter_lua(void);
+extern const TSLanguage *tree_sitter_alda(void);
+extern const TSLanguage *tree_sitter_csound(void);
+extern const TSLanguage *tree_sitter_joy(void);
+extern const TSLanguage *tree_sitter_haskell(void);
+extern const TSLanguage *tree_sitter_scheme(void);
 
 /* Highlight query for Lua */
 static const char *LUA_HIGHLIGHT_QUERY =
@@ -37,6 +42,113 @@ static const char *LUA_HIGHLIGHT_QUERY =
     "(comment) @comment\n"
     "(number) @number\n"
     "(string) @string\n"
+;
+
+/* Highlight query for Alda */
+static const char *ALDA_HIGHLIGHT_QUERY =
+    "(comment) @comment\n"
+    "(string) @string\n"
+    "(note_length) @number\n"
+    "(duration_ms) @number\n"
+    "(duration_s) @number\n"
+    "(sexp_number) @number\n"
+    "(note_letter) @constant\n"
+    "(pitch) @constant\n"
+    "(accidental) @operator\n"
+    "(rest) @constant.builtin\n"
+    "(octave_set) @keyword\n"
+    "(octave_up) @operator\n"
+    "(octave_down) @operator\n"
+    "(chord) @constant\n"
+    "(instrument_call) @function\n"
+    "(identifier) @variable\n"
+    "(marker) @label\n"
+    "(at_marker) @label\n"
+    "(voice_marker) @keyword\n"
+    "(repeat_count) @number\n"
+    "(on_repetitions) @number\n"
+    "(sexp_symbol) @function.builtin\n"
+    "(quoted_list) @constant\n"
+    "(barline) @punctuation.delimiter\n"
+    "(dot) @operator\n"
+    "(tie_duration) @operator\n"
+    "\"=\" @operator\n"
+    "\"/\" @operator\n"
+    "\":\" @punctuation.delimiter\n"
+;
+
+/* Highlight query for Csound */
+static const char *CSOUND_HIGHLIGHT_QUERY =
+    "(comment) @comment\n"
+    "(block_comment) @comment\n"
+    "(xml_tag) @keyword.directive\n"
+    "(header_var) @variable.builtin\n"
+    "(instrument_keyword) @keyword.function\n"
+    "(opcode_keyword) @keyword.function\n"
+    "(block_keyword) @keyword\n"
+    "(control_keyword) @keyword.control\n"
+    "(type_keyword) @keyword\n"
+    "(variable) @variable\n"
+    "(pfield) @variable.parameter\n"
+    "(number) @number\n"
+    "(string) @string\n"
+    "(operator) @operator\n"
+    "(identifier) @function\n"
+;
+
+/* Highlight query for Joy */
+static const char *JOY_HIGHLIGHT_QUERY =
+    "(library_keyword) @keyword\n"
+    "\"==\" @keyword.operator\n"
+    "(boolean) @constant.builtin\n"
+    "(null) @constant.builtin\n"
+    "(integer) @number\n"
+    "(float) @number\n"
+    "(character) @string\n"
+    "(string) @string\n"
+    "(interpolated_string) @string\n"
+    "(line_comment) @comment\n"
+    "(block_comment) @comment\n"
+    "(shell_escape) @comment\n"
+    "(operator) @operator\n"
+    "(cons_operator) @operator\n"
+    "(definition name: (symbol) @function)\n"
+    "(symbol) @variable\n"
+    "[\"[\" \"]\"] @punctuation.bracket\n"
+    "[\"{\" \"}\"] @punctuation.bracket\n"
+    "\".\" @punctuation.delimiter\n"
+    "(semicolon) @punctuation.delimiter\n"
+;
+
+/* Highlight query for Haskell (simplified) */
+static const char *HASKELL_HIGHLIGHT_QUERY =
+    "(variable) @variable\n"
+    "(integer) @number\n"
+    "(negation) @number\n"
+    "(char) @string\n"
+    "(string) @string\n"
+    "(comment) @comment\n"
+    "[\"(\" \")\" \"{\" \"}\" \"[\" \"]\"] @punctuation.bracket\n"
+    "[\",\" \";\"] @punctuation.delimiter\n"
+    "[\"if\" \"then\" \"else\" \"case\" \"of\"] @keyword.conditional\n"
+    "[\"import\" \"qualified\" \"module\"] @keyword\n"
+    "[\"where\" \"let\" \"in\" \"class\" \"instance\" \"data\"\n"
+    " \"newtype\" \"type\" \"do\"] @keyword\n"
+    "[(operator) \".\" \"=\" \"|\" \"::\" \"=>\" \"->\" \"<-\"] @operator\n"
+    "(name) @type\n"
+    "(constructor) @constructor\n"
+;
+
+/* Highlight query for Scheme */
+static const char *SCHEME_HIGHLIGHT_QUERY =
+    "[\"(\" \")\" \"[\" \"]\" \"{\" \"}\"] @punctuation.bracket\n"
+    "(number) @number\n"
+    "(character) @constant.builtin\n"
+    "(boolean) @constant.builtin\n"
+    "(symbol) @variable\n"
+    "(string) @string\n"
+    "(list . (symbol) @function)\n"
+    "[(comment) (block_comment) (directive)] @comment\n"
 ;
 
 /**
@@ -93,6 +205,21 @@ const TSLanguage *treesitter_get_language(const char *lang_name) {
     if (strcmp(lang_name, "lua") == 0) {
         return tree_sitter_lua();
     }
+    if (strcmp(lang_name, "alda") == 0) {
+        return tree_sitter_alda();
+    }
+    if (strcmp(lang_name, "csound") == 0) {
+        return tree_sitter_csound();
+    }
+    if (strcmp(lang_name, "joy") == 0) {
+        return tree_sitter_joy();
+    }
+    if (strcmp(lang_name, "haskell") == 0) {
+        return tree_sitter_haskell();
+    }
+    if (strcmp(lang_name, "scheme") == 0) {
+        return tree_sitter_scheme();
+    }
 
     return NULL;
 }
@@ -102,6 +229,21 @@ static const char *get_highlight_query(const char *lang_name) {
 
     if (strcmp(lang_name, "lua") == 0) {
         return LUA_HIGHLIGHT_QUERY;
+    }
+    if (strcmp(lang_name, "alda") == 0) {
+        return ALDA_HIGHLIGHT_QUERY;
+    }
+    if (strcmp(lang_name, "csound") == 0) {
+        return CSOUND_HIGHLIGHT_QUERY;
+    }
+    if (strcmp(lang_name, "joy") == 0) {
+        return JOY_HIGHLIGHT_QUERY;
+    }
+    if (strcmp(lang_name, "haskell") == 0) {
+        return HASKELL_HIGHLIGHT_QUERY;
+    }
+    if (strcmp(lang_name, "scheme") == 0) {
+        return SCHEME_HIGHLIGHT_QUERY;
     }
 
     return NULL;
@@ -115,6 +257,16 @@ const char *treesitter_lang_from_filename(const char *filename) {
     ext++; /* Skip the dot */
 
     if (strcmp(ext, "lua") == 0) return "lua";
+    if (strcmp(ext, "alda") == 0) return "alda";
+    if (strcmp(ext, "csd") == 0) return "csound";
+    if (strcmp(ext, "orc") == 0) return "csound";
+    if (strcmp(ext, "sco") == 0) return "csound";
+    if (strcmp(ext, "joy") == 0) return "joy";
+    if (strcmp(ext, "hs") == 0) return "haskell";
+    if (strcmp(ext, "lhs") == 0) return "haskell";
+    if (strcmp(ext, "scm") == 0) return "scheme";
+    if (strcmp(ext, "ss") == 0) return "scheme";
+    if (strcmp(ext, "rkt") == 0) return "scheme";
 
     return NULL;
 }

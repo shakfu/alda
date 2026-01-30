@@ -1,0 +1,719 @@
+[
+  {
+    "type": "accidental",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "bracket_seq",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "at_marker",
+          "named": true
+        },
+        {
+          "type": "barline",
+          "named": true
+        },
+        {
+          "type": "bracket_seq",
+          "named": true
+        },
+        {
+          "type": "chord",
+          "named": true
+        },
+        {
+          "type": "cram",
+          "named": true
+        },
+        {
+          "type": "duration",
+          "named": true
+        },
+        {
+          "type": "marker",
+          "named": true
+        },
+        {
+          "type": "note",
+          "named": true
+        },
+        {
+          "type": "octave_down",
+          "named": true
+        },
+        {
+          "type": "octave_set",
+          "named": true
+        },
+        {
+          "type": "octave_up",
+          "named": true
+        },
+        {
+          "type": "on_repetitions",
+          "named": true
+        },
+        {
+          "type": "repeat_count",
+          "named": true
+        },
+        {
+          "type": "rest",
+          "named": true
+        },
+        {
+          "type": "sexp",
+          "named": true
+        },
+        {
+          "type": "voice_marker",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "chord",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "duration",
+          "named": true
+        },
+        {
+          "type": "octave_down",
+          "named": true
+        },
+        {
+          "type": "octave_up",
+          "named": true
+        },
+        {
+          "type": "on_repetitions",
+          "named": true
+        },
+        {
+          "type": "pitch",
+          "named": true
+        },
+        {
+          "type": "repeat_count",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "cram",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "at_marker",
+          "named": true
+        },
+        {
+          "type": "barline",
+          "named": true
+        },
+        {
+          "type": "bracket_seq",
+          "named": true
+        },
+        {
+          "type": "chord",
+          "named": true
+        },
+        {
+          "type": "cram",
+          "named": true
+        },
+        {
+          "type": "duration",
+          "named": true
+        },
+        {
+          "type": "marker",
+          "named": true
+        },
+        {
+          "type": "note",
+          "named": true
+        },
+        {
+          "type": "octave_down",
+          "named": true
+        },
+        {
+          "type": "octave_set",
+          "named": true
+        },
+        {
+          "type": "octave_up",
+          "named": true
+        },
+        {
+          "type": "repeat_count",
+          "named": true
+        },
+        {
+          "type": "rest",
+          "named": true
+        },
+        {
+          "type": "sexp",
+          "named": true
+        },
+        {
+          "type": "voice_marker",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "duration",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "dot",
+          "named": true
+        },
+        {
+          "type": "duration_ms",
+          "named": true
+        },
+        {
+          "type": "duration_s",
+          "named": true
+        },
+        {
+          "type": "note_length",
+          "named": true
+        },
+        {
+          "type": "tie_duration",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "instrument_call",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "note",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "duration",
+          "named": true
+        },
+        {
+          "type": "on_repetitions",
+          "named": true
+        },
+        {
+          "type": "pitch",
+          "named": true
+        },
+        {
+          "type": "repeat_count",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "part_declaration",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "at_marker",
+          "named": true
+        },
+        {
+          "type": "barline",
+          "named": true
+        },
+        {
+          "type": "bracket_seq",
+          "named": true
+        },
+        {
+          "type": "chord",
+          "named": true
+        },
+        {
+          "type": "cram",
+          "named": true
+        },
+        {
+          "type": "instrument_call",
+          "named": true
+        },
+        {
+          "type": "marker",
+          "named": true
+        },
+        {
+          "type": "note",
+          "named": true
+        },
+        {
+          "type": "octave_down",
+          "named": true
+        },
+        {
+          "type": "octave_set",
+          "named": true
+        },
+        {
+          "type": "octave_up",
+          "named": true
+        },
+        {
+          "type": "rest",
+          "named": true
+        },
+        {
+          "type": "sexp",
+          "named": true
+        },
+        {
+          "type": "voice_marker",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "pitch",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "accidental",
+          "named": true
+        },
+        {
+          "type": "note_letter",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "quoted_list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "sexp",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "rest",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "duration",
+          "named": true
+        },
+        {
+          "type": "on_repetitions",
+          "named": true
+        },
+        {
+          "type": "repeat_count",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "sexp",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "quoted_list",
+          "named": true
+        },
+        {
+          "type": "sexp",
+          "named": true
+        },
+        {
+          "type": "sexp_number",
+          "named": true
+        },
+        {
+          "type": "sexp_symbol",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "source_file",
+    "named": true,
+    "root": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "at_marker",
+          "named": true
+        },
+        {
+          "type": "barline",
+          "named": true
+        },
+        {
+          "type": "bracket_seq",
+          "named": true
+        },
+        {
+          "type": "chord",
+          "named": true
+        },
+        {
+          "type": "cram",
+          "named": true
+        },
+        {
+          "type": "marker",
+          "named": true
+        },
+        {
+          "type": "note",
+          "named": true
+        },
+        {
+          "type": "octave_down",
+          "named": true
+        },
+        {
+          "type": "octave_set",
+          "named": true
+        },
+        {
+          "type": "octave_up",
+          "named": true
+        },
+        {
+          "type": "part_declaration",
+          "named": true
+        },
+        {
+          "type": "rest",
+          "named": true
+        },
+        {
+          "type": "sexp",
+          "named": true
+        },
+        {
+          "type": "variable_definition",
+          "named": true
+        },
+        {
+          "type": "voice_marker",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "tie_duration",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "dot",
+          "named": true
+        },
+        {
+          "type": "duration_ms",
+          "named": true
+        },
+        {
+          "type": "duration_s",
+          "named": true
+        },
+        {
+          "type": "note_length",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "variable_definition",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "at_marker",
+          "named": true
+        },
+        {
+          "type": "barline",
+          "named": true
+        },
+        {
+          "type": "bracket_seq",
+          "named": true
+        },
+        {
+          "type": "chord",
+          "named": true
+        },
+        {
+          "type": "cram",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "marker",
+          "named": true
+        },
+        {
+          "type": "note",
+          "named": true
+        },
+        {
+          "type": "octave_down",
+          "named": true
+        },
+        {
+          "type": "octave_set",
+          "named": true
+        },
+        {
+          "type": "octave_up",
+          "named": true
+        },
+        {
+          "type": "rest",
+          "named": true
+        },
+        {
+          "type": "sexp",
+          "named": true
+        },
+        {
+          "type": "voice_marker",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "'",
+    "named": false
+  },
+  {
+    "type": "(",
+    "named": false
+  },
+  {
+    "type": ")",
+    "named": false
+  },
+  {
+    "type": "+",
+    "named": false
+  },
+  {
+    "type": "-",
+    "named": false
+  },
+  {
+    "type": "/",
+    "named": false
+  },
+  {
+    "type": ":",
+    "named": false
+  },
+  {
+    "type": "=",
+    "named": false
+  },
+  {
+    "type": "[",
+    "named": false
+  },
+  {
+    "type": "]",
+    "named": false
+  },
+  {
+    "type": "_",
+    "named": false
+  },
+  {
+    "type": "at_marker",
+    "named": true
+  },
+  {
+    "type": "barline",
+    "named": true
+  },
+  {
+    "type": "comment",
+    "named": true,
+    "extra": true
+  },
+  {
+    "type": "dot",
+    "named": true
+  },
+  {
+    "type": "duration_ms",
+    "named": true
+  },
+  {
+    "type": "duration_s",
+    "named": true
+  },
+  {
+    "type": "identifier",
+    "named": true
+  },
+  {
+    "type": "marker",
+    "named": true
+  },
+  {
+    "type": "note_length",
+    "named": true
+  },
+  {
+    "type": "note_letter",
+    "named": true
+  },
+  {
+    "type": "octave_down",
+    "named": true
+  },
+  {
+    "type": "octave_set",
+    "named": true
+  },
+  {
+    "type": "octave_up",
+    "named": true
+  },
+  {
+    "type": "on_repetitions",
+    "named": true
+  },
+  {
+    "type": "repeat_count",
+    "named": true
+  },
+  {
+    "type": "sexp_number",
+    "named": true
+  },
+  {
+    "type": "sexp_symbol",
+    "named": true
+  },
+  {
+    "type": "string",
+    "named": true
+  },
+  {
+    "type": "voice_marker",
+    "named": true
+  },
+  {
+    "type": "{",
+    "named": false
+  },
+  {
+    "type": "}",
+    "named": false
+  },
+  {
+    "type": "~",
+    "named": false
+  }
+]

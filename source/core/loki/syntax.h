@@ -43,4 +43,10 @@ int syntax_row_has_open_comment(t_erow *row);
  * Sets up RGB color values for all HL_* types with sensible defaults. */
 void syntax_init_default_colors(editor_ctx_t *ctx);
 
+#ifdef LOKI_USE_LINENOISE
+/* Apply current theme colors to the editor's color array.
+ * Called by :theme command to update colors after theme change. */
+void syntax_apply_theme_colors(editor_ctx_t *ctx);
+#endif
+
 #endif /* LOKI_SYNTAX_H */

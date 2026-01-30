@@ -1,6 +1,10 @@
 /**
  * @file repl.h
  * @brief Common REPL infrastructure - types and functions shared by all language REPLs.
+ *
+ * When LOKI_USE_LINENOISE is defined, provides linenoise-based line editing
+ * with tree-sitter syntax highlighting. Otherwise, provides a fallback
+ * implementation using the editor's terminal handling.
  */
 
 #ifndef PSND_REPL_H
@@ -8,7 +12,13 @@
 
 #include "loki/internal.h"
 
+#ifdef LOKI_USE_LINENOISE
+#include <linenoise.h>
+#include "loki/repl_linenoise.h"
+#endif
+
 #define MAX_INPUT_LENGTH 1024
+#define REPL_MAX_INPUT_LENGTH MAX_INPUT_LENGTH  /* Alias for compatibility */
 #define REPL_HISTORY_MAX 64
 
 /* Control key definitions */
@@ -63,10 +73,21 @@ typedef struct {
 
     /* Completion state */
     ReplCompletionState completion;        /* Current completion state */
+
+#ifdef LOKI_USE_LINENOISE
+    /* Linenoise context for this editor */
+    linenoise_context_t *ln_ctx;
+    ReplLanguage ln_lang;                  /* Language for syntax highlighting */
+#endif
 } ReplLineEditor;
 
-/* Initialize line editor state */
+/* Initialize line editor state (defaults to REPL_LANG_LUA) */
 void repl_editor_init(ReplLineEditor *ed);
+
+/* Initialize line editor with specific language for syntax highlighting */
+#ifdef LOKI_USE_LINENOISE
+void repl_editor_init_with_language(ReplLineEditor *ed, ReplLanguage lang);
+#endif
 
 /* Cleanup line editor (free history) */
 void repl_editor_cleanup(ReplLineEditor *ed);

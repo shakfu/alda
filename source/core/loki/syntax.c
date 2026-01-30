@@ -10,6 +10,9 @@
  *
  * The highlighting is performed on the "rendered" version of each row
  * (after tab expansion) and stores highlight types in the row->hl array.
+ *
+ * When built with linenoise support (LOKI_USE_LINENOISE), colors are
+ * pulled from the current tree-sitter theme for consistency.
  */
 
 #include "syntax.h"
@@ -18,6 +21,10 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdio.h>
+
+#ifdef LOKI_USE_LINENOISE
+#include <syntax/theme.h>
+#endif
 
 /* ====================== Syntax highlight color scheme  ==================== */
 
@@ -267,10 +274,118 @@ void syntax_select_for_filename(editor_ctx_t *ctx, char *filename) {
     }
 }
 
+#ifdef LOKI_USE_LINENOISE
+/* Convert 256-color palette index to RGB.
+ * Handles: 0-15 (standard), 16-231 (6x6x6 cube), 232-255 (grayscale) */
+static void color256_to_rgb(unsigned char c, int *r, int *g, int *b) {
+    if (c == 0) {
+        /* Color 0 means "default" - use light gray */
+        *r = 200; *g = 200; *b = 200;
+    } else if (c < 16) {
+        /* Standard ANSI colors */
+        static const int ansi[16][3] = {
+            {0, 0, 0},       /* 0: black */
+            {205, 49, 49},   /* 1: red */
+            {13, 188, 121},  /* 2: green */
+            {229, 229, 16},  /* 3: yellow */
+            {36, 114, 200},  /* 4: blue */
+            {188, 63, 188},  /* 5: magenta */
+            {17, 168, 205},  /* 6: cyan */
+            {229, 229, 229}, /* 7: white */
+            {102, 102, 102}, /* 8: bright black */
+            {241, 76, 76},   /* 9: bright red */
+            {35, 209, 139},  /* 10: bright green */
+            {245, 245, 67},  /* 11: bright yellow */
+            {59, 142, 234},  /* 12: bright blue */
+            {214, 112, 214}, /* 13: bright magenta */
+            {41, 184, 219},  /* 14: bright cyan */
+            {255, 255, 255}, /* 15: bright white */
+        };
+        *r = ansi[c][0]; *g = ansi[c][1]; *b = ansi[c][2];
+    } else if (c < 232) {
+        /* 6x6x6 color cube (indices 16-231) */
+        int idx = c - 16;
+        int ri = idx / 36;
+        int gi = (idx % 36) / 6;
+        int bi = idx % 6;
+        *r = ri ? (ri * 40 + 55) : 0;
+        *g = gi ? (gi * 40 + 55) : 0;
+        *b = bi ? (bi * 40 + 55) : 0;
+    } else {
+        /* Grayscale (indices 232-255) */
+        int gray = (c - 232) * 10 + 8;
+        *r = gray; *g = gray; *b = gray;
+    }
+}
+
+/* Apply current theme colors to the editor's color array */
+void syntax_apply_theme_colors(editor_ctx_t *ctx) {
+    int r, g, b;
+
+    /* HL_NORMAL - default foreground */
+    color256_to_rgb(theme_color(TOK_DEFAULT), &r, &g, &b);
+    ctx->view.colors[HL_NORMAL].r = r;
+    ctx->view.colors[HL_NORMAL].g = g;
+    ctx->view.colors[HL_NORMAL].b = b;
+
+    /* HL_NONPRINT - use muted color */
+    color256_to_rgb(theme_color(TOK_COMMENT), &r, &g, &b);
+    ctx->view.colors[HL_NONPRINT].r = r / 2;
+    ctx->view.colors[HL_NONPRINT].g = g / 2;
+    ctx->view.colors[HL_NONPRINT].b = b / 2;
+
+    /* HL_COMMENT */
+    color256_to_rgb(theme_color(TOK_COMMENT), &r, &g, &b);
+    ctx->view.colors[HL_COMMENT].r = r;
+    ctx->view.colors[HL_COMMENT].g = g;
+    ctx->view.colors[HL_COMMENT].b = b;
+
+    /* HL_MLCOMMENT - same as comment */
+    ctx->view.colors[HL_MLCOMMENT].r = r;
+    ctx->view.colors[HL_MLCOMMENT].g = g;
+    ctx->view.colors[HL_MLCOMMENT].b = b;
+
+    /* HL_KEYWORD1 - primary keywords */
+    color256_to_rgb(theme_color(TOK_KEYWORD), &r, &g, &b);
+    ctx->view.colors[HL_KEYWORD1].r = r;
+    ctx->view.colors[HL_KEYWORD1].g = g;
+    ctx->view.colors[HL_KEYWORD1].b = b;
+
+    /* HL_KEYWORD2 - type keywords */
+    color256_to_rgb(theme_color(TOK_TYPE), &r, &g, &b);
+    ctx->view.colors[HL_KEYWORD2].r = r;
+    ctx->view.colors[HL_KEYWORD2].g = g;
+    ctx->view.colors[HL_KEYWORD2].b = b;
+
+    /* HL_STRING */
+    color256_to_rgb(theme_color(TOK_STRING), &r, &g, &b);
+    ctx->view.colors[HL_STRING].r = r;
+    ctx->view.colors[HL_STRING].g = g;
+    ctx->view.colors[HL_STRING].b = b;
+
+    /* HL_NUMBER */
+    color256_to_rgb(theme_color(TOK_NUMBER), &r, &g, &b);
+    ctx->view.colors[HL_NUMBER].r = r;
+    ctx->view.colors[HL_NUMBER].g = g;
+    ctx->view.colors[HL_NUMBER].b = b;
+
+    /* HL_MATCH - search match highlight (use function color for visibility) */
+    color256_to_rgb(theme_color(TOK_FUNCTION), &r, &g, &b);
+    ctx->view.colors[HL_MATCH].r = r;
+    ctx->view.colors[HL_MATCH].g = g;
+    ctx->view.colors[HL_MATCH].b = b;
+}
+#endif
+
 /* Initialize default syntax highlighting colors.
  * Colors are stored as RGB values and rendered using true color escape codes.
- * These defaults match the visual appearance of the original ANSI color scheme. */
+ * When built with linenoise, colors come from the current theme. */
 void syntax_init_default_colors(editor_ctx_t *ctx) {
+#ifdef LOKI_USE_LINENOISE
+    /* Use colors from the current theme */
+    syntax_apply_theme_colors(ctx);
+#else
+    /* Fallback: hardcoded colors matching original appearance */
     /* HL_NORMAL */
     ctx->view.colors[0].r = 200; ctx->view.colors[0].g = 200; ctx->view.colors[0].b = 200;
     /* HL_NONPRINT */
@@ -289,4 +404,5 @@ void syntax_init_default_colors(editor_ctx_t *ctx) {
     ctx->view.colors[7].r = 200; ctx->view.colors[7].g = 100; ctx->view.colors[7].b = 200;
     /* HL_MATCH */
     ctx->view.colors[8].r = 100; ctx->view.colors[8].g = 150; ctx->view.colors[8].b = 220;
+#endif
 }

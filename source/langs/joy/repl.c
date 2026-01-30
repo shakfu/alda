@@ -190,7 +190,11 @@ static void joy_repl_loop(JoyContext *ctx, editor_ctx_t *syntax_ctx) {
         return;
     }
 
+#ifdef LOKI_USE_LINENOISE
+    repl_editor_init_with_language(&ed, REPL_LANG_JOY);
+#else
     repl_editor_init(&ed);
+#endif
 
     /* Set up tab completion for Joy dictionary words */
     repl_set_completion(&ed, joy_completion_callback, ctx);

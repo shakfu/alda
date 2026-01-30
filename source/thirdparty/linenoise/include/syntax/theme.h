@@ -128,6 +128,27 @@ extern const syntax_theme_t theme_one_dark;
 /* Simple 16-color theme for basic terminals */
 extern const syntax_theme_t theme_basic16;
 
+/* Catppuccin Mocha - Soothing pastel theme */
+extern const syntax_theme_t theme_catppuccin;
+
+/* Tokyo Night - Dark theme inspired by Tokyo city lights */
+extern const syntax_theme_t theme_tokyo_night;
+
+/* Everforest - Green-based nature theme */
+extern const syntax_theme_t theme_everforest;
+
+/* Kanagawa - Inspired by Hokusai's The Great Wave */
+extern const syntax_theme_t theme_kanagawa;
+
+/* Rose Pine - Elegant, soft theme */
+extern const syntax_theme_t theme_rose_pine;
+
+/* Palenight - Material palenight theme */
+extern const syntax_theme_t theme_palenight;
+
+/* Ayu Dark - Warm dark theme */
+extern const syntax_theme_t theme_ayu_dark;
+
 /* Default theme (alias for monokai) */
 extern const syntax_theme_t theme_default;
 

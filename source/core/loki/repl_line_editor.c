@@ -31,6 +31,19 @@
  * Line Editor State Management
  * ============================================================================ */
 
+#ifdef LOKI_USE_LINENOISE
+void repl_editor_init_with_language(ReplLineEditor *ed, ReplLanguage lang) {
+    memset(ed, 0, sizeof(*ed));
+    ed->history_idx = -1;
+
+    /* Initialize linenoise context with specified language */
+    if (repl_linenoise_init(lang) == 0) {
+        ed->ln_ctx = repl_linenoise_get_context();
+        ed->ln_lang = lang;
+    }
+}
+#endif
+
 void repl_editor_init(ReplLineEditor *ed) {
     memset(ed, 0, sizeof(*ed));
     ed->history_idx = -1;

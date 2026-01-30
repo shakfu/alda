@@ -80,8 +80,13 @@ typedef struct {
 #endif
 } ReplLineEditor;
 
-/* Initialize line editor state */
+/* Initialize line editor state (defaults to REPL_LANG_LUA) */
 void repl_editor_init(ReplLineEditor *ed);
+
+/* Initialize line editor with specific language for syntax highlighting */
+#ifdef LOKI_USE_LINENOISE
+void repl_editor_init_with_language(ReplLineEditor *ed, ReplLanguage lang);
+#endif
 
 /* Cleanup line editor (free history) */
 void repl_editor_cleanup(ReplLineEditor *ed);
