@@ -1,0 +1,82 @@
+# Dracula Theme for Loki Editor
+# Based on https://draculatheme.com 
+
+[meta]
+name = "Dracula"
+description = "Based on https://draculatheme.com "
+
+[colors]
+# Base
+normal = [248, 248, 242]
+nonprint = [68, 71, 90]
+comment = [98, 114, 164]
+mlcomment = [98, 114, 164]
+keyword1 = [255, 121, 198]
+keyword2 = [139, 233, 253]
+string = [241, 250, 140]
+number = [189, 147, 249]
+match = [80, 250, 123]
+
+# Function
+function = [80, 250, 123]
+function_builtin = [139, 233, 253]
+function_call = [80, 250, 123]
+function_method = [80, 250, 123]
+function_macro = [139, 233, 253]
+
+# Variable
+variable = [248, 248, 242]
+variable_builtin = [189, 147, 249]
+variable_parameter = [255, 184, 108]
+variable_field = [248, 248, 242]
+variable_property = [248, 248, 242]
+
+# Keyword
+keyword_control = [255, 121, 198]
+keyword_function = [139, 233, 253]
+keyword_return = [255, 121, 198]
+keyword_operator = [255, 121, 198]
+keyword_import = [255, 121, 198]
+keyword_type = [139, 233, 253]
+keyword_modifier = [255, 121, 198]
+
+# String
+string_escape = [255, 121, 198]
+string_regex = [255, 85, 85]
+string_special = [241, 250, 140]
+
+# Number
+number_float = [189, 147, 249]
+
+# Literal
+boolean = [189, 147, 249]
+constant = [189, 147, 249]
+constant_builtin = [189, 147, 249]
+
+# Comment
+comment_doc = [98, 114, 164]
+
+# Type
+type = [139, 233, 253]
+type_builtin = [139, 233, 253]
+type_parameter = [255, 184, 108]
+type_qualifier = [255, 121, 198]
+
+# Operator
+operator = [255, 121, 198]
+punctuation = [248, 248, 242]
+punctuation_bracket = [248, 248, 242]
+punctuation_delimiter = [248, 248, 242]
+
+# Special
+constructor = [139, 233, 253]
+namespace = [255, 121, 198]
+module = [255, 121, 198]
+label = [139, 233, 253]
+tag = [255, 121, 198]
+tag_attribute = [80, 250, 123]
+preprocessor = [255, 121, 198]
+
+# Diagnostic
+error = [255, 85, 85]
+warning = [255, 184, 108]

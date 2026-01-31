@@ -6,6 +6,10 @@ set(PSND_BUILD_TESTING ${BUILD_TESTING})
 # Lua 5.5.0 - Embedded scripting language
 add_subdirectory(lua-5.5.0)
 
+# tomlc99 - TOML configuration file parser (MIT License)
+# Used for declarative config files (.psnd/config.toml, themes/*.toml)
+add_subdirectory(tomlc99)
+
 # libremidi - Cross-platform MIDI I/O (C++ library)
 set(LIBREMIDI_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LIBREMIDI_TESTS OFF CACHE BOOL "" FORCE)

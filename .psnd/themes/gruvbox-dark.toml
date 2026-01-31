@@ -1,0 +1,82 @@
+# Gruvbox Dark Theme for Loki Editor
+# Based on https://github.com/morhetz/gruvbox 
+
+[meta]
+name = "Gruvbox Dark"
+description = "Based on https://github.com/morhetz/gruvbox "
+
+[colors]
+# Base
+normal = [235, 219, 178]
+nonprint = [146, 131, 116]
+comment = [146, 131, 116]
+mlcomment = [146, 131, 116]
+keyword1 = [251, 73, 52]
+keyword2 = [131, 165, 152]
+string = [184, 187, 38]
+number = [211, 134, 155]
+match = [250, 189, 47]
+
+# Function
+function = [184, 187, 38]
+function_builtin = [142, 192, 124]
+function_call = [184, 187, 38]
+function_method = [184, 187, 38]
+function_macro = [142, 192, 124]
+
+# Variable
+variable = [235, 219, 178]
+variable_builtin = [254, 128, 25]
+variable_parameter = [131, 165, 152]
+variable_field = [235, 219, 178]
+variable_property = [235, 219, 178]
+
+# Keyword
+keyword_control = [251, 73, 52]
+keyword_function = [142, 192, 124]
+keyword_return = [251, 73, 52]
+keyword_operator = [251, 73, 52]
+keyword_import = [142, 192, 124]
+keyword_type = [250, 189, 47]
+keyword_modifier = [251, 73, 52]
+
+# String
+string_escape = [254, 128, 25]
+string_regex = [184, 187, 38]
+string_special = [184, 187, 38]
+
+# Number
+number_float = [211, 134, 155]
+
+# Literal
+boolean = [211, 134, 155]
+constant = [211, 134, 155]
+constant_builtin = [254, 128, 25]
+
+# Comment
+comment_doc = [146, 131, 116]
+
+# Type
+type = [250, 189, 47]
+type_builtin = [250, 189, 47]
+type_parameter = [131, 165, 152]
+type_qualifier = [251, 73, 52]
+
+# Operator
+operator = [235, 219, 178]
+punctuation = [235, 219, 178]
+punctuation_bracket = [235, 219, 178]
+punctuation_delimiter = [168, 153, 132]
+
+# Special
+constructor = [250, 189, 47]
+namespace = [142, 192, 124]
+module = [142, 192, 124]
+label = [142, 192, 124]
+tag = [251, 73, 52]
+tag_attribute = [250, 189, 47]
+preprocessor = [142, 192, 124]
+
+# Diagnostic
+error = [251, 73, 52]
+warning = [250, 189, 47]

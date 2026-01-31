@@ -1,0 +1,82 @@
+# Nord Theme for Loki Editor
+# Based on https://www.nordtheme.com 
+
+[meta]
+name = "Nord"
+description = "Based on https://www.nordtheme.com "
+
+[colors]
+# Base
+normal = [216, 222, 233]
+nonprint = [76, 86, 106]
+comment = [136, 192, 208]
+mlcomment = [136, 192, 208]
+keyword1 = [129, 161, 193]
+keyword2 = [143, 188, 187]
+string = [163, 190, 140]
+number = [180, 142, 173]
+match = [235, 203, 139]
+
+# Function
+function = [136, 192, 208]
+function_builtin = [94, 129, 172]
+function_call = [136, 192, 208]
+function_method = [136, 192, 208]
+function_macro = [180, 142, 173]
+
+# Variable
+variable = [216, 222, 233]
+variable_builtin = [208, 135, 112]
+variable_parameter = [216, 222, 233]
+variable_field = [143, 188, 187]
+variable_property = [143, 188, 187]
+
+# Keyword
+keyword_control = [129, 161, 193]
+keyword_function = [129, 161, 193]
+keyword_return = [129, 161, 193]
+keyword_operator = [129, 161, 193]
+keyword_import = [129, 161, 193]
+keyword_type = [129, 161, 193]
+keyword_modifier = [129, 161, 193]
+
+# String
+string_escape = [235, 203, 139]
+string_regex = [208, 135, 112]
+string_special = [163, 190, 140]
+
+# Number
+number_float = [180, 142, 173]
+
+# Literal
+boolean = [94, 129, 172]
+constant = [143, 188, 187]
+constant_builtin = [94, 129, 172]
+
+# Comment
+comment_doc = [136, 192, 208]
+
+# Type
+type = [143, 188, 187]
+type_builtin = [143, 188, 187]
+type_parameter = [143, 188, 187]
+type_qualifier = [129, 161, 193]
+
+# Operator
+operator = [129, 161, 193]
+punctuation = [216, 222, 233]
+punctuation_bracket = [216, 222, 233]
+punctuation_delimiter = [216, 222, 233]
+
+# Special
+constructor = [143, 188, 187]
+namespace = [129, 161, 193]
+module = [143, 188, 187]
+label = [235, 203, 139]
+tag = [129, 161, 193]
+tag_attribute = [143, 188, 187]
+preprocessor = [180, 142, 173]
+
+# Diagnostic
+error = [191, 97, 106]
+warning = [235, 203, 139]

@@ -1,0 +1,82 @@
+# Ayu Dark Theme for Loki Editor
+# Based on https://github.com/ayu-theme/ayu-colors 
+
+[meta]
+name = "Ayu Dark"
+description = "Based on https://github.com/ayu-theme/ayu-colors "
+
+[colors]
+# Base
+normal = [191, 189, 182]
+nonprint = [98, 106, 115]
+comment = [98, 106, 115]
+mlcomment = [98, 106, 115]
+keyword1 = [255, 143, 64]
+keyword2 = [115, 208, 255]
+string = [170, 217, 76]
+number = [210, 166, 255]
+match = [230, 180, 80]
+
+# Function
+function = [230, 180, 80]
+function_builtin = [115, 208, 255]
+function_call = [230, 180, 80]
+function_method = [230, 180, 80]
+function_macro = [255, 143, 64]
+
+# Variable
+variable = [191, 189, 182]
+variable_builtin = [240, 113, 120]
+variable_parameter = [89, 194, 255]
+variable_field = [191, 189, 182]
+variable_property = [191, 189, 182]
+
+# Keyword
+keyword_control = [255, 143, 64]
+keyword_function = [255, 143, 64]
+keyword_return = [255, 143, 64]
+keyword_operator = [255, 143, 64]
+keyword_import = [255, 143, 64]
+keyword_type = [115, 208, 255]
+keyword_modifier = [255, 143, 64]
+
+# String
+string_escape = [115, 208, 255]
+string_regex = [170, 217, 76]
+string_special = [170, 217, 76]
+
+# Number
+number_float = [210, 166, 255]
+
+# Literal
+boolean = [255, 143, 64]
+constant = [210, 166, 255]
+constant_builtin = [255, 143, 64]
+
+# Comment
+comment_doc = [98, 106, 115]
+
+# Type
+type = [115, 208, 255]
+type_builtin = [115, 208, 255]
+type_parameter = [115, 208, 255]
+type_qualifier = [255, 143, 64]
+
+# Operator
+operator = [255, 143, 64]
+punctuation = [191, 189, 182]
+punctuation_bracket = [98, 106, 115]
+punctuation_delimiter = [191, 189, 182]
+
+# Special
+constructor = [115, 208, 255]
+namespace = [89, 194, 255]
+module = [89, 194, 255]
+label = [230, 180, 80]
+tag = [255, 143, 64]
+tag_attribute = [115, 208, 255]
+preprocessor = [255, 143, 64]
+
+# Diagnostic
+error = [240, 113, 120]
+warning = [230, 180, 80]

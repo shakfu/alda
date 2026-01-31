@@ -1,0 +1,82 @@
+# Rose Pine Theme for Loki Editor
+# Based on https://rosepinetheme.com/ 
+
+[meta]
+name = "Rose Pine"
+description = "Based on https://rosepinetheme.com/ "
+
+[colors]
+# Base
+normal = [224, 222, 244]
+nonprint = [110, 106, 134]
+comment = [110, 106, 134]
+mlcomment = [110, 106, 134]
+keyword1 = [49, 116, 143]
+keyword2 = [156, 207, 216]
+string = [246, 193, 119]
+number = [235, 188, 186]
+match = [246, 193, 119]
+
+# Function
+function = [235, 188, 186]
+function_builtin = [156, 207, 216]
+function_call = [235, 188, 186]
+function_method = [235, 188, 186]
+function_macro = [196, 167, 231]
+
+# Variable
+variable = [224, 222, 244]
+variable_builtin = [235, 111, 146]
+variable_parameter = [196, 167, 231]
+variable_field = [224, 222, 244]
+variable_property = [224, 222, 244]
+
+# Keyword
+keyword_control = [49, 116, 143]
+keyword_function = [49, 116, 143]
+keyword_return = [49, 116, 143]
+keyword_operator = [144, 140, 170]
+keyword_import = [49, 116, 143]
+keyword_type = [156, 207, 216]
+keyword_modifier = [49, 116, 143]
+
+# String
+string_escape = [196, 167, 231]
+string_regex = [235, 111, 146]
+string_special = [246, 193, 119]
+
+# Number
+number_float = [235, 188, 186]
+
+# Literal
+boolean = [235, 188, 186]
+constant = [235, 188, 186]
+constant_builtin = [235, 111, 146]
+
+# Comment
+comment_doc = [144, 140, 170]
+
+# Type
+type = [156, 207, 216]
+type_builtin = [156, 207, 216]
+type_parameter = [196, 167, 231]
+type_qualifier = [49, 116, 143]
+
+# Operator
+operator = [144, 140, 170]
+punctuation = [144, 140, 170]
+punctuation_bracket = [144, 140, 170]
+punctuation_delimiter = [110, 106, 134]
+
+# Special
+constructor = [156, 207, 216]
+namespace = [196, 167, 231]
+module = [196, 167, 231]
+label = [246, 193, 119]
+tag = [156, 207, 216]
+tag_attribute = [196, 167, 231]
+preprocessor = [196, 167, 231]
+
+# Diagnostic
+error = [235, 111, 146]
+warning = [246, 193, 119]

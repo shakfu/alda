@@ -1,0 +1,47 @@
+# psnd Configuration
+# This file configures the psnd editor.
+# Settings here override defaults but can be overridden by CLI flags.
+
+[editor]
+# Color theme for syntax highlighting
+# Available themes: see .psnd/themes/ directory
+theme = "nord"
+
+# Show line numbers in the gutter
+line_numbers = true
+
+# Tab width for indentation
+tab_width = 4
+
+# Lua scripting (opt-in for security)
+# When enabled, .psnd/init.lua is loaded at startup
+[editor.lua]
+enabled = false
+
+[audio]
+# Audio backend: "tsf" (TinySoundFont), "fluid" (FluidSynth),
+#                "csound", or "midi" (external)
+backend = "tsf"
+
+# Path to SoundFont file for tsf/fluid backends
+# Leave empty to use the default GM soundfont
+soundfont = ""
+
+[link]
+# Ableton Link synchronization
+enabled = false
+tempo = 120
+
+# Keybindings
+# Format: "key" = "command"
+# Available modifiers: ctrl-, alt-, shift-
+# See :help keybindings for available commands
+[keybindings]
+"ctrl-s" = "save"
+"ctrl-q" = "quit"
+"ctrl-e" = "eval_line"
+"ctrl-p" = "play_file"
+"ctrl-g" = "stop"
+"ctrl-f" = "find"
+"ctrl-l" = "lua_repl"
+"ctrl-t" = "new_buffer"

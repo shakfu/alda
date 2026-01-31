@@ -1,12 +1,13 @@
 /* theme.c - Theme switching command
  *
  * Provides :theme command to switch syntax highlighting themes.
- * Tries Lua themes first (.psnd/themes/*.lua), falls back to C built-ins.
+ * Priority: TOML themes > Lua themes > C built-ins.
  * Only available when built with linenoise (WITH_LINENOISE).
  */
 
 #include "command_impl.h"
 #include "../syntax.h"
+#include "../theme_toml.h"
 
 #ifdef LOKI_USE_LINENOISE
 #include <syntax/theme.h>
@@ -51,6 +52,21 @@ static int try_load_lua_theme(editor_ctx_t *ctx, const char *name) {
 }
 #endif
 
+/* Helper to apply theme colors to all buffers */
+static void apply_to_all_buffers(editor_ctx_t *ctx) {
+    int buffer_ids[MAX_BUFFERS];
+    int count = buffer_get_list(buffer_ids);
+    for (int i = 0; i < count; i++) {
+        editor_ctx_t *buf_ctx = buffer_get(buffer_ids[i]);
+        if (buf_ctx && buf_ctx != ctx) {
+            /* Copy colors from current ctx to other buffers */
+            memcpy(buf_ctx->view.colors, ctx->view.colors,
+                   sizeof(ctx->view.colors));
+            buf_ctx->model.dirty++;
+        }
+    }
+}
+
 int cmd_theme(editor_ctx_t *ctx, const char *args) {
 #ifdef LOKI_USE_LINENOISE
     /* No args: list available themes */
@@ -70,9 +86,9 @@ int cmd_theme(editor_ctx_t *ctx, const char *args) {
             }
         }
 
-        /* Add note about Lua themes */
+        /* Add note about TOML/Lua themes */
         int note_len = snprintf(buf + pos, sizeof(buf) - pos,
-                                " (+ .psnd/themes/*.lua)");
+                                " (+ .psnd/themes/)");
         if (note_len > 0 && pos + note_len < sizeof(buf)) {
             pos += note_len;
         }
@@ -81,20 +97,16 @@ int cmd_theme(editor_ctx_t *ctx, const char *args) {
         return 1;
     }
 
-    /* First, try loading as a Lua theme */
+    /* First, try loading as a TOML theme (preferred) */
+    if (theme_toml_load(ctx, args)) {
+        apply_to_all_buffers(ctx);
+        editor_set_status_msg(ctx, "Theme set to: %s (TOML)", args);
+        return 1;
+    }
+
+    /* Second, try loading as a Lua theme */
     if (try_load_lua_theme(ctx, args)) {
-        /* Apply theme colors to all other open buffers */
-        int buffer_ids[MAX_BUFFERS];
-        int count = buffer_get_list(buffer_ids);
-        for (int i = 0; i < count; i++) {
-            editor_ctx_t *buf_ctx = buffer_get(buffer_ids[i]);
-            if (buf_ctx && buf_ctx != ctx) {
-                /* Copy colors from current ctx to other buffers */
-                memcpy(buf_ctx->view.colors, ctx->view.colors,
-                       sizeof(ctx->view.colors));
-                buf_ctx->model.dirty++;
-            }
-        }
+        apply_to_all_buffers(ctx);
         editor_set_status_msg(ctx, "Theme set to: %s (Lua)", args);
         return 1;
     }

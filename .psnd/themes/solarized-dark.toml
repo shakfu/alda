@@ -1,0 +1,82 @@
+# Solarized Dark Theme for Loki Editor
+# Based on https://ethanschoonover.com/solarized/ 
+
+[meta]
+name = "Solarized Dark"
+description = "Based on https://ethanschoonover.com/solarized/ "
+
+[colors]
+# Base
+normal = [131, 148, 150]
+nonprint = [88, 110, 117]
+comment = [88, 110, 117]
+mlcomment = [88, 110, 117]
+keyword1 = [133, 153, 0]
+keyword2 = [38, 139, 210]
+string = [42, 161, 152]
+number = [211, 54, 130]
+match = [181, 137, 0]
+
+# Function
+function = [38, 139, 210]
+function_builtin = [42, 161, 152]
+function_call = [38, 139, 210]
+function_method = [38, 139, 210]
+function_macro = [203, 75, 22]
+
+# Variable
+variable = [131, 148, 150]
+variable_builtin = [203, 75, 22]
+variable_parameter = [131, 148, 150]
+variable_field = [131, 148, 150]
+variable_property = [131, 148, 150]
+
+# Keyword
+keyword_control = [133, 153, 0]
+keyword_function = [133, 153, 0]
+keyword_return = [133, 153, 0]
+keyword_operator = [133, 153, 0]
+keyword_import = [203, 75, 22]
+keyword_type = [181, 137, 0]
+keyword_modifier = [133, 153, 0]
+
+# String
+string_escape = [220, 50, 47]
+string_regex = [42, 161, 152]
+string_special = [42, 161, 152]
+
+# Number
+number_float = [211, 54, 130]
+
+# Literal
+boolean = [211, 54, 130]
+constant = [211, 54, 130]
+constant_builtin = [203, 75, 22]
+
+# Comment
+comment_doc = [88, 110, 117]
+
+# Type
+type = [181, 137, 0]
+type_builtin = [181, 137, 0]
+type_parameter = [181, 137, 0]
+type_qualifier = [133, 153, 0]
+
+# Operator
+operator = [133, 153, 0]
+punctuation = [131, 148, 150]
+punctuation_bracket = [131, 148, 150]
+punctuation_delimiter = [88, 110, 117]
+
+# Special
+constructor = [108, 113, 196]
+namespace = [108, 113, 196]
+module = [108, 113, 196]
+label = [42, 161, 152]
+tag = [38, 139, 210]
+tag_attribute = [131, 148, 150]
+preprocessor = [203, 75, 22]
+
+# Diagnostic
+error = [220, 50, 47]
+warning = [181, 137, 0]

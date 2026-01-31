@@ -1,0 +1,82 @@
+# Everforest Theme for Loki Editor
+# Based on https://github.com/sainnhe/everforest 
+
+[meta]
+name = "Everforest"
+description = "Based on https://github.com/sainnhe/everforest "
+
+[colors]
+# Base
+normal = [211, 198, 170]
+nonprint = [133, 146, 137]
+comment = [133, 146, 137]
+mlcomment = [133, 146, 137]
+keyword1 = [230, 126, 128]
+keyword2 = [127, 187, 179]
+string = [167, 192, 128]
+number = [214, 153, 182]
+match = [219, 188, 127]
+
+# Function
+function = [167, 192, 128]
+function_builtin = [131, 192, 146]
+function_call = [167, 192, 128]
+function_method = [167, 192, 128]
+function_macro = [131, 192, 146]
+
+# Variable
+variable = [211, 198, 170]
+variable_builtin = [230, 152, 117]
+variable_parameter = [214, 153, 182]
+variable_field = [211, 198, 170]
+variable_property = [211, 198, 170]
+
+# Keyword
+keyword_control = [230, 126, 128]
+keyword_function = [131, 192, 146]
+keyword_return = [230, 126, 128]
+keyword_operator = [230, 152, 117]
+keyword_import = [214, 153, 182]
+keyword_type = [219, 188, 127]
+keyword_modifier = [230, 126, 128]
+
+# String
+string_escape = [230, 152, 117]
+string_regex = [167, 192, 128]
+string_special = [167, 192, 128]
+
+# Number
+number_float = [214, 153, 182]
+
+# Literal
+boolean = [214, 153, 182]
+constant = [214, 153, 182]
+constant_builtin = [230, 152, 117]
+
+# Comment
+comment_doc = [133, 146, 137]
+
+# Type
+type = [219, 188, 127]
+type_builtin = [219, 188, 127]
+type_parameter = [127, 187, 179]
+type_qualifier = [230, 126, 128]
+
+# Operator
+operator = [230, 152, 117]
+punctuation = [211, 198, 170]
+punctuation_bracket = [211, 198, 170]
+punctuation_delimiter = [133, 146, 137]
+
+# Special
+constructor = [219, 188, 127]
+namespace = [127, 187, 179]
+module = [127, 187, 179]
+label = [230, 152, 117]
+tag = [230, 126, 128]
+tag_attribute = [167, 192, 128]
+preprocessor = [214, 153, 182]
+
+# Diagnostic
+error = [230, 126, 128]
+warning = [219, 188, 127]

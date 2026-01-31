@@ -1,0 +1,82 @@
+# Catppuccin Mocha Theme for Loki Editor
+# Based on https://github.com/catppuccin/catppuccin 
+
+[meta]
+name = "Catppuccin Mocha"
+description = "Based on https://github.com/catppuccin/catppuccin "
+
+[colors]
+# Base
+normal = [205, 214, 244]
+nonprint = [108, 112, 134]
+comment = [108, 112, 134]
+mlcomment = [108, 112, 134]
+keyword1 = [203, 166, 247]
+keyword2 = [137, 180, 250]
+string = [166, 227, 161]
+number = [250, 179, 135]
+match = [249, 226, 175]
+
+# Function
+function = [137, 180, 250]
+function_builtin = [250, 179, 135]
+function_call = [137, 180, 250]
+function_method = [137, 180, 250]
+function_macro = [203, 166, 247]
+
+# Variable
+variable = [205, 214, 244]
+variable_builtin = [243, 139, 168]
+variable_parameter = [235, 160, 172]
+variable_field = [180, 190, 254]
+variable_property = [180, 190, 254]
+
+# Keyword
+keyword_control = [203, 166, 247]
+keyword_function = [203, 166, 247]
+keyword_return = [203, 166, 247]
+keyword_operator = [137, 220, 235]
+keyword_import = [203, 166, 247]
+keyword_type = [249, 226, 175]
+keyword_modifier = [203, 166, 247]
+
+# String
+string_escape = [245, 194, 231]
+string_regex = [250, 179, 135]
+string_special = [166, 227, 161]
+
+# Number
+number_float = [250, 179, 135]
+
+# Literal
+boolean = [250, 179, 135]
+constant = [250, 179, 135]
+constant_builtin = [250, 179, 135]
+
+# Comment
+comment_doc = [147, 153, 178]
+
+# Type
+type = [249, 226, 175]
+type_builtin = [249, 226, 175]
+type_parameter = [245, 194, 231]
+type_qualifier = [203, 166, 247]
+
+# Operator
+operator = [137, 220, 235]
+punctuation = [186, 194, 222]
+punctuation_bracket = [186, 194, 222]
+punctuation_delimiter = [186, 194, 222]
+
+# Special
+constructor = [116, 199, 236]
+namespace = [137, 180, 250]
+module = [137, 180, 250]
+label = [116, 199, 236]
+tag = [203, 166, 247]
+tag_attribute = [249, 226, 175]
+preprocessor = [245, 194, 231]
+
+# Diagnostic
+error = [243, 139, 168]
+warning = [249, 226, 175]

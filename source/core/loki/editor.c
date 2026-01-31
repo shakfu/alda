@@ -28,6 +28,8 @@
 #include "terminal.h"
 #include "buffers.h"
 #include "syntax.h"
+#include "config.h"
+#include "theme_toml.h"
 #ifdef LOKI_USE_LINENOISE
 #include "treesitter.h"
 #endif
@@ -414,32 +416,46 @@ int loki_editor_main(int argc, char **argv) {
     syntax_select_for_filename(&E, filename);
     editor_open(&E, (char*)filename);
 
-    /* Initialize LuaHost */
-    LuaHost *lua_host = lua_host_create();
-    if (!lua_host) {
-        fprintf(stderr, "Warning: Failed to allocate LuaHost\n");
-    } else {
-        struct loki_lua_opts opts = {
-            .bind_editor = 1,
-            .bind_http = 0,
-            .load_config = 1,
-            .config_override = NULL,
-            .project_root = NULL,
-            .extra_lua_path = NULL,
-            .reporter = loki_lua_status_reporter,
-            .reporter_userdata = NULL
-        };
+    /* Load TOML configuration first (before Lua) */
+    loki_config_t *config = config_global();
 
-        /* Set lua_host on E before bootstrap (so bootstrap can find context) */
-        E.lua_host = lua_host;
+    /* Apply config settings to editor */
+    E.view.line_numbers = config->line_numbers ? 1 : 0;
 
-        lua_host->L = loki_lua_bootstrap(&E, &opts);
-        if (!lua_host->L) {
-            fprintf(stderr, "Warning: Failed to initialize Lua runtime (%s)\n", loki_lua_runtime());
+    /* Load theme from config (TOML themes only - Lua themes require Lua) */
+    if (config->theme[0] != '\0') {
+        theme_toml_load(&E, config->theme);
+    }
+
+    /* Initialize LuaHost only if Lua is enabled in config */
+    LuaHost *lua_host = NULL;
+    if (config->lua_enabled) {
+        lua_host = lua_host_create();
+        if (!lua_host) {
+            fprintf(stderr, "Warning: Failed to allocate LuaHost\n");
+        } else {
+            struct loki_lua_opts opts = {
+                .bind_editor = 1,
+                .bind_http = 0,
+                .load_config = 1,
+                .config_override = NULL,
+                .project_root = NULL,
+                .extra_lua_path = NULL,
+                .reporter = loki_lua_status_reporter,
+                .reporter_userdata = NULL
+            };
+
+            /* Set lua_host on E before bootstrap (so bootstrap can find context) */
+            E.lua_host = lua_host;
+
+            lua_host->L = loki_lua_bootstrap(&E, &opts);
+            if (!lua_host->L) {
+                fprintf(stderr, "Warning: Failed to initialize Lua runtime (%s)\n", loki_lua_runtime());
+            }
+
+            /* Initialize REPL */
+            lua_host_init_repl(lua_host);
         }
-
-        /* Initialize REPL */
-        lua_host_init_repl(lua_host);
     }
 
     /* Re-select syntax now that Lua has registered dynamic languages */

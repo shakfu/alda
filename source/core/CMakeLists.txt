@@ -130,6 +130,8 @@ function(psnd_build_loki)
     set(LOKI_CORE_SOURCES
         ${PSND_CORE_DIR}/loki/core.c
         ${PSND_CORE_DIR}/loki/lua.c
+        ${PSND_CORE_DIR}/loki/config.c
+        ${PSND_CORE_DIR}/loki/theme_toml.c
         ${PSND_CORE_DIR}/loki/editor.c
         ${PSND_CORE_DIR}/loki/syntax.c
         ${PSND_CORE_DIR}/loki/indent.c
@@ -275,6 +277,7 @@ function(psnd_build_loki)
 
     target_link_libraries(libloki PUBLIC
         lua
+        tomlc99
         Threads::Threads
         ${CMAKE_DL_LIBS}
         abl_link

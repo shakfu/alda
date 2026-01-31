@@ -1,0 +1,82 @@
+# Kanagawa Theme for Loki Editor
+# Based on https://github.com/rebelot/kanagawa.nvim Inspired by Katsushika Hokusai's "The Great Wave off Kanagawa"
+
+[meta]
+name = "Kanagawa"
+description = "Based on https://github.com/rebelot/kanagawa.nvim Inspired b"
+
+[colors]
+# Base
+normal = [220, 215, 186]
+nonprint = [102, 102, 102]
+comment = [102, 102, 102]
+mlcomment = [102, 102, 102]
+keyword1 = [149, 127, 184]
+keyword2 = [106, 149, 137]
+string = [152, 187, 108]
+number = [210, 126, 153]
+match = [230, 195, 132]
+
+# Function
+function = [126, 156, 216]
+function_builtin = [106, 149, 137]
+function_call = [126, 156, 216]
+function_method = [126, 156, 216]
+function_macro = [255, 160, 102]
+
+# Variable
+variable = [220, 215, 186]
+variable_builtin = [255, 93, 98]
+variable_parameter = [230, 195, 132]
+variable_field = [127, 180, 202]
+variable_property = [127, 180, 202]
+
+# Keyword
+keyword_control = [149, 127, 184]
+keyword_function = [149, 127, 184]
+keyword_return = [149, 127, 184]
+keyword_operator = [255, 93, 98]
+keyword_import = [149, 127, 184]
+keyword_type = [106, 149, 137]
+keyword_modifier = [149, 127, 184]
+
+# String
+string_escape = [255, 160, 102]
+string_regex = [255, 158, 59]
+string_special = [152, 187, 108]
+
+# Number
+number_float = [210, 126, 153]
+
+# Literal
+boolean = [255, 160, 102]
+constant = [255, 160, 102]
+constant_builtin = [255, 160, 102]
+
+# Comment
+comment_doc = [102, 102, 102]
+
+# Type
+type = [106, 149, 137]
+type_builtin = [106, 149, 137]
+type_parameter = [106, 149, 137]
+type_qualifier = [149, 127, 184]
+
+# Operator
+operator = [255, 93, 98]
+punctuation = [220, 215, 186]
+punctuation_bracket = [102, 102, 102]
+punctuation_delimiter = [220, 215, 186]
+
+# Special
+constructor = [230, 195, 132]
+namespace = [34, 50, 73]
+module = [34, 50, 73]
+label = [147, 138, 169]
+tag = [195, 64, 67]
+tag_attribute = [118, 148, 106]
+preprocessor = [149, 127, 184]
+
+# Diagnostic
+error = [255, 93, 98]
+warning = [255, 158, 59]

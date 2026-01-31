@@ -1,0 +1,82 @@
+# Norse Theme for Loki Editor
+# Based on the C 'nord' theme with Nord's actual RGB palette https://www.nordtheme.com/
+
+[meta]
+name = "Norse"
+description = "Based on the C 'nord' theme with Nord's actual RGB palette h"
+
+[colors]
+# Base
+normal = [216, 222, 233]
+nonprint = [76, 86, 106]
+comment = [76, 86, 106]
+mlcomment = [76, 86, 106]
+keyword1 = [180, 142, 173]
+keyword2 = [136, 192, 208]
+string = [163, 190, 140]
+number = [180, 142, 173]
+match = [235, 203, 139]
+
+# Function
+function = [129, 161, 193]
+function_builtin = [136, 192, 208]
+function_call = [129, 161, 193]
+function_method = [129, 161, 193]
+function_macro = [143, 188, 187]
+
+# Variable
+variable = [216, 222, 233]
+variable_builtin = [180, 142, 173]
+variable_parameter = [216, 222, 233]
+variable_field = [216, 222, 233]
+variable_property = [216, 222, 233]
+
+# Keyword
+keyword_control = [180, 142, 173]
+keyword_function = [180, 142, 173]
+keyword_return = [180, 142, 173]
+keyword_operator = [180, 142, 173]
+keyword_import = [180, 142, 173]
+keyword_type = [94, 129, 172]
+keyword_modifier = [180, 142, 173]
+
+# String
+string_escape = [235, 203, 139]
+string_regex = [208, 135, 112]
+string_special = [163, 190, 140]
+
+# Number
+number_float = [180, 142, 173]
+
+# Literal
+boolean = [180, 142, 173]
+constant = [180, 142, 173]
+constant_builtin = [180, 142, 173]
+
+# Comment
+comment_doc = [76, 86, 106]
+
+# Type
+type = [94, 129, 172]
+type_builtin = [94, 129, 172]
+type_parameter = [94, 129, 172]
+type_qualifier = [180, 142, 173]
+
+# Operator
+operator = [136, 192, 208]
+punctuation = [216, 222, 233]
+punctuation_bracket = [216, 222, 233]
+punctuation_delimiter = [216, 222, 233]
+
+# Special
+constructor = [94, 129, 172]
+namespace = [94, 129, 172]
+module = [94, 129, 172]
+label = [235, 203, 139]
+tag = [180, 142, 173]
+tag_attribute = [129, 161, 193]
+preprocessor = [143, 188, 187]
+
+# Diagnostic
+error = [191, 97, 106]
+warning = [208, 135, 112]

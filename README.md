@@ -14,8 +14,9 @@ All are practical for daily live-coding, REPL sketches, and headless playback. T
 
 ## Features
 
-- **Vim-style editor** with INSERT/NORMAL modes, live evaluation shortcuts, and Lua scripting (built on [loki](https://github.com/shakfu/loki), a fork of [kilo](https://github.com/antirez/kilo))
-- **Tree-sitter syntax highlighting** in REPLs with 17 Lua themes (monokai, dracula, nord, gruvbox, solarized, catppuccin, tokyo-night, kanagawa, and more) plus custom theme support via `.psnd/themes/`
+- **Vim-style editor** with INSERT/NORMAL modes, live evaluation shortcuts, and opt-in Lua scripting (built on [loki](https://github.com/shakfu/loki), a fork of [kilo](https://github.com/antirez/kilo))
+- **TOML configuration** via `.psnd/config.toml` for themes, keybindings, audio settings, and editor options
+- **Tree-sitter syntax highlighting** in REPLs with 17 TOML themes (monokai, dracula, nord, gruvbox, solarized, catppuccin, tokyo-night, kanagawa, and more) plus custom theme support via `.psnd/themes/`
 - **MIDI tracker/step sequencer** with terminal UI, plugin-based cell notation, and pattern looping
 - **Native webview mode** for a self-contained GUI window without requiring a browser (optional)
 - **Web-based editor** accessible via browser using xterm.js terminal emulator (optional)
@@ -30,7 +31,7 @@ All are practical for daily live-coding, REPL sketches, and headless playback. T
 - **[OSC (Open Sound Control)](http://opensoundcontrol.org/) support** for remote control and inter-application communication (optional)
 - **Parameter binding** for MIDI CC and OSC control of named parameters from physical controllers
 - **[Scala .scl](https://www.huygens-fokker.org/scala/scl_format.html) import support** for microtuning
-- **Lua APIs** for editor automation, playback control, and extensibility
+- **Lua APIs** (opt-in) for editor automation, playback control, and extensibility
 
 ## Status
 
@@ -375,9 +376,54 @@ echo ':def kick event(kick, 36, 0.9, T) :- every(T, 1.0).' | psnd bog
 
 This is useful for testing, CI/CD pipelines, and batch processing.
 
+## Configuration
+
+psnd uses TOML for configuration. Settings are loaded from `.psnd/config.toml` (project-local) or `~/.psnd/config.toml` (home directory).
+
+### Example config.toml
+
+```toml
+[editor]
+theme = "nord"           # Color theme (see .psnd/themes/)
+line_numbers = true      # Show line numbers
+tab_width = 4            # Tab width for indentation
+
+[editor.lua]
+enabled = false          # Opt-in Lua scripting (disabled by default)
+
+[audio]
+backend = "tsf"          # "tsf", "fluid", "csound", or "midi"
+soundfont = ""           # Path to SoundFont (empty = default GM)
+
+[link]
+enabled = false          # Ableton Link sync
+tempo = 120              # Default tempo
+
+[keybindings]
+"ctrl-s" = "save"
+"ctrl-q" = "quit"
+"ctrl-e" = "eval_line"
+"ctrl-p" = "play_file"
+"ctrl-g" = "stop"
+"ctrl-f" = "find"
+"ctrl-l" = "lua_repl"    # Only works when Lua is enabled
+"ctrl-t" = "new_buffer"
+```
+
+### Lua Scripting (Opt-in)
+
+Lua scripting is disabled by default for security. To enable it, set `editor.lua.enabled = true` in your config.toml. When enabled:
+
+- `.psnd/init.lua` is loaded at startup
+- `Ctrl-L` opens the Lua console
+- Custom commands and keybindings via Lua are available
+- Full `loki.*` Lua API is accessible
+
+When Lua is disabled, core functionality (Alda, Joy, Bog, themes, keybindings, audio) works normally.
+
 ## Lua Scripting
 
-Press `Ctrl-L` in the editor to access the Lua console:
+Press `Ctrl-L` in the editor to access the Lua console (requires `editor.lua.enabled = true`):
 
 ```lua
 -- Play Alda code
@@ -1293,36 +1339,36 @@ psnd supports 17 color themes with true RGB colors. Use `:theme` to list availab
 
 **Built-in themes**: ayu-dark, basic16, catppuccin, dracula, everforest, github-light, gruvbox-dark, kanagawa, monokai, nord, norse, one-dark, palenight, rose-pine, solarized-dark, solarized-light, tokyo-night
 
-**Custom themes**: Create `.psnd/themes/<name>.lua` with:
+**Custom TOML themes** (recommended): Create `.psnd/themes/<name>.toml`:
 
-```lua
--- Example: .psnd/themes/my-theme.lua
-return function()
-    loki.set_theme({
-        -- Base types
-        normal    = {r=200, g=200, b=200},
-        comment   = {r=128, g=128, b=128},
-        keyword1  = {r=220, g=100, b=220},
-        keyword2  = {r=100, g=200, b=200},
-        string    = {r=150, g=200, b=100},
-        number    = {r=200, g=150, b=100},
+```toml
+# Example: .psnd/themes/my-theme.toml
+[meta]
+name = "My Theme"
+description = "A custom color theme"
 
-        -- Extended types (51 total for full tree-sitter support)
-        ["function"]      = {r=100, g=150, b=220},
-        function_builtin  = {r=100, g=200, b=200},
-        variable          = {r=200, g=200, b=200},
-        variable_builtin  = {r=220, g=100, b=100},
-        type              = {r=200, g=180, b=100},
-        operator          = {r=220, g=100, b=220},
-        -- ... see existing themes for all 51 types
-    })
-    if loki.status then
-        loki.status("My theme loaded")
-    end
-end
+[colors]
+# Base types
+normal = [200, 200, 200]
+comment = [128, 128, 128]
+keyword1 = [220, 100, 220]
+keyword2 = [100, 200, 200]
+string = [150, 200, 100]
+number = [200, 150, 100]
+
+# Extended types (51 total for full tree-sitter support)
+function = [100, 150, 220]
+function_builtin = [100, 200, 200]
+variable = [200, 200, 200]
+variable_builtin = [220, 100, 100]
+type = [200, 180, 100]
+operator = [220, 100, 220]
+# ... see existing themes for all 51 types
 ```
 
-The `:theme` command prefers Lua themes over C built-ins for better color accuracy (true RGB vs 256-color approximations).
+**Lua themes** (requires `editor.lua.enabled = true`): Create `.psnd/themes/<name>.lua` for dynamic themes with Lua logic.
+
+The `:theme` command loads themes in order: TOML > Lua > C built-ins.
 
 ## Scala Scale Files (Microtuning)
 

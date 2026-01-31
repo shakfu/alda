@@ -1,0 +1,82 @@
+# Monokai Theme for Loki Editor
+# Classic Monokai/Monokai Pro color scheme 
+
+[meta]
+name = "Monokai"
+description = "Classic Monokai/Monokai Pro color scheme "
+
+[colors]
+# Base
+normal = [248, 248, 242]
+nonprint = [73, 72, 62]
+comment = [117, 113, 94]
+mlcomment = [117, 113, 94]
+keyword1 = [249, 38, 114]
+keyword2 = [102, 217, 239]
+string = [230, 219, 116]
+number = [174, 129, 255]
+match = [166, 226, 46]
+
+# Function
+function = [166, 226, 46]
+function_builtin = [102, 217, 239]
+function_call = [166, 226, 46]
+function_method = [166, 226, 46]
+function_macro = [102, 217, 239]
+
+# Variable
+variable = [248, 248, 242]
+variable_builtin = [253, 151, 31]
+variable_parameter = [253, 151, 31]
+variable_field = [248, 248, 242]
+variable_property = [248, 248, 242]
+
+# Keyword
+keyword_control = [249, 38, 114]
+keyword_function = [102, 217, 239]
+keyword_return = [249, 38, 114]
+keyword_operator = [249, 38, 114]
+keyword_import = [249, 38, 114]
+keyword_type = [102, 217, 239]
+keyword_modifier = [249, 38, 114]
+
+# String
+string_escape = [174, 129, 255]
+string_regex = [230, 219, 116]
+string_special = [230, 219, 116]
+
+# Number
+number_float = [174, 129, 255]
+
+# Literal
+boolean = [174, 129, 255]
+constant = [174, 129, 255]
+constant_builtin = [174, 129, 255]
+
+# Comment
+comment_doc = [117, 113, 94]
+
+# Type
+type = [102, 217, 239]
+type_builtin = [102, 217, 239]
+type_parameter = [253, 151, 31]
+type_qualifier = [249, 38, 114]
+
+# Operator
+operator = [249, 38, 114]
+punctuation = [248, 248, 242]
+punctuation_bracket = [248, 248, 242]
+punctuation_delimiter = [248, 248, 242]
+
+# Special
+constructor = [166, 226, 46]
+namespace = [166, 226, 46]
+module = [166, 226, 46]
+label = [230, 219, 116]
+tag = [249, 38, 114]
+tag_attribute = [166, 226, 46]
+preprocessor = [249, 38, 114]
+
+# Diagnostic
+error = [249, 38, 114]
+warning = [253, 151, 31]

@@ -19,6 +19,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 
+- **TOML Configuration System**: Safe, declarative configuration via `.psnd/config.toml`
+  - Settings for theme, line numbers, tab width, audio backend, soundfont, and keybindings
+  - TOML themes in `.psnd/themes/*.toml` with 51 semantic color types (full tree-sitter support)
+  - All 17 themes converted to TOML format (nord, dracula, monokai, gruvbox-dark, catppuccin, etc.)
+  - Config loading order: project-local `.psnd/config.toml` > home `~/.psnd/config.toml` > defaults
+  - Built on [tomlc99](https://github.com/cktan/tomlc99) (MIT license, ~1000 LOC)
+
+- **Opt-in Lua Scripting**: Lua is now disabled by default for improved security
+  - Enable with `editor.lua.enabled = true` in config.toml
+  - When disabled: core features (Alda, Joy, Bog, themes, keybindings) work normally
+  - When enabled: full Lua API, custom commands, `.psnd/init.lua` scripting
+  - All Lua-dependent code paths gracefully degrade when Lua is disabled
+
 - **Tree-sitter Syntax Highlighting**: Real-time syntax highlighting in REPLs and editor
   - Language-specific grammars: Alda, Joy, Scheme, Haskell, Lua, Csound
   - 51 highlight types for full tree-sitter semantic granularity (functions, variables, keywords, types, operators, etc.)
@@ -556,6 +569,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - **Files Modified**: `source/langs/joy/register.c`
 
 ### Changed
+
+- **Theme Loading Priority**: `:theme` command now loads TOML themes first, then falls back to Lua themes, then C built-ins
+  - TOML themes provide true RGB colors in a safe, declarative format
+  - Lua themes still work when Lua is enabled
+  - C built-in themes remain as final fallback
 
 - **Renamed `tsf_enabled` to `builtin_synth_enabled`**: Flag name now reflects that it controls whichever built-in synth is compiled (TSF or FluidSynth)
   - Updated in `SharedContext`, `AldaContext`, and all language contexts

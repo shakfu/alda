@@ -1,0 +1,82 @@
+# One Dark Theme for Loki Editor
+# Based on Atom's One Dark theme 
+
+[meta]
+name = "One Dark"
+description = "Based on Atom's One Dark theme "
+
+[colors]
+# Base
+normal = [171, 178, 191]
+nonprint = [92, 99, 112]
+comment = [92, 99, 112]
+mlcomment = [92, 99, 112]
+keyword1 = [198, 120, 221]
+keyword2 = [86, 182, 194]
+string = [152, 195, 121]
+number = [209, 154, 102]
+match = [229, 192, 123]
+
+# Function
+function = [97, 175, 239]
+function_builtin = [86, 182, 194]
+function_call = [97, 175, 239]
+function_method = [97, 175, 239]
+function_macro = [198, 120, 221]
+
+# Variable
+variable = [224, 108, 117]
+variable_builtin = [224, 108, 117]
+variable_parameter = [171, 178, 191]
+variable_field = [224, 108, 117]
+variable_property = [224, 108, 117]
+
+# Keyword
+keyword_control = [198, 120, 221]
+keyword_function = [198, 120, 221]
+keyword_return = [198, 120, 221]
+keyword_operator = [198, 120, 221]
+keyword_import = [198, 120, 221]
+keyword_type = [86, 182, 194]
+keyword_modifier = [198, 120, 221]
+
+# String
+string_escape = [86, 182, 194]
+string_regex = [152, 195, 121]
+string_special = [152, 195, 121]
+
+# Number
+number_float = [209, 154, 102]
+
+# Literal
+boolean = [209, 154, 102]
+constant = [209, 154, 102]
+constant_builtin = [209, 154, 102]
+
+# Comment
+comment_doc = [92, 99, 112]
+
+# Type
+type = [229, 192, 123]
+type_builtin = [229, 192, 123]
+type_parameter = [229, 192, 123]
+type_qualifier = [198, 120, 221]
+
+# Operator
+operator = [171, 178, 191]
+punctuation = [171, 178, 191]
+punctuation_bracket = [171, 178, 191]
+punctuation_delimiter = [171, 178, 191]
+
+# Special
+constructor = [229, 192, 123]
+namespace = [229, 192, 123]
+module = [229, 192, 123]
+label = [224, 108, 117]
+tag = [224, 108, 117]
+tag_attribute = [209, 154, 102]
+preprocessor = [198, 120, 221]
+
+# Diagnostic
+error = [224, 108, 117]
+warning = [229, 192, 123]

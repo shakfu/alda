@@ -1,0 +1,82 @@
+# Tokyo Night Theme for Loki Editor
+# Based on https://github.com/enkia/tokyo-night-vscode-theme 
+
+[meta]
+name = "Tokyo Night"
+description = "Based on https://github.com/enkia/tokyo-night-vscode-theme "
+
+[colors]
+# Base
+normal = [169, 177, 214]
+nonprint = [86, 95, 137]
+comment = [86, 95, 137]
+mlcomment = [86, 95, 137]
+keyword1 = [187, 154, 247]
+keyword2 = [45, 212, 191]
+string = [158, 206, 106]
+number = [255, 158, 100]
+match = [224, 175, 104]
+
+# Function
+function = [122, 162, 247]
+function_builtin = [125, 207, 255]
+function_call = [122, 162, 247]
+function_method = [122, 162, 247]
+function_macro = [125, 207, 255]
+
+# Variable
+variable = [169, 177, 214]
+variable_builtin = [247, 118, 142]
+variable_parameter = [224, 175, 104]
+variable_field = [115, 218, 202]
+variable_property = [115, 218, 202]
+
+# Keyword
+keyword_control = [187, 154, 247]
+keyword_function = [187, 154, 247]
+keyword_return = [187, 154, 247]
+keyword_operator = [137, 221, 255]
+keyword_import = [187, 154, 247]
+keyword_type = [45, 212, 191]
+keyword_modifier = [187, 154, 247]
+
+# String
+string_escape = [137, 221, 255]
+string_regex = [255, 158, 100]
+string_special = [158, 206, 106]
+
+# Number
+number_float = [255, 158, 100]
+
+# Literal
+boolean = [255, 158, 100]
+constant = [255, 158, 100]
+constant_builtin = [255, 158, 100]
+
+# Comment
+comment_doc = [86, 95, 137]
+
+# Type
+type = [45, 212, 191]
+type_builtin = [45, 212, 191]
+type_parameter = [224, 175, 104]
+type_qualifier = [187, 154, 247]
+
+# Operator
+operator = [137, 221, 255]
+punctuation = [169, 177, 214]
+punctuation_bracket = [169, 177, 214]
+punctuation_delimiter = [169, 177, 214]
+
+# Special
+constructor = [122, 162, 247]
+namespace = [122, 162, 247]
+module = [122, 162, 247]
+label = [122, 162, 247]
+tag = [247, 118, 142]
+tag_attribute = [187, 154, 247]
+preprocessor = [187, 154, 247]
+
+# Diagnostic
+error = [247, 118, 142]
+warning = [224, 175, 104]

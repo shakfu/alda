@@ -1,0 +1,82 @@
+# GitHub Light Theme for Loki Editor
+# Inspired by GitHub's light theme 
+
+[meta]
+name = "GitHub Light"
+description = "Inspired by GitHub's light theme "
+
+[colors]
+# Base
+normal = [36, 41, 46]
+nonprint = [149, 157, 165]
+comment = [106, 115, 125]
+mlcomment = [106, 115, 125]
+keyword1 = [215, 58, 73]
+keyword2 = [111, 66, 193]
+string = [3, 47, 98]
+number = [0, 92, 197]
+match = [255, 223, 0]
+
+# Function
+function = [111, 66, 193]
+function_builtin = [0, 92, 197]
+function_call = [111, 66, 193]
+function_method = [111, 66, 193]
+function_macro = [111, 66, 193]
+
+# Variable
+variable = [36, 41, 46]
+variable_builtin = [0, 92, 197]
+variable_parameter = [227, 98, 9]
+variable_field = [0, 92, 197]
+variable_property = [0, 92, 197]
+
+# Keyword
+keyword_control = [215, 58, 73]
+keyword_function = [215, 58, 73]
+keyword_return = [215, 58, 73]
+keyword_operator = [215, 58, 73]
+keyword_import = [215, 58, 73]
+keyword_type = [215, 58, 73]
+keyword_modifier = [215, 58, 73]
+
+# String
+string_escape = [0, 92, 197]
+string_regex = [3, 47, 98]
+string_special = [3, 47, 98]
+
+# Number
+number_float = [0, 92, 197]
+
+# Literal
+boolean = [0, 92, 197]
+constant = [0, 92, 197]
+constant_builtin = [0, 92, 197]
+
+# Comment
+comment_doc = [106, 115, 125]
+
+# Type
+type = [111, 66, 193]
+type_builtin = [111, 66, 193]
+type_parameter = [227, 98, 9]
+type_qualifier = [215, 58, 73]
+
+# Operator
+operator = [215, 58, 73]
+punctuation = [36, 41, 46]
+punctuation_bracket = [36, 41, 46]
+punctuation_delimiter = [36, 41, 46]
+
+# Special
+constructor = [111, 66, 193]
+namespace = [227, 98, 9]
+module = [227, 98, 9]
+label = [0, 92, 197]
+tag = [34, 134, 58]
+tag_attribute = [111, 66, 193]
+preprocessor = [215, 58, 73]
+
+# Diagnostic
+error = [203, 36, 49]
+warning = [227, 98, 9]

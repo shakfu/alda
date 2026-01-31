@@ -1,0 +1,82 @@
+# Palenight Theme for Loki Editor
+# Based on Material Palenight https://github.com/kaicataldo/material.vim
+
+[meta]
+name = "Palenight"
+description = "Based on Material Palenight https://github.com/kaicataldo/ma"
+
+[colors]
+# Base
+normal = [166, 172, 205]
+nonprint = [103, 110, 149]
+comment = [103, 110, 149]
+mlcomment = [103, 110, 149]
+keyword1 = [199, 146, 234]
+keyword2 = [137, 221, 255]
+string = [195, 232, 141]
+number = [247, 140, 108]
+match = [255, 203, 107]
+
+# Function
+function = [130, 170, 255]
+function_builtin = [137, 221, 255]
+function_call = [130, 170, 255]
+function_method = [130, 170, 255]
+function_macro = [137, 221, 255]
+
+# Variable
+variable = [166, 172, 205]
+variable_builtin = [255, 83, 112]
+variable_parameter = [247, 140, 108]
+variable_field = [255, 83, 112]
+variable_property = [255, 83, 112]
+
+# Keyword
+keyword_control = [199, 146, 234]
+keyword_function = [199, 146, 234]
+keyword_return = [199, 146, 234]
+keyword_operator = [137, 221, 255]
+keyword_import = [199, 146, 234]
+keyword_type = [255, 203, 107]
+keyword_modifier = [199, 146, 234]
+
+# String
+string_escape = [137, 221, 255]
+string_regex = [255, 83, 112]
+string_special = [195, 232, 141]
+
+# Number
+number_float = [247, 140, 108]
+
+# Literal
+boolean = [247, 140, 108]
+constant = [247, 140, 108]
+constant_builtin = [247, 140, 108]
+
+# Comment
+comment_doc = [103, 110, 149]
+
+# Type
+type = [255, 203, 107]
+type_builtin = [255, 203, 107]
+type_parameter = [255, 203, 107]
+type_qualifier = [199, 146, 234]
+
+# Operator
+operator = [137, 221, 255]
+punctuation = [166, 172, 205]
+punctuation_bracket = [166, 172, 205]
+punctuation_delimiter = [166, 172, 205]
+
+# Special
+constructor = [255, 203, 107]
+namespace = [255, 203, 107]
+module = [255, 203, 107]
+label = [255, 156, 172]
+tag = [255, 83, 112]
+tag_attribute = [199, 146, 234]
+preprocessor = [137, 221, 255]
+
+# Diagnostic
+error = [255, 83, 112]
+warning = [255, 203, 107]
