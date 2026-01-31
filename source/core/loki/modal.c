@@ -392,113 +392,10 @@ static void process_normal_mode(editor_ctx_t *ctx, int fd, int c) {
             }
             break;
         case CTRL_E:
-            /* Eval selection (or current part) */
-            {
-                /* Handle .csd files - partial playback not supported */
-                if (is_csd_file(ctx->model.filename)) {
-                    editor_set_status_msg(ctx, "Partial playback not supported for .csd files (use Ctrl-P)");
-                    break;
-                }
-
-                /* Get code to evaluate */
-                char *code = get_selection_text(ctx);
-                if (!code && ctx->model.numrows > 0 && ctx->view.cy < ctx->model.numrows) {
-                    /* No selection - use current part/line */
-                    code = get_current_part(ctx);
-                }
-                if (!code || !*code) {
-                    editor_set_status_msg(ctx, "No code to evaluate");
-                    free(code);
-                    break;
-                }
-
-                /* Evaluate code with the appropriate language */
-                const LokiLangOps *lang = loki_lang_for_file(ctx->model.filename);
-                if (lang) {
-                    int ret = loki_lang_eval(ctx, code);
-                    if (ret == 0) {
-                        editor_set_status_msg(ctx, "%s: evaluated", lang->name);
-                    } else if (ret == -1) {
-                        const char *err = loki_lang_get_error(ctx);
-                        editor_set_status_msg(ctx, "%s error: %s", lang->name,
-                            err ? err : "eval failed");
-                    }
-                } else {
-                    editor_set_status_msg(ctx, "No language support for this file type");
-                }
-                free(code);
-                /* Clear selection after eval */
-                ctx->view.sel_active = 0;
-            }
+            cmd_eval_line(ctx, fd);
             break;
         case CTRL_P:
-            /* Play entire file */
-            {
-#ifdef BUILD_CSOUND_BACKEND
-                /* Handle .csd files with Csound backend */
-                if (is_csd_file(ctx->model.filename)) {
-                    if (ctx->model.dirty) {
-                        editor_set_status_msg(ctx, "Save file first (Ctrl-S) before playing");
-                        break;
-                    }
-                    if (!ctx->model.filename) {
-                        editor_set_status_msg(ctx, "No filename - save file first");
-                        break;
-                    }
-                    /* Stop any existing playback */
-                    shared_csound_stop_playback();
-                    /* Start async playback */
-                    int result = shared_csound_play_file_async(ctx->model.filename);
-                    if (result == 0) {
-                        editor_set_status_msg(ctx, "Playing %s (Ctrl-G to stop)", ctx->model.filename);
-                    } else {
-                        const char *err = shared_csound_get_error();
-                        editor_set_status_msg(ctx, "Csound error: %s", err ? err : "failed to play");
-                    }
-                    break;
-                }
-#endif
-
-                /* Check for empty file */
-                if (ctx->model.numrows == 0) {
-                    editor_set_status_msg(ctx, "Empty file");
-                    break;
-                }
-
-                /* Build full buffer content */
-                size_t total_len = 0;
-                for (int i = 0; i < ctx->model.numrows; i++) {
-                    total_len += ctx->model.row[i].size + 1; /* +1 for newline */
-                }
-                char *code = malloc(total_len + 1);
-                if (!code) {
-                    editor_set_status_msg(ctx, "Out of memory");
-                    break;
-                }
-                char *p = code;
-                for (int i = 0; i < ctx->model.numrows; i++) {
-                    memcpy(p, ctx->model.row[i].chars, ctx->model.row[i].size);
-                    p += ctx->model.row[i].size;
-                    *p++ = '\n';
-                }
-                *p = '\0';
-
-                /* Evaluate full file with the appropriate language */
-                const LokiLangOps *lang = loki_lang_for_file(ctx->model.filename);
-                if (lang) {
-                    int ret = loki_lang_eval(ctx, code);
-                    if (ret == 0) {
-                        editor_set_status_msg(ctx, "%s: playing file", lang->name);
-                    } else if (ret == -1) {
-                        const char *err = loki_lang_get_error(ctx);
-                        editor_set_status_msg(ctx, "%s error: %s", lang->name,
-                            err ? err : "eval failed");
-                    }
-                } else {
-                    editor_set_status_msg(ctx, "No language support for this file type");
-                }
-                free(code);
-            }
+            cmd_play_file(ctx, fd);
             break;
         case CTRL_G:
             /* Stop playback */
@@ -595,95 +492,10 @@ static void process_insert_mode(editor_ctx_t *ctx, int fd, int c) {
             copy_selection_to_clipboard(ctx);
             break;
         case CTRL_E:
+            cmd_eval_line(ctx, fd);
+            break;
         case CTRL_P:
-            /* Play file or selection */
-            {
-                int play_file = (c == CTRL_P);
-
-#ifdef BUILD_CSOUND_BACKEND
-                /* Handle .csd files with Csound backend */
-                if (is_csd_file(ctx->model.filename)) {
-                    if (c == CTRL_E) {
-                        /* Ctrl-E: partial playback not supported for CSD */
-                        editor_set_status_msg(ctx, "Partial playback not supported for .csd files (use Ctrl-P)");
-                        break;
-                    }
-                    /* Ctrl-P: play the entire CSD file */
-                    if (ctx->model.dirty) {
-                        editor_set_status_msg(ctx, "Save file first (Ctrl-S) before playing");
-                        break;
-                    }
-                    if (!ctx->model.filename) {
-                        editor_set_status_msg(ctx, "No filename - save file first");
-                        break;
-                    }
-                    /* Stop any existing playback */
-                    shared_csound_stop_playback();
-                    /* Start async playback */
-                    int result = shared_csound_play_file_async(ctx->model.filename);
-                    if (result == 0) {
-                        editor_set_status_msg(ctx, "Playing %s (Ctrl-G to stop)", ctx->model.filename);
-                    } else {
-                        const char *err = shared_csound_get_error();
-                        editor_set_status_msg(ctx, "Csound error: %s", err ? err : "failed to play");
-                    }
-                    break;
-                }
-#endif
-
-                /* Handle .alda files with Alda interpreter */
-                char *code = NULL;
-
-                if (play_file) {
-                    /* Play entire file */
-                    if (ctx->model.numrows == 0) {
-                        editor_set_status_msg(ctx, "Empty file");
-                        break;
-                    }
-                    size_t total_len = 0;
-                    for (int i = 0; i < ctx->model.numrows; i++) {
-                        total_len += ctx->model.row[i].size + 1;
-                    }
-                    code = malloc(total_len + 1);
-                    if (code) {
-                        char *p = code;
-                        for (int i = 0; i < ctx->model.numrows; i++) {
-                            memcpy(p, ctx->model.row[i].chars, ctx->model.row[i].size);
-                            p += ctx->model.row[i].size;
-                            *p++ = '\n';
-                        }
-                        *p = '\0';
-                    }
-                } else {
-                    /* Play selection or current part */
-                    code = get_selection_text(ctx);
-                    if (!code && ctx->model.numrows > 0 && ctx->view.cy < ctx->model.numrows) {
-                        code = get_current_part(ctx);
-                    }
-                }
-
-                if (code && *code) {
-                    /* Evaluate code with the appropriate language */
-                    const LokiLangOps *lang = loki_lang_for_file(ctx->model.filename);
-                    if (lang) {
-                        int ret = loki_lang_eval(ctx, code);
-                        if (ret == 0) {
-                            editor_set_status_msg(ctx, "%s: %s", lang->name,
-                                play_file ? "playing file" : "evaluated");
-                        } else if (ret == -1) {
-                            const char *err = loki_lang_get_error(ctx);
-                            editor_set_status_msg(ctx, "%s error: %s", lang->name,
-                                err ? err : "eval failed");
-                        }
-                    } else {
-                        editor_set_status_msg(ctx, "No language support for this file type");
-                    }
-                } else {
-                    editor_set_status_msg(ctx, "No code to evaluate");
-                }
-                free(code);
-                ctx->view.sel_active = 0;
-            }
+            cmd_play_file(ctx, fd);
             break;
         case CTRL_G:
             /* Stop playback */
@@ -1118,6 +930,135 @@ void modal_process_event(editor_ctx_t *ctx, const EditorEvent *event) {
     }
 
     quit_times = KILO_QUIT_TIMES; /* Reset it to the original value. */
+}
+
+/* ============================================================================
+ * Keybind Command Handlers
+ * ============================================================================
+ * These functions implement commands that can be registered with the keybind
+ * system, allowing them to be remapped via TOML configuration.
+ */
+
+/* Command: eval_line - evaluate selection or current part */
+int cmd_eval_line(editor_ctx_t *ctx, int fd) {
+    (void)fd;
+
+    /* Handle .csd files - partial playback not supported */
+    if (is_csd_file(ctx->model.filename)) {
+        editor_set_status_msg(ctx, "Partial playback not supported for .csd files (use Ctrl-P)");
+        return 1;
+    }
+
+    /* Get code to evaluate */
+    char *code = get_selection_text(ctx);
+    if (!code && ctx->model.numrows > 0 && ctx->view.cy < ctx->model.numrows) {
+        /* No selection - use current part/line */
+        code = get_current_part(ctx);
+    }
+    if (!code || !*code) {
+        editor_set_status_msg(ctx, "No code to evaluate");
+        free(code);
+        return 1;
+    }
+
+    /* Evaluate code with the appropriate language */
+    const LokiLangOps *lang = loki_lang_for_file(ctx->model.filename);
+    if (lang) {
+        int ret = loki_lang_eval(ctx, code);
+        if (ret == 0) {
+            editor_set_status_msg(ctx, "%s: evaluated", lang->name);
+        } else if (ret == -1) {
+            const char *err = loki_lang_get_error(ctx);
+            editor_set_status_msg(ctx, "%s error: %s", lang->name,
+                err ? err : "eval failed");
+        }
+    } else {
+        editor_set_status_msg(ctx, "No language support for this file type");
+    }
+    free(code);
+
+    /* Clear selection after eval */
+    ctx->view.sel_active = 0;
+    return 1;
+}
+
+/* Command: play_file - play entire file */
+int cmd_play_file(editor_ctx_t *ctx, int fd) {
+    (void)fd;
+
+#ifdef BUILD_CSOUND_BACKEND
+    /* Handle .csd files with Csound backend */
+    if (is_csd_file(ctx->model.filename)) {
+        if (ctx->model.dirty) {
+            editor_set_status_msg(ctx, "Save file first (Ctrl-S) before playing");
+            return 1;
+        }
+        if (!ctx->model.filename) {
+            editor_set_status_msg(ctx, "No filename - save file first");
+            return 1;
+        }
+        /* Stop any existing playback */
+        shared_csound_stop_playback();
+        /* Start async playback */
+        int result = shared_csound_play_file_async(ctx->model.filename);
+        if (result == 0) {
+            editor_set_status_msg(ctx, "Playing %s (Ctrl-G to stop)", ctx->model.filename);
+        } else {
+            const char *err = shared_csound_get_error();
+            editor_set_status_msg(ctx, "Csound error: %s", err ? err : "failed to play");
+        }
+        return 1;
+    }
+#endif
+
+    /* Check for empty file */
+    if (ctx->model.numrows == 0) {
+        editor_set_status_msg(ctx, "Empty file");
+        return 1;
+    }
+
+    /* Build full buffer content */
+    size_t total_len = 0;
+    for (int i = 0; i < ctx->model.numrows; i++) {
+        total_len += ctx->model.row[i].size + 1; /* +1 for newline */
+    }
+    char *code = malloc(total_len + 1);
+    if (!code) {
+        editor_set_status_msg(ctx, "Out of memory");
+        return 1;
+    }
+    char *p = code;
+    for (int i = 0; i < ctx->model.numrows; i++) {
+        memcpy(p, ctx->model.row[i].chars, ctx->model.row[i].size);
+        p += ctx->model.row[i].size;
+        *p++ = '\n';
+    }
+    *p = '\0';
+
+    /* Evaluate full file with the appropriate language */
+    const LokiLangOps *lang = loki_lang_for_file(ctx->model.filename);
+    if (lang) {
+        int ret = loki_lang_eval(ctx, code);
+        if (ret == 0) {
+            editor_set_status_msg(ctx, "%s: playing file", lang->name);
+        } else if (ret == -1) {
+            const char *err = loki_lang_get_error(ctx);
+            editor_set_status_msg(ctx, "%s error: %s", lang->name,
+                err ? err : "eval failed");
+        }
+    } else {
+        editor_set_status_msg(ctx, "No language support for this file type");
+    }
+    free(code);
+    return 1;
+}
+
+/* Command: quit via keybind - request quit (multi-press confirmation handled elsewhere) */
+int cmd_quit_keybind(editor_ctx_t *ctx, int fd) {
+    (void)fd;
+    /* Signal quit request - actual confirmation is in modal_process_keypress */
+    editor_set_status_msg(ctx, "Quit requested");
+    return 0;  /* Return 0 to indicate not fully handled - let caller handle quit logic */
 }
 
 /* ============================================================================

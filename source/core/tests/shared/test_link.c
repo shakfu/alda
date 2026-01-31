@@ -230,6 +230,187 @@ TEST(link_get_phase) {
 }
 
 /* ============================================================================
+ * Callback Tests
+ * ============================================================================ */
+
+/* Callback tracking variables */
+static int g_peers_callback_count = 0;
+static uint64_t g_peers_callback_value = 0;
+static void *g_peers_callback_userdata = NULL;
+
+static int g_tempo_callback_count = 0;
+static double g_tempo_callback_value = 0.0;
+static void *g_tempo_callback_userdata = NULL;
+
+static int g_transport_callback_count = 0;
+static int g_transport_callback_value = 0;
+static void *g_transport_callback_userdata = NULL;
+
+static void reset_callback_state(void) {
+    g_peers_callback_count = 0;
+    g_peers_callback_value = 0;
+    g_peers_callback_userdata = NULL;
+    g_tempo_callback_count = 0;
+    g_tempo_callback_value = 0.0;
+    g_tempo_callback_userdata = NULL;
+    g_transport_callback_count = 0;
+    g_transport_callback_value = 0;
+    g_transport_callback_userdata = NULL;
+}
+
+static void test_peers_callback(uint64_t num_peers, void *userdata) {
+    g_peers_callback_count++;
+    g_peers_callback_value = num_peers;
+    g_peers_callback_userdata = userdata;
+}
+
+static void test_tempo_callback(double tempo, void *userdata) {
+    g_tempo_callback_count++;
+    g_tempo_callback_value = tempo;
+    g_tempo_callback_userdata = userdata;
+}
+
+static void test_transport_callback(int is_playing, void *userdata) {
+    g_transport_callback_count++;
+    g_transport_callback_value = is_playing;
+    g_transport_callback_userdata = userdata;
+}
+
+TEST(link_set_peers_callback) {
+    reset_callback_state();
+    int result = shared_link_init(120.0);
+    ASSERT_EQ(result, 0);
+
+    int userdata_marker = 42;
+
+    /* Set callback */
+    shared_link_set_peers_callback(test_peers_callback, &userdata_marker);
+
+    /* Clear callback */
+    shared_link_set_peers_callback(NULL, NULL);
+
+    shared_link_cleanup();
+}
+
+TEST(link_set_tempo_callback) {
+    reset_callback_state();
+    int result = shared_link_init(120.0);
+    ASSERT_EQ(result, 0);
+
+    int userdata_marker = 42;
+
+    /* Set callback */
+    shared_link_set_tempo_callback(test_tempo_callback, &userdata_marker);
+
+    /* Clear callback */
+    shared_link_set_tempo_callback(NULL, NULL);
+
+    shared_link_cleanup();
+}
+
+TEST(link_set_transport_callback) {
+    reset_callback_state();
+    int result = shared_link_init(120.0);
+    ASSERT_EQ(result, 0);
+
+    int userdata_marker = 42;
+
+    /* Set callback */
+    shared_link_set_transport_callback(test_transport_callback, &userdata_marker);
+
+    /* Clear callback */
+    shared_link_set_transport_callback(NULL, NULL);
+
+    shared_link_cleanup();
+}
+
+TEST(link_check_callbacks_not_initialized) {
+    /* Should not crash when not initialized */
+    shared_link_check_callbacks();
+}
+
+TEST(link_check_callbacks_no_callbacks) {
+    int result = shared_link_init(120.0);
+    ASSERT_EQ(result, 0);
+
+    /* Should not crash with no callbacks set */
+    shared_link_check_callbacks();
+
+    shared_link_cleanup();
+}
+
+TEST(link_callbacks_not_called_when_not_initialized) {
+    reset_callback_state();
+
+    /* Set callbacks before init */
+    shared_link_set_peers_callback(test_peers_callback, NULL);
+    shared_link_set_tempo_callback(test_tempo_callback, NULL);
+    shared_link_set_transport_callback(test_transport_callback, NULL);
+
+    /* Check callbacks (Link not initialized) */
+    shared_link_check_callbacks();
+
+    /* Should not have been called */
+    ASSERT_EQ(g_peers_callback_count, 0);
+    ASSERT_EQ(g_tempo_callback_count, 0);
+    ASSERT_EQ(g_transport_callback_count, 0);
+}
+
+TEST(link_ms_to_next_beat_disabled) {
+    int result = shared_link_init(120.0);
+    ASSERT_EQ(result, 0);
+
+    /* When Link is disabled, should return 0 */
+    int ms = shared_link_ms_to_next_beat(4.0);
+    ASSERT_EQ(ms, 0);
+
+    shared_link_cleanup();
+}
+
+TEST(link_ms_to_next_beat_enabled) {
+    int result = shared_link_init(120.0);
+    ASSERT_EQ(result, 0);
+
+    shared_link_enable(1);
+
+    /* When enabled, should return some value (may be 0 or positive) */
+    int ms = shared_link_ms_to_next_beat(4.0);
+    ASSERT_TRUE(ms >= 0);
+
+    shared_link_cleanup();
+}
+
+TEST(link_tempo_clamping_low) {
+    int result = shared_link_init(120.0);
+    ASSERT_EQ(result, 0);
+
+    shared_link_enable(1);
+
+    /* Set tempo below minimum (20 BPM) */
+    shared_link_set_tempo(10.0);
+    double tempo = shared_link_get_tempo();
+    /* Should be clamped to minimum */
+    ASSERT_TRUE(tempo >= 20.0);
+
+    shared_link_cleanup();
+}
+
+TEST(link_tempo_clamping_high) {
+    int result = shared_link_init(120.0);
+    ASSERT_EQ(result, 0);
+
+    shared_link_enable(1);
+
+    /* Set tempo above maximum (999 BPM) */
+    shared_link_set_tempo(1500.0);
+    double tempo = shared_link_get_tempo();
+    /* Should be clamped to maximum */
+    ASSERT_TRUE(tempo <= 999.0);
+
+    shared_link_cleanup();
+}
+
+/* ============================================================================
  * Test Runner
  * ============================================================================ */
 
@@ -262,5 +443,21 @@ BEGIN_TEST_SUITE("Ableton Link Tests")
     /* Beat/Phase */
     RUN_TEST(link_get_beat);
     RUN_TEST(link_get_phase);
+
+    /* Callbacks */
+    RUN_TEST(link_set_peers_callback);
+    RUN_TEST(link_set_tempo_callback);
+    RUN_TEST(link_set_transport_callback);
+    RUN_TEST(link_check_callbacks_not_initialized);
+    RUN_TEST(link_check_callbacks_no_callbacks);
+    RUN_TEST(link_callbacks_not_called_when_not_initialized);
+
+    /* Timing */
+    RUN_TEST(link_ms_to_next_beat_disabled);
+    RUN_TEST(link_ms_to_next_beat_enabled);
+
+    /* Tempo clamping */
+    RUN_TEST(link_tempo_clamping_low);
+    RUN_TEST(link_tempo_clamping_high);
 
 END_TEST_SUITE()

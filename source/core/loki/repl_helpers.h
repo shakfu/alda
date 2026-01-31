@@ -93,6 +93,74 @@ void repl_pipe_loop(int (*process_fn)(void *ctx, const char *line),
                     void (*eval_fn)(void *ctx, const char *line),
                     void *ctx);
 
+/* ============================================================================
+ * Interactive REPL Loop Skeleton
+ * ============================================================================ */
+
+/**
+ * @brief Language identifier for syntax highlighting in interactive REPLs.
+ */
+typedef enum {
+    REPL_SKEL_LANG_NONE = 0,
+    REPL_SKEL_LANG_ALDA,
+    REPL_SKEL_LANG_JOY,
+    REPL_SKEL_LANG_BOG,
+    REPL_SKEL_LANG_TR7,
+    REPL_SKEL_LANG_LUA
+} ReplSkelLanguage;
+
+/**
+ * @brief Completion callback type for interactive REPL.
+ *
+ * @param prefix Current word prefix to complete
+ * @param count Output: number of completions returned
+ * @param user_data User-provided context
+ * @return Array of completion strings (caller frees), or NULL
+ */
+typedef char **(*ReplSkelCompletionFn)(const char *prefix, int *count, void *user_data);
+
+/**
+ * @brief Configuration for the interactive REPL skeleton.
+ */
+typedef struct {
+    /* Required callbacks */
+    int (*process_command)(void *ctx, const char *input);  /**< Returns 0=handled, 1=quit, 2=eval */
+    void (*eval_line)(void *ctx, const char *input);       /**< Evaluate code */
+
+    /* Optional callbacks */
+    void (*print_banner)(void);                            /**< Print startup banner (NULL = skip) */
+    void (*on_iteration)(void);                            /**< Called each loop iteration (e.g., Link polling) */
+
+    /* Completion support */
+    ReplSkelCompletionFn completion_fn;                    /**< Tab completion callback (NULL = disabled) */
+    void *completion_user_data;                            /**< User data for completion callback */
+
+    /* Configuration */
+    const char *prompt;                                    /**< REPL prompt (e.g., "joy> ") */
+    const char *lang_name;                                 /**< Language name for history file (e.g., "joy") */
+    ReplSkelLanguage syntax_lang;                          /**< Syntax highlighting language */
+
+    /* Context */
+    void *lang_ctx;                                        /**< Language-specific context passed to callbacks */
+} ReplSkeletonConfig;
+
+/**
+ * @brief Run an interactive REPL loop using the provided configuration.
+ *
+ * Handles the common REPL pattern:
+ * 1. Detects interactive vs piped input (falls back to repl_pipe_loop for pipes)
+ * 2. Initializes line editor with syntax highlighting
+ * 3. Sets up tab completion if provided
+ * 4. Loads history from language-specific history file
+ * 5. Enables raw mode for input
+ * 6. Runs main loop: readline -> process command -> eval
+ * 7. Saves history and cleans up on exit
+ *
+ * @param config Configuration for the REPL loop
+ * @param syntax_ctx Editor context for syntax highlighting (can be NULL)
+ */
+void repl_skeleton_run(const ReplSkeletonConfig *config, void *syntax_ctx);
+
 #ifdef __cplusplus
 }
 #endif

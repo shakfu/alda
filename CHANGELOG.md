@@ -37,6 +37,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - `test_mkdtemp()`, `test_rmdir_recursive()` - Temp directory management
   - `test_write_file()` - Create test fixture files
 
+- **REPL Skeleton Module**: Callback-based infrastructure for language REPLs (`repl_helpers.h`)
+  - `ReplSkeletonConfig` struct with pluggable command/eval callbacks
+  - `repl_skeleton_run()` handles: interactive vs pipe mode, line editor, history, raw mode
+  - Joy REPL refactored as proof-of-concept (~50 lines reduced to config struct)
+  - Eliminates ~150 lines of duplicated loop code per language
+
+- **Configurable Playback Commands**: `eval_line` and `play_file` now in keybind system
+  - `cmd_eval_line()` - Evaluate selection or current Alda part (Ctrl-E)
+  - `cmd_play_file()` - Play entire buffer (Ctrl-P)
+  - `cmd_quit_keybind()` - Quit command for keybind mapping
+  - All commands configurable via TOML `[keybindings]` section
+
 ### Changed
 
 - **CLI Tests Refactored**: Replaced `system()` shell spawning with direct `fork`/`execve`
@@ -50,6 +62,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - `psnd_platform_add_math()` - Math library linking
   - `psnd_platform_add_pthread()` - Thread library linking
   - Updated core, alda, joy, and bog CMakeLists.txt to use centralized functions
+
+- **Modal Command Dispatcher Refactored**: Hardcoded commands moved to keybind system
+  - Removed duplicate CTRL_E/CTRL_P handlers from `process_normal_mode()` and `process_insert_mode()`
+  - Commands now dispatched via `keybind_try_handle()` before mode-specific handlers
+  - Enables user remapping of playback commands via config.toml
 
 ## [0.1.4]
 

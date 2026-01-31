@@ -114,3 +114,18 @@ add_test(
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 set_tests_properties(shared_minihost_backend_tests PROPERTIES LABELS "unit")
+
+# Test for shared REPL command processor
+add_executable(test_repl_commands test_repl_commands.c)
+target_include_directories(test_repl_commands PRIVATE
+    ${PSND_ROOT_DIR}/source/core/include
+    ${PSND_ROOT_DIR}/source/core/shared
+    ${PSND_ROOT_DIR}/source/testing
+)
+target_link_libraries(test_repl_commands PRIVATE shared test_framework m)
+add_test(
+    NAME shared_repl_commands_tests
+    COMMAND $<TARGET_FILE:test_repl_commands>
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+set_tests_properties(shared_repl_commands_tests PROPERTIES LABELS "unit")

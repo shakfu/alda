@@ -96,6 +96,11 @@ static void joy_stop_playback(void) {
     joy_midi_panic(g_joy_repl_shared);
 }
 
+/* Forward declarations for skeleton callbacks */
+static int joy_skel_process_command(void *ctx, const char *input);
+static void joy_skel_eval_line(void *ctx, const char *input);
+static void joy_skel_print_banner(void);
+
 /* Note: Using repl_repl_starts_with() from loki/repl_helpers.h */
 
 /* Process a Joy REPL command. Returns: 0=continue, 1=quit, 2=evaluate as Joy code */
@@ -145,31 +150,6 @@ static int joy_process_command(JoyContext* ctx, const char* input) {
     return 2; /* evaluate as Joy code */
 }
 
-/* Non-interactive Joy REPL loop for piped input */
-static void joy_repl_loop_pipe(JoyContext *ctx) {
-    char line[MAX_INPUT_LENGTH];
-    jmp_buf error_recovery;
-
-    ctx->error_jmp = &error_recovery;
-    joy_set_current_context(ctx);
-
-    while (fgets(line, sizeof(line), stdin) != NULL) {
-        /* Strip trailing newline */
-        size_t len = repl_strip_newlines(line);
-        if (len == 0) continue;
-
-        int result = joy_process_command(ctx, line);
-        if (result == 1) break; /* quit */
-        if (result == 0) continue; /* command handled */
-
-        /* Set up error recovery and evaluate */
-        if (setjmp(error_recovery) != 0) {
-            continue;
-        }
-        joy_eval_line(ctx, line);
-    }
-}
-
 /* Tab completion callback for Joy REPL */
 static char **joy_completion_callback(const char *prefix, int *count, void *user_data) {
     JoyContext *ctx = (JoyContext *)user_data;
@@ -178,87 +158,60 @@ static char **joy_completion_callback(const char *prefix, int *count, void *user
     return joy_dict_get_completions(ctx->dictionary, prefix, count, REPL_COMPLETIONS_MAX);
 }
 
-static void joy_repl_loop(JoyContext *ctx, editor_ctx_t *syntax_ctx) {
-    ReplLineEditor ed;
-    char *input;
-    jmp_buf error_recovery;
-    char history_path[512] = {0};
+/* ============================================================================
+ * REPL Skeleton Callbacks
+ * ============================================================================ */
 
-    /* Use non-interactive mode for piped input */
-    if (!isatty(STDIN_FILENO)) {
-        joy_repl_loop_pipe(ctx);
+/* Global for error recovery - needed across skeleton callbacks */
+static jmp_buf g_joy_error_recovery;
+
+/* Skeleton callback: process command */
+static int joy_skel_process_command(void *ctx, const char *input) {
+    return joy_process_command((JoyContext *)ctx, input);
+}
+
+/* Skeleton callback: evaluate line */
+static void joy_skel_eval_line(void *ctx, const char *input) {
+    JoyContext *joy_ctx = (JoyContext *)ctx;
+
+    /* Set up error recovery point */
+    if (setjmp(g_joy_error_recovery) != 0) {
+        /* Error occurred during eval - just return */
         return;
     }
 
-#ifdef LOKI_USE_LINENOISE
-    repl_editor_init_with_language(&ed, REPL_LANG_JOY);
-#else
-    repl_editor_init(&ed);
-#endif
+    joy_ctx->error_jmp = &g_joy_error_recovery;
+    joy_set_current_context(joy_ctx);
 
-    /* Set up tab completion for Joy dictionary words */
-    repl_set_completion(&ed, joy_completion_callback, ctx);
+    /* Evaluate Joy code */
+    joy_eval_line(joy_ctx, input);
+}
 
-    /* Build history file path and load history */
-    if (repl_get_history_path("joy", history_path, sizeof(history_path))) {
-        repl_history_load(&ed, history_path);
-    }
+/* Skeleton callback: print banner */
+static void joy_skel_print_banner(void) {
+    printf("Joy REPL %s (type help for help, quit to exit)\n", PSND_VERSION);
+}
 
-    /* Set up error recovery */
-    ctx->error_jmp = &error_recovery;
+static void joy_repl_loop(JoyContext *ctx, editor_ctx_t *syntax_ctx) {
+    /* Set up context for error recovery */
+    ctx->error_jmp = &g_joy_error_recovery;
     joy_set_current_context(ctx);
 
-    printf("Joy REPL %s (type help for help, quit to exit)\n", PSND_VERSION);
+    /* Configure the REPL skeleton */
+    ReplSkeletonConfig config = {
+        .process_command = joy_skel_process_command,
+        .eval_line = joy_skel_eval_line,
+        .print_banner = joy_skel_print_banner,
+        .on_iteration = shared_repl_link_check,
+        .completion_fn = joy_completion_callback,
+        .completion_user_data = ctx,
+        .prompt = "joy> ",
+        .lang_name = "joy",
+        .syntax_lang = REPL_SKEL_LANG_JOY,
+        .lang_ctx = ctx
+    };
 
-    /* Enable raw mode for syntax-highlighted input */
-    repl_enable_raw_mode();
-
-    while (1) {
-        input = repl_readline(syntax_ctx, &ed, "joy> ");
-
-        if (input == NULL) {
-            /* EOF - exit cleanly */
-            break;
-        }
-
-        if (input[0] == '\0') {
-            continue;
-        }
-
-        repl_add_history(&ed, input);
-
-        /* Process command */
-        int result = joy_process_command(ctx, input);
-        if (result == 1) break;      /* quit */
-        if (result == 0) {
-            /* Command handled - poll Link callbacks */
-            shared_repl_link_check();
-            continue;
-        }
-
-        /* Set up error recovery point */
-        if (setjmp(error_recovery) != 0) {
-            /* Error occurred during eval - continue REPL */
-            shared_repl_link_check();
-            continue;
-        }
-
-        /* Evaluate Joy code */
-        joy_eval_line(ctx, input);
-
-        /* Poll Link callbacks after evaluation */
-        shared_repl_link_check();
-    }
-
-    /* Disable raw mode before exit */
-    repl_disable_raw_mode();
-
-    /* Save history */
-    if (history_path[0]) {
-        repl_history_save(&ed, history_path);
-    }
-
-    repl_editor_cleanup(&ed);
+    repl_skeleton_run(&config, syntax_ctx);
 }
 
 /* ============================================================================

@@ -1304,9 +1304,10 @@ static int alda_bridge_init(editor_ctx_t *ctx) {
     return loki_alda_init(ctx, NULL);
 }
 
-/* Wrapper for eval (bridge uses sync eval) */
+/* Wrapper for eval (bridge uses async eval for non-blocking playback) */
 static int alda_bridge_eval(editor_ctx_t *ctx, const char *code) {
-    return loki_alda_eval_sync(ctx, code);
+    int slot = loki_alda_eval_async(ctx, code, NULL);
+    return (slot >= 0) ? 0 : slot;  /* Convert slot_id to 0 success, negative for error */
 }
 
 /* Wrapper for stop (bridge doesn't take slot_id) */

@@ -38,9 +38,11 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
   - Uses `mkdtemp()` and `nftw()` for temp directory management
   - Added `test_process.h` with reusable process execution utilities
 
-- [ ] Add missing test coverage
-  - No tests for: editor bridge, Ableton Link callbacks, shared REPL command processor
-  - Pointer/string comparisons can silently truncate in test framework
+- [x] ~~Add missing test coverage~~ **DONE**
+  - Added `test_lang_bridge.c`: 38 tests for language bridge dispatch (registration, lookup, lifecycle, eval, stop)
+  - Extended `test_link.c`: 10 new tests for callbacks and tempo clamping (now 33 total Link tests)
+  - Added `test_repl_commands.c`: 52 tests for shared REPL command processor (quit, stop, link, synth, csound, play, etc.)
+  - Pointer/string comparisons can silently truncate in test framework (known limitation)
 
 - [x] ~~Expand test framework with comparison macros~~ **DONE**
   - Added `ASSERT_GT`, `ASSERT_LT`, `ASSERT_GTE`, `ASSERT_LTE` to all test frameworks
@@ -57,9 +59,12 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
 
 ### Code Quality & Refactoring
 
-- [ ] Extract shared REPL loop skeleton
-  - ~150 lines of help functions still duplicated per language
-  - Interactive loop structure still duplicated (could use callback pattern)
+- [x] ~~Extract shared REPL loop skeleton~~ **DONE**
+  - Created `ReplSkeletonConfig` struct with callback-based interface in `repl_helpers.h`
+  - `repl_skeleton_run()` handles: interactive vs pipe mode detection, line editor init,
+    tab completion, history loading/saving, raw mode, main loop, cleanup
+  - Refactored Joy REPL to use skeleton as proof-of-concept
+  - Other REPLs (Alda, Bog, TR7) can be similarly refactored
 
 - [x] ~~Centralize platform CMake logic~~ **DONE**
   - Created `scripts/cmake/psnd_platform.cmake` module
@@ -68,10 +73,11 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
   - Updated `source/core/CMakeLists.txt`, `source/langs/alda/CMakeLists.txt`,
     `source/langs/joy/CMakeLists.txt`, `source/langs/bog/CMakeLists.txt`
 
-- [ ] Complete command dispatcher for all keybindings
-  - Currently `eval_line`, `play_file`, and `quit` are hardcoded in `modal.c`
-  - These commands have complex behavior (multi-press confirmation, internal functions)
-  - Refactor to allow TOML configuration of these bindings
+- [x] ~~Complete command dispatcher for all keybindings~~ **DONE**
+  - Registered `eval_line`, `play_file`, and `quit` as keybind commands in `keybind.c`
+  - Command handlers defined in `modal.c`: `cmd_eval_line()`, `cmd_play_file()`, `cmd_quit_keybind()`
+  - Removed duplicate case handlers from `process_normal_mode()` and `process_insert_mode()`
+  - All keybindings now configurable via TOML `[keybindings]` section
 
 ### Architecture
 

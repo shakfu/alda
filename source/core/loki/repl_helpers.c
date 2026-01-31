@@ -4,6 +4,9 @@
  */
 
 #include "repl_helpers.h"
+#include "repl.h"
+#include "internal.h"
+#include "shared/repl_commands.h"
 #include "psnd.h"
 
 #include <stdio.h>
@@ -11,6 +14,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <ctype.h>
+#include <unistd.h>
 
 /* Maximum input line length for piped input */
 #ifndef MAX_INPUT_LENGTH
@@ -126,4 +130,148 @@ void repl_pipe_loop(int (*process_fn)(void *ctx, const char *line),
 
         fflush(stdout);
     }
+}
+
+/* ============================================================================
+ * Interactive REPL Loop Skeleton
+ * ============================================================================ */
+
+/* Map ReplSkelLanguage to ReplLanguage for linenoise */
+#ifdef LOKI_USE_LINENOISE
+static ReplLanguage skel_lang_to_repl_lang(ReplSkelLanguage lang) {
+    switch (lang) {
+        case REPL_SKEL_LANG_ALDA: return REPL_LANG_ALDA;
+        case REPL_SKEL_LANG_JOY:  return REPL_LANG_JOY;
+        case REPL_SKEL_LANG_TR7:  return REPL_LANG_SCHEME;
+        case REPL_SKEL_LANG_LUA:  return REPL_LANG_LUA;
+        case REPL_SKEL_LANG_BOG:
+        case REPL_SKEL_LANG_NONE:
+        default:
+            return REPL_LANG_NONE;
+    }
+}
+#endif
+
+/* Adapter for pipe loop: wraps config->process_command */
+typedef struct {
+    const ReplSkeletonConfig *config;
+} PipeLoopAdapter;
+
+static int pipe_process_adapter(void *ctx, const char *line) {
+    PipeLoopAdapter *adapter = (PipeLoopAdapter *)ctx;
+    return adapter->config->process_command(adapter->config->lang_ctx, line);
+}
+
+static void pipe_eval_adapter(void *ctx, const char *line) {
+    PipeLoopAdapter *adapter = (PipeLoopAdapter *)ctx;
+    if (adapter->config->eval_line) {
+        adapter->config->eval_line(adapter->config->lang_ctx, line);
+    }
+}
+
+void repl_skeleton_run(const ReplSkeletonConfig *config, void *syntax_ctx) {
+    if (!config || !config->process_command) {
+        return;
+    }
+
+    /* Use non-interactive mode for piped input */
+    if (!isatty(STDIN_FILENO)) {
+        PipeLoopAdapter adapter = { .config = config };
+        repl_pipe_loop(pipe_process_adapter, pipe_eval_adapter, &adapter);
+        return;
+    }
+
+    /* Interactive mode */
+    ReplLineEditor ed;
+    char *input;
+    char history_path[512] = {0};
+
+    /* Initialize line editor with language-specific syntax highlighting */
+#ifdef LOKI_USE_LINENOISE
+    if (config->syntax_lang != REPL_SKEL_LANG_NONE) {
+        repl_editor_init_with_language(&ed, skel_lang_to_repl_lang(config->syntax_lang));
+    } else {
+        repl_editor_init(&ed);
+    }
+#else
+    repl_editor_init(&ed);
+#endif
+
+    /* Set up tab completion if provided */
+    if (config->completion_fn) {
+        repl_set_completion(&ed, config->completion_fn, config->completion_user_data);
+    }
+
+    /* Load history */
+    if (config->lang_name) {
+        if (repl_get_history_path(config->lang_name, history_path, sizeof(history_path))) {
+            repl_history_load(&ed, history_path);
+        }
+    }
+
+    /* Print startup banner */
+    if (config->print_banner) {
+        config->print_banner();
+    }
+
+    /* Enable raw mode for syntax-highlighted input */
+    repl_enable_raw_mode();
+
+    /* Main REPL loop */
+    const char *prompt = config->prompt ? config->prompt : "> ";
+
+    while (1) {
+        input = repl_readline((editor_ctx_t *)syntax_ctx, &ed, prompt);
+
+        if (input == NULL) {
+            /* EOF - exit cleanly */
+            break;
+        }
+
+        if (input[0] == '\0') {
+            /* Empty input - poll callbacks and continue */
+            if (config->on_iteration) {
+                config->on_iteration();
+            }
+            continue;
+        }
+
+        repl_add_history(&ed, input);
+
+        /* Process command */
+        int result = config->process_command(config->lang_ctx, input);
+
+        if (result == 1) {
+            /* Quit */
+            break;
+        }
+
+        if (result == 0) {
+            /* Command handled - poll callbacks and continue */
+            if (config->on_iteration) {
+                config->on_iteration();
+            }
+            continue;
+        }
+
+        /* result == 2: evaluate as code */
+        if (config->eval_line) {
+            config->eval_line(config->lang_ctx, input);
+        }
+
+        /* Poll callbacks after evaluation */
+        if (config->on_iteration) {
+            config->on_iteration();
+        }
+    }
+
+    /* Disable raw mode before exit */
+    repl_disable_raw_mode();
+
+    /* Save history */
+    if (history_path[0]) {
+        repl_history_save(&ed, history_path);
+    }
+
+    repl_editor_cleanup(&ed);
 }

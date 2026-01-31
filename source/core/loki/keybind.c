@@ -8,6 +8,7 @@
 #include "config.h"
 #include "lang_bridge.h"
 #include "selection.h"
+#include "modal.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -183,13 +184,7 @@ int keybind_register(const char *command, keybind_handler_t handler) {
 void keybind_init(void) {
     if (g_initialized) return;
 
-    /* Register built-in commands
-     * Note: Some commands are handled directly in modal.c:
-     * - quit: multi-press confirmation
-     * - eval_line: needs internal get_current_part()
-     * - play_file: complex CSD file handling
-     * - link_toggle: use :link command instead
-     */
+    /* Register built-in commands */
     keybind_register("save", cmd_save);
     keybind_register("find", cmd_find);
     keybind_register("stop", cmd_stop);
@@ -197,6 +192,11 @@ void keybind_init(void) {
     keybind_register("new_buffer", cmd_new_buffer);
     keybind_register("copy", cmd_copy);
     keybind_register("word_wrap", cmd_word_wrap);
+
+    /* Register modal commands (defined in modal.c) */
+    keybind_register("eval_line", cmd_eval_line);
+    keybind_register("play_file", cmd_play_file);
+    keybind_register("quit", cmd_quit_keybind);
 
     g_initialized = 1;
 }
