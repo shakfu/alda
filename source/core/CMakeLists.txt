@@ -132,6 +132,7 @@ function(psnd_build_loki)
         ${PSND_CORE_DIR}/loki/lua.c
         ${PSND_CORE_DIR}/loki/config.c
         ${PSND_CORE_DIR}/loki/theme_toml.c
+        ${PSND_CORE_DIR}/loki/lang_toml.c
         ${PSND_CORE_DIR}/loki/editor.c
         ${PSND_CORE_DIR}/loki/syntax.c
         ${PSND_CORE_DIR}/loki/indent.c

@@ -30,6 +30,7 @@
 #include "syntax.h"
 #include "config.h"
 #include "theme_toml.h"
+#include "lang_toml.h"
 #ifdef LOKI_USE_LINENOISE
 #include "treesitter.h"
 #endif
@@ -426,6 +427,9 @@ int loki_editor_main(int argc, char **argv) {
     if (config->theme[0] != '\0') {
         theme_toml_load(&E, config->theme);
     }
+
+    /* Load TOML language definitions (for syntax highlighting without Lua) */
+    lang_toml_load_all();
 
     /* Initialize LuaHost only if Lua is enabled in config */
     LuaHost *lua_host = NULL;

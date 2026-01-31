@@ -32,15 +32,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - When enabled: full Lua API, custom commands, `.psnd/init.lua` scripting
   - All Lua-dependent code paths gracefully degrade when Lua is disabled
 
+- **TOML Language Definitions**: Syntax highlighting without Lua via `.psnd/languages/*.toml`
+  - Language definitions include extensions, keywords, comments, and separators
+  - Primary keywords (keyword1) and secondary keywords (keyword2) support
+  - Loaded automatically at startup from project-local and home directories
+  - Alda language definition included as reference example
+
 - **Tree-sitter Syntax Highlighting**: Real-time syntax highlighting in REPLs and editor
   - Language-specific grammars: Alda, Joy, Scheme, Haskell, Lua, Csound
   - 51 highlight types for full tree-sitter semantic granularity (functions, variables, keywords, types, operators, etc.)
-  - 15 built-in C themes (monokai, dracula, nord, gruvbox-dark, solarized-dark, one-dark, catppuccin, tokyo-night, everforest, kanagawa, rose-pine, palenight, ayu-dark, solarized-light, basic16)
-  - 17 Lua themes in `.psnd/themes/` with true RGB colors (superset of C themes plus github-light, norse)
-  - `:theme` command prefers Lua themes over C themes for better color accuracy
+  - 17 TOML themes in `.psnd/themes/` with true RGB colors
+  - `:theme` command loads themes (TOML > Lua > C built-ins)
   - `:theme NAME` to switch to a specific theme (applies to all open buffers)
-  - Lua theme API: `loki.set_theme({...})` with 51 semantic token types
-  - Custom themes: create `.psnd/themes/<name>.lua` returning a function that calls `loki.set_theme()`
+  - Custom themes: create `.psnd/themes/<name>.toml` with `[colors]` section
   - Theme colors apply to REPL input highlighting
   - Build with `-DWITH_LINENOISE=ON` (enabled by default)
 
@@ -616,6 +620,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Root cause: `command_mode_exit()` was called with stale context after buffer-switching commands
   - Fix: Get fresh buffer context via `buffer_get_current()` after command execution
   - Affects: `:plugin presets`, `:e`, and any command that switches buffers
+
+### Removed
+
+- **Lua theme files**: `.psnd/themes/*.lua` replaced by TOML equivalents
+  - All 17 themes now in TOML format with same color definitions
+  - Lua themes still supported when Lua is enabled (for dynamic themes)
+
+- **Lua language files**: `.psnd/languages/*.lua` replaced by TOML equivalents
+  - Language definitions now parsed by C loader (`lang_toml.c`)
+  - No runtime Lua dependency for syntax highlighting
+
+- **Lua modules for themes/languages**: `.psnd/modules/theme.lua` and `.psnd/modules/languages.lua`
+  - Replaced by C-based TOML loaders
+  - Language integration modules (alda.lua, joy.lua, tr7.lua, bog.lua) retained
 
 ## [0.1.3]
 
