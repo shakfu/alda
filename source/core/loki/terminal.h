@@ -6,8 +6,9 @@
  * - Window size detection and monitoring
  * - Screen buffer management for efficient rendering
  *
- * These functions are platform-specific (POSIX) and isolate terminal
- * dependencies from the core editor logic.
+ * Platform support:
+ * - POSIX (macOS, Linux): termios, ioctl, SIGWINCH
+ * - Windows: Console API with VT mode (Windows 10+) or legacy fallback
  */
 
 #ifndef LOKI_TERMINAL_H
@@ -28,23 +29,25 @@ int terminal_read_key(int fd);
 /* ======================= Window Size Detection ============================ */
 
 /* Get current terminal window size in rows and columns.
- * First tries ioctl(TIOCGWINSZ), falls back to VT100 cursor queries.
+ * POSIX: tries ioctl(TIOCGWINSZ), falls back to VT100 cursor queries.
+ * Windows: uses GetConsoleScreenBufferInfo.
  * Returns 0 on success, -1 on failure. */
 int terminal_get_window_size(int ifd, int ofd, int *rows, int *cols);
 
 /* Query cursor position using VT100 escape sequences.
- * Used as fallback when ioctl fails.
+ * Used as fallback when ioctl fails (POSIX only, no-op on Windows).
  * Returns 0 on success, -1 on failure. */
 int terminal_get_cursor_position(int ifd, int ofd, int *rows, int *cols);
 
 /* Update editor context with current window size.
  * Adjusts screenrows/screencols and handles REPL layout.
- * Should be called on initialization and after SIGWINCH. */
+ * Should be called on initialization and after resize events. */
 void terminal_update_window_size(editor_ctx_t *ctx);
 
 /* Check if window size changed and update if needed.
- * Reads the winsize_changed flag set by signal handler.
- * Safe to call in main loop (signal handler only sets flag). */
+ * POSIX: reads the winsize_changed flag set by SIGWINCH handler.
+ * Windows: polls console for size changes.
+ * Safe to call in main loop. */
 void terminal_handle_resize(editor_ctx_t *ctx);
 
 /* ======================= Screen Buffer ==================================== */
@@ -60,13 +63,36 @@ void terminal_buffer_free(struct abuf *ab);
 
 /* ======================= Signal Handling ================================== */
 
+#ifdef _WIN32
+/* Windows: No SIGWINCH, resize is polled via console API */
+#define terminal_sig_winch_handler(sig) ((void)0)
+#else
 /* Signal handler for SIGWINCH (window size change).
  * Async-signal-safe: only sets a flag, actual handling in terminal_handle_resize().
  * Should be registered with signal(SIGWINCH, terminal_sig_winch_handler). */
 void terminal_sig_winch_handler(int sig);
+#endif
 
 /* ======================= Terminal Host Abstraction ========================= */
 
+#ifdef _WIN32
+/* Windows terminal host state */
+#include <windows.h>
+
+typedef struct TerminalHost {
+    HANDLE input_handle;            /* Console input handle */
+    HANDLE output_handle;           /* Console output handle */
+    DWORD orig_input_mode;          /* Original input console mode */
+    DWORD orig_output_mode;         /* Original output console mode */
+    volatile int winsize_changed;   /* Set when size change detected */
+    int rawmode;                    /* Is raw mode currently active? */
+    int vt_mode;                    /* Is VT mode available? (Windows 10+) */
+    int last_cols;                  /* Last known column count (for resize detection) */
+    int last_rows;                  /* Last known row count */
+} TerminalHost;
+
+#else
+/* POSIX terminal host state */
 #include <termios.h>
 #include <signal.h>
 
@@ -87,8 +113,9 @@ typedef struct TerminalHost {
     int rawmode;                           /* Is raw mode currently active? */
     int fd;                                /* Terminal file descriptor */
 } TerminalHost;
+#endif
 
-/* Global terminal host pointer (for signal handler access) */
+/* Global terminal host pointer (for signal handler access on POSIX) */
 extern TerminalHost *g_terminal_host;
 
 /* Initialize terminal host and register signal handlers.

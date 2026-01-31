@@ -33,7 +33,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
+#include "compat/thread.h"
 
 /* Optional embedded xterm - include host_web_xterm.h to enable */
 #if defined(LOKI_EMBED_XTERM) && !defined(XTERM_CSS)
@@ -62,7 +62,7 @@ typedef struct {
     EditorEvent queue[WEB_HOST_QUEUE_SIZE];
     int queue_head;
     int queue_tail;
-    pthread_mutex_t queue_mutex;
+    psnd_mutex_t queue_mutex;
 
     /* Configuration */
     char *web_root;                 /* Static file directory (owned, may be NULL) */
@@ -79,33 +79,33 @@ typedef struct {
 /* ======================= Event Queue ======================================= */
 
 static int web_host_queue_event(WebHostData *data, const EditorEvent *event) {
-    pthread_mutex_lock(&data->queue_mutex);
+    psnd_mutex_lock(&data->queue_mutex);
 
     int next_tail = (data->queue_tail + 1) % WEB_HOST_QUEUE_SIZE;
     if (next_tail == data->queue_head) {
-        pthread_mutex_unlock(&data->queue_mutex);
+        psnd_mutex_unlock(&data->queue_mutex);
         return -1; /* Queue full */
     }
 
     data->queue[data->queue_tail] = *event;
     data->queue_tail = next_tail;
 
-    pthread_mutex_unlock(&data->queue_mutex);
+    psnd_mutex_unlock(&data->queue_mutex);
     return 0;
 }
 
 static int web_host_dequeue_event(WebHostData *data, EditorEvent *event) {
-    pthread_mutex_lock(&data->queue_mutex);
+    psnd_mutex_lock(&data->queue_mutex);
 
     if (data->queue_head == data->queue_tail) {
-        pthread_mutex_unlock(&data->queue_mutex);
+        psnd_mutex_unlock(&data->queue_mutex);
         return -1; /* Queue empty */
     }
 
     *event = data->queue[data->queue_head];
     data->queue_head = (data->queue_head + 1) % WEB_HOST_QUEUE_SIZE;
 
-    pthread_mutex_unlock(&data->queue_mutex);
+    psnd_mutex_unlock(&data->queue_mutex);
     return 0;
 }
 
@@ -788,7 +788,7 @@ static void web_host_destroy(EditorHost *host) {
     if (data) {
         data->running = 0;
         mg_mgr_free(&data->mgr);
-        pthread_mutex_destroy(&data->queue_mutex);
+        psnd_mutex_destroy(&data->queue_mutex);
         free(data->web_root);
         free(data);
     }
@@ -808,7 +808,7 @@ EditorHost *editor_host_web_create(int port, const char *web_root) {
     }
 
     /* Initialize mutex */
-    if (pthread_mutex_init(&data->queue_mutex, NULL) != 0) {
+    if (psnd_mutex_init(&data->queue_mutex) != 0) {
         free(data);
         free(host);
         return NULL;
@@ -820,7 +820,7 @@ EditorHost *editor_host_web_create(int port, const char *web_root) {
     if (web_root) {
         data->web_root = strdup(web_root);
         if (!data->web_root) {
-            pthread_mutex_destroy(&data->queue_mutex);
+            psnd_mutex_destroy(&data->queue_mutex);
             free(data);
             free(host);
             return NULL;
@@ -839,7 +839,7 @@ EditorHost *editor_host_web_create(int port, const char *web_root) {
     if (!data->listener) {
         fprintf(stderr, "Error: Failed to bind to port %d\n", data->port);
         mg_mgr_free(&data->mgr);
-        pthread_mutex_destroy(&data->queue_mutex);
+        psnd_mutex_destroy(&data->queue_mutex);
         free(data->web_root);
         free(data);
         free(host);

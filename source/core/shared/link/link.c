@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
+#include "compat/thread.h"
 
 /* Ableton Link C wrapper */
 #include <abl_link.h>
@@ -24,7 +24,7 @@ typedef struct {
     abl_link_session_state session_state;
     int initialized;
     int ref_count;      /* Reference count for enable/disable */
-    pthread_mutex_t mutex;
+    psnd_mutex_t mutex;
 
     /* Callback state (set by Link thread, polled by main thread) */
     volatile int peers_changed;
@@ -56,26 +56,26 @@ static LinkState g_link = {0};
 
 static void on_peers_changed(uint64_t num_peers, void* context) {
     (void)context;
-    pthread_mutex_lock(&g_link.mutex);
+    psnd_mutex_lock(&g_link.mutex);
     g_link.pending_peers = num_peers;
     g_link.peers_changed = 1;
-    pthread_mutex_unlock(&g_link.mutex);
+    psnd_mutex_unlock(&g_link.mutex);
 }
 
 static void on_tempo_changed(double tempo, void* context) {
     (void)context;
-    pthread_mutex_lock(&g_link.mutex);
+    psnd_mutex_lock(&g_link.mutex);
     g_link.pending_tempo = tempo;
     g_link.tempo_changed = 1;
-    pthread_mutex_unlock(&g_link.mutex);
+    psnd_mutex_unlock(&g_link.mutex);
 }
 
 static void on_start_stop_changed(bool is_playing, void* context) {
     (void)context;
-    pthread_mutex_lock(&g_link.mutex);
+    psnd_mutex_lock(&g_link.mutex);
     g_link.pending_playing = is_playing ? 1 : 0;
     g_link.playing_changed = 1;
-    pthread_mutex_unlock(&g_link.mutex);
+    psnd_mutex_unlock(&g_link.mutex);
 }
 
 /* ============================================================================
@@ -92,7 +92,7 @@ int shared_link_init(double initial_bpm) {
     if (initial_bpm > 999.0) initial_bpm = 999.0;
 
     /* Initialize mutex */
-    if (pthread_mutex_init(&g_link.mutex, NULL) != 0) {
+    if (psnd_mutex_init(&g_link.mutex) != 0) {
         return -1;
     }
 
@@ -120,7 +120,7 @@ int shared_link_init(double initial_bpm) {
 void shared_link_cleanup(void) {
     if (!g_link.initialized) return;
 
-    pthread_mutex_lock(&g_link.mutex);
+    psnd_mutex_lock(&g_link.mutex);
 
     /* Disable Link before cleanup */
     abl_link_enable(g_link.link, false);
@@ -141,8 +141,8 @@ void shared_link_cleanup(void) {
 
     g_link.initialized = 0;
 
-    pthread_mutex_unlock(&g_link.mutex);
-    pthread_mutex_destroy(&g_link.mutex);
+    psnd_mutex_unlock(&g_link.mutex);
+    psnd_mutex_destroy(&g_link.mutex);
 }
 
 int shared_link_is_initialized(void) {
@@ -324,34 +324,34 @@ uint64_t shared_link_num_peers(void) {
 void shared_link_set_peers_callback(shared_link_peers_callback_t callback, void* userdata) {
     if (!g_link.initialized) return;
 
-    pthread_mutex_lock(&g_link.mutex);
+    psnd_mutex_lock(&g_link.mutex);
     g_link.peers_callback = callback;
     g_link.peers_userdata = userdata;
-    pthread_mutex_unlock(&g_link.mutex);
+    psnd_mutex_unlock(&g_link.mutex);
 }
 
 void shared_link_set_tempo_callback(shared_link_tempo_callback_t callback, void* userdata) {
     if (!g_link.initialized) return;
 
-    pthread_mutex_lock(&g_link.mutex);
+    psnd_mutex_lock(&g_link.mutex);
     g_link.tempo_callback = callback;
     g_link.tempo_userdata = userdata;
-    pthread_mutex_unlock(&g_link.mutex);
+    psnd_mutex_unlock(&g_link.mutex);
 }
 
 void shared_link_set_transport_callback(shared_link_transport_callback_t callback, void* userdata) {
     if (!g_link.initialized) return;
 
-    pthread_mutex_lock(&g_link.mutex);
+    psnd_mutex_lock(&g_link.mutex);
     g_link.transport_callback = callback;
     g_link.transport_userdata = userdata;
-    pthread_mutex_unlock(&g_link.mutex);
+    psnd_mutex_unlock(&g_link.mutex);
 }
 
 void shared_link_check_callbacks(void) {
     if (!g_link.initialized) return;
 
-    pthread_mutex_lock(&g_link.mutex);
+    psnd_mutex_lock(&g_link.mutex);
 
     /* Check for peer count changes */
     if (g_link.peers_changed && g_link.peers_callback) {
@@ -361,9 +361,9 @@ void shared_link_check_callbacks(void) {
         g_link.peers_changed = 0;
         g_link.last_peers = peers;
 
-        pthread_mutex_unlock(&g_link.mutex);
+        psnd_mutex_unlock(&g_link.mutex);
         callback(peers, userdata);
-        pthread_mutex_lock(&g_link.mutex);
+        psnd_mutex_lock(&g_link.mutex);
     }
 
     /* Check for tempo changes */
@@ -374,9 +374,9 @@ void shared_link_check_callbacks(void) {
         g_link.tempo_changed = 0;
         g_link.last_tempo = tempo;
 
-        pthread_mutex_unlock(&g_link.mutex);
+        psnd_mutex_unlock(&g_link.mutex);
         callback(tempo, userdata);
-        pthread_mutex_lock(&g_link.mutex);
+        psnd_mutex_lock(&g_link.mutex);
     }
 
     /* Check for transport changes */
@@ -387,10 +387,10 @@ void shared_link_check_callbacks(void) {
         g_link.playing_changed = 0;
         g_link.last_playing = playing;
 
-        pthread_mutex_unlock(&g_link.mutex);
+        psnd_mutex_unlock(&g_link.mutex);
         callback(playing, userdata);
-        pthread_mutex_lock(&g_link.mutex);
+        psnd_mutex_lock(&g_link.mutex);
     }
 
-    pthread_mutex_unlock(&g_link.mutex);
+    psnd_mutex_unlock(&g_link.mutex);
 }

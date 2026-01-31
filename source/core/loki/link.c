@@ -7,8 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 
+#include "compat/thread.h"
 #include "loki/link.h"
 #include "internal.h"
 #include "async_queue.h"
@@ -26,7 +26,7 @@ typedef struct {
     abl_link link;
     abl_link_session_state session_state;
     int initialized;
-    pthread_mutex_t mutex;
+    psnd_mutex_t mutex;
 
     /* Callback state (set by Link thread, polled by main thread) */
     volatile int peers_changed;
@@ -54,12 +54,12 @@ static LinkState g_link_state = {0};
 /* Called on Link-managed thread when peer count changes */
 static void on_peers_changed(uint64_t num_peers, void *context) {
     (void)context;
-    pthread_mutex_lock(&g_link_state.mutex);
+    psnd_mutex_lock(&g_link_state.mutex);
     g_link_state.pending_peers = num_peers;
     g_link_state.peers_changed = 1;
     /* Capture callback name while holding mutex */
     const char *callback = g_link_state.peers_callback;
-    pthread_mutex_unlock(&g_link_state.mutex);
+    psnd_mutex_unlock(&g_link_state.mutex);
 
     /* Push event to async queue for unified event handling */
     async_queue_push_link_peers(NULL, num_peers, callback);
@@ -68,12 +68,12 @@ static void on_peers_changed(uint64_t num_peers, void *context) {
 /* Called on Link-managed thread when tempo changes */
 static void on_tempo_changed(double tempo, void *context) {
     (void)context;
-    pthread_mutex_lock(&g_link_state.mutex);
+    psnd_mutex_lock(&g_link_state.mutex);
     g_link_state.pending_tempo = tempo;
     g_link_state.tempo_changed = 1;
     /* Capture callback name while holding mutex */
     const char *callback = g_link_state.tempo_callback;
-    pthread_mutex_unlock(&g_link_state.mutex);
+    psnd_mutex_unlock(&g_link_state.mutex);
 
     /* Push event to async queue for unified event handling */
     async_queue_push_link_tempo(NULL, tempo, callback);
@@ -82,12 +82,12 @@ static void on_tempo_changed(double tempo, void *context) {
 /* Called on Link-managed thread when start/stop state changes */
 static void on_start_stop_changed(bool is_playing, void *context) {
     (void)context;
-    pthread_mutex_lock(&g_link_state.mutex);
+    psnd_mutex_lock(&g_link_state.mutex);
     g_link_state.pending_playing = is_playing ? 1 : 0;
     g_link_state.playing_changed = 1;
     /* Capture callback name while holding mutex */
     const char *callback = g_link_state.start_stop_callback;
-    pthread_mutex_unlock(&g_link_state.mutex);
+    psnd_mutex_unlock(&g_link_state.mutex);
 
     /* Push event to async queue for unified event handling */
     async_queue_push_link_transport(NULL, is_playing ? 1 : 0, callback);
@@ -107,7 +107,7 @@ int loki_link_init(editor_ctx_t *ctx, double initial_bpm) {
     if (initial_bpm > 999.0) initial_bpm = 999.0;
 
     /* Initialize mutex */
-    if (pthread_mutex_init(&g_link_state.mutex, NULL) != 0) {
+    if (psnd_mutex_init(&g_link_state.mutex) != 0) {
         return -1;
     }
 
@@ -137,7 +137,7 @@ void loki_link_cleanup(editor_ctx_t *ctx) {
 
     if (!g_link_state.initialized) return;
 
-    pthread_mutex_lock(&g_link_state.mutex);
+    psnd_mutex_lock(&g_link_state.mutex);
 
     /* Disable Link before cleanup */
     abl_link_enable(g_link_state.link, false);
@@ -159,8 +159,8 @@ void loki_link_cleanup(editor_ctx_t *ctx) {
 
     g_link_state.initialized = 0;
 
-    pthread_mutex_unlock(&g_link_state.mutex);
-    pthread_mutex_destroy(&g_link_state.mutex);
+    psnd_mutex_unlock(&g_link_state.mutex);
+    psnd_mutex_destroy(&g_link_state.mutex);
 }
 
 int loki_link_is_initialized(editor_ctx_t *ctx) {
@@ -299,10 +299,10 @@ void loki_link_set_peers_callback(editor_ctx_t *ctx, const char *callback_name) 
 
     if (!g_link_state.initialized) return;
 
-    pthread_mutex_lock(&g_link_state.mutex);
+    psnd_mutex_lock(&g_link_state.mutex);
     free(g_link_state.peers_callback);
     g_link_state.peers_callback = callback_name ? strdup(callback_name) : NULL;
-    pthread_mutex_unlock(&g_link_state.mutex);
+    psnd_mutex_unlock(&g_link_state.mutex);
 }
 
 void loki_link_set_tempo_callback(editor_ctx_t *ctx, const char *callback_name) {
@@ -310,10 +310,10 @@ void loki_link_set_tempo_callback(editor_ctx_t *ctx, const char *callback_name) 
 
     if (!g_link_state.initialized) return;
 
-    pthread_mutex_lock(&g_link_state.mutex);
+    psnd_mutex_lock(&g_link_state.mutex);
     free(g_link_state.tempo_callback);
     g_link_state.tempo_callback = callback_name ? strdup(callback_name) : NULL;
-    pthread_mutex_unlock(&g_link_state.mutex);
+    psnd_mutex_unlock(&g_link_state.mutex);
 }
 
 void loki_link_set_start_stop_callback(editor_ctx_t *ctx, const char *callback_name) {
@@ -321,10 +321,10 @@ void loki_link_set_start_stop_callback(editor_ctx_t *ctx, const char *callback_n
 
     if (!g_link_state.initialized) return;
 
-    pthread_mutex_lock(&g_link_state.mutex);
+    psnd_mutex_lock(&g_link_state.mutex);
     free(g_link_state.start_stop_callback);
     g_link_state.start_stop_callback = callback_name ? strdup(callback_name) : NULL;
-    pthread_mutex_unlock(&g_link_state.mutex);
+    psnd_mutex_unlock(&g_link_state.mutex);
 }
 
 /* ======================= Main Loop Integration ======================= */
@@ -335,7 +335,7 @@ void loki_link_check_callbacks(editor_ctx_t *ctx, lua_State *L) {
     if (!g_link_state.initialized) return;
     if (!L) return;
 
-    pthread_mutex_lock(&g_link_state.mutex);
+    psnd_mutex_lock(&g_link_state.mutex);
 
     /* Check for peer count changes */
     if (g_link_state.peers_changed && g_link_state.peers_callback) {
@@ -344,7 +344,7 @@ void loki_link_check_callbacks(editor_ctx_t *ctx, lua_State *L) {
         g_link_state.last_peers = peers;
 
         char *callback = g_link_state.peers_callback;
-        pthread_mutex_unlock(&g_link_state.mutex);
+        psnd_mutex_unlock(&g_link_state.mutex);
 
         lua_getglobal(L, callback);
         if (lua_isfunction(L, -1)) {
@@ -358,7 +358,7 @@ void loki_link_check_callbacks(editor_ctx_t *ctx, lua_State *L) {
             lua_pop(L, 1);
         }
 
-        pthread_mutex_lock(&g_link_state.mutex);
+        psnd_mutex_lock(&g_link_state.mutex);
     }
 
     /* Check for tempo changes */
@@ -368,7 +368,7 @@ void loki_link_check_callbacks(editor_ctx_t *ctx, lua_State *L) {
         g_link_state.last_tempo = tempo;
 
         char *callback = g_link_state.tempo_callback;
-        pthread_mutex_unlock(&g_link_state.mutex);
+        psnd_mutex_unlock(&g_link_state.mutex);
 
         lua_getglobal(L, callback);
         if (lua_isfunction(L, -1)) {
@@ -382,7 +382,7 @@ void loki_link_check_callbacks(editor_ctx_t *ctx, lua_State *L) {
             lua_pop(L, 1);
         }
 
-        pthread_mutex_lock(&g_link_state.mutex);
+        psnd_mutex_lock(&g_link_state.mutex);
     }
 
     /* Check for start/stop changes */
@@ -392,7 +392,7 @@ void loki_link_check_callbacks(editor_ctx_t *ctx, lua_State *L) {
         g_link_state.last_playing = playing;
 
         char *callback = g_link_state.start_stop_callback;
-        pthread_mutex_unlock(&g_link_state.mutex);
+        psnd_mutex_unlock(&g_link_state.mutex);
 
         lua_getglobal(L, callback);
         if (lua_isfunction(L, -1)) {
@@ -406,10 +406,10 @@ void loki_link_check_callbacks(editor_ctx_t *ctx, lua_State *L) {
             lua_pop(L, 1);
         }
 
-        pthread_mutex_lock(&g_link_state.mutex);
+        psnd_mutex_lock(&g_link_state.mutex);
     }
 
-    pthread_mutex_unlock(&g_link_state.mutex);
+    psnd_mutex_unlock(&g_link_state.mutex);
 }
 
 /* ======================= Timing Integration ======================= */

@@ -40,6 +40,7 @@ target_include_directories(shared
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/shared
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
     PRIVATE
         ${PSND_ROOT_DIR}/source/thirdparty/TinySoundFont
         ${PSND_ROOT_DIR}/source/thirdparty/miniaudio
@@ -139,7 +140,8 @@ function(psnd_build_loki)
         ${PSND_CORE_DIR}/loki/command/loop.c
         ${PSND_CORE_DIR}/loki/command/plugin.c
         ${PSND_CORE_DIR}/loki/command/theme.c
-        ${PSND_CORE_DIR}/loki/terminal.c
+        ${PSND_CORE_DIR}/loki/terminal_posix.c
+        ${PSND_CORE_DIR}/loki/terminal_win.c
         ${PSND_CORE_DIR}/loki/undo.c
         ${PSND_CORE_DIR}/loki/buffers.c
         ${PSND_CORE_DIR}/loki/link.c

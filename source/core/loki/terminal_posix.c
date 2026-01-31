@@ -1,9 +1,11 @@
-/* loki_terminal.c - Terminal I/O implementation
+/* terminal_posix.c - POSIX terminal implementation
  *
- * Platform-specific terminal operations for POSIX systems.
+ * Platform-specific terminal operations for POSIX systems (macOS, Linux).
  * Uses termios for raw mode, ioctl for window size, and VT100
  * escape sequences for advanced features.
  */
+
+#ifndef _WIN32
 
 #include "terminal.h"
 #include <termios.h>
@@ -332,3 +334,5 @@ void terminal_buffer_append(struct abuf *ab, const char *s, int len) {
 void terminal_buffer_free(struct abuf *ab) {
     free(ab->b);
 }
+
+#endif /* !_WIN32 */

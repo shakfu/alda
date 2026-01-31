@@ -62,6 +62,8 @@ function(psnd_platform_link_audio target)
             target_link_libraries(${target} ${visibility} ${PSND_ALSA_LIBRARIES})
             target_include_directories(${target} PRIVATE ${PSND_ALSA_INCLUDE_DIRS})
         endif()
+    elseif(PSND_PLATFORM_WINDOWS)
+        target_link_libraries(${target} ${visibility} winmm)
     endif()
 endfunction()
 
@@ -89,6 +91,8 @@ function(psnd_platform_link_midi target)
             target_link_libraries(${target} ${visibility} ${PSND_ALSA_LIBRARIES})
             target_include_directories(${target} PRIVATE ${PSND_ALSA_INCLUDE_DIRS})
         endif()
+    elseif(PSND_PLATFORM_WINDOWS)
+        target_link_libraries(${target} ${visibility} winmm)
     endif()
 endfunction()
 
@@ -120,6 +124,8 @@ function(psnd_platform_link_audio_midi target)
             target_include_directories(${target} PRIVATE ${PSND_ALSA_INCLUDE_DIRS})
         endif()
         target_link_libraries(${target} ${visibility} pthread dl m)
+    elseif(PSND_PLATFORM_WINDOWS)
+        target_link_libraries(${target} ${visibility} winmm ws2_32)
     endif()
 endfunction()
 
@@ -137,9 +143,12 @@ function(psnd_platform_add_posix_defs target)
     endif()
 endfunction()
 
-# Add pthread and common Unix libraries to a target
+# Add threading support to a target
 #
 # Usage: psnd_platform_add_pthread(my_target [PUBLIC|PRIVATE])
+#
+# On Windows, this is a no-op since the compat/thread.h header uses
+# Windows threading primitives (CRITICAL_SECTION, CreateThread).
 #
 function(psnd_platform_add_pthread target)
     set(visibility PUBLIC)
@@ -150,6 +159,7 @@ function(psnd_platform_add_pthread target)
     if(PSND_PLATFORM_UNIX)
         target_link_libraries(${target} ${visibility} pthread)
     endif()
+    # Windows: no additional libraries needed - uses built-in threading
 endfunction()
 
 # Add common Unix libraries (dl, m) to a target
