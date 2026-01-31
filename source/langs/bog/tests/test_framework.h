@@ -91,6 +91,46 @@ static const char* g_current_test = NULL;
         }                                                                      \
     } while (0)
 
+#define ASSERT_GT(a, b)                                                        \
+    do {                                                                       \
+        if (!((a) > (b))) {                                                    \
+            fprintf(stderr, "  FAIL: %s\n    %s:%d: %d > %d failed\n",         \
+                    g_current_test, __FILE__, __LINE__, (int)(a), (int)(b));   \
+            g_tests_failed++;                                                  \
+            return;                                                            \
+        }                                                                      \
+    } while (0)
+
+#define ASSERT_LT(a, b)                                                        \
+    do {                                                                       \
+        if (!((a) < (b))) {                                                    \
+            fprintf(stderr, "  FAIL: %s\n    %s:%d: %d < %d failed\n",         \
+                    g_current_test, __FILE__, __LINE__, (int)(a), (int)(b));   \
+            g_tests_failed++;                                                  \
+            return;                                                            \
+        }                                                                      \
+    } while (0)
+
+#define ASSERT_GTE(a, b)                                                       \
+    do {                                                                       \
+        if (!((a) >= (b))) {                                                   \
+            fprintf(stderr, "  FAIL: %s\n    %s:%d: %d >= %d failed\n",        \
+                    g_current_test, __FILE__, __LINE__, (int)(a), (int)(b));   \
+            g_tests_failed++;                                                  \
+            return;                                                            \
+        }                                                                      \
+    } while (0)
+
+#define ASSERT_LTE(a, b)                                                       \
+    do {                                                                       \
+        if (!((a) <= (b))) {                                                   \
+            fprintf(stderr, "  FAIL: %s\n    %s:%d: %d <= %d failed\n",        \
+                    g_current_test, __FILE__, __LINE__, (int)(a), (int)(b));   \
+            g_tests_failed++;                                                  \
+            return;                                                            \
+        }                                                                      \
+    } while (0)
+
 #define TEST_PASS()                                                            \
     do {                                                                       \
         g_tests_passed++;                                                      \
@@ -104,5 +144,51 @@ static const char* g_current_test = NULL;
     } while (0)
 
 #define TEST_EXIT_CODE() (g_tests_failed > 0 ? 1 : 0)
+
+/* =============================================================================
+ * Test Fixtures
+ * =============================================================================
+ */
+
+/* Define a fixture with its state structure */
+#define FIXTURE(name, state_struct)                                            \
+    typedef struct name##_fixture_state state_struct name##_fixture_state_t;   \
+    static name##_fixture_state_t name##_fixture_instance;                     \
+    static void name##_setup(name##_fixture_state_t *fixture);                 \
+    static void name##_teardown(name##_fixture_state_t *fixture)
+
+/* Define the setup function for a fixture */
+#define FIXTURE_SETUP(name)                                                    \
+    static void name##_setup(name##_fixture_state_t *fixture)
+
+/* Define the teardown function for a fixture */
+#define FIXTURE_TEARDOWN(name)                                                 \
+    static void name##_teardown(name##_fixture_state_t *fixture)
+
+/* Define a test that uses a fixture */
+#define TEST_F(fixture_name, test_name)                                        \
+    static void test_##fixture_name##_##test_name(                             \
+        fixture_name##_fixture_state_t *fixture);                              \
+    static void run_test_##fixture_name##_##test_name(void)                    \
+    {                                                                          \
+        g_current_test = #fixture_name "_" #test_name;                         \
+        g_tests_run++;                                                         \
+        fixture_name##_setup(&fixture_name##_fixture_instance);                \
+        test_##fixture_name##_##test_name(&fixture_name##_fixture_instance);   \
+        fixture_name##_teardown(&fixture_name##_fixture_instance);             \
+    }                                                                          \
+    static void test_##fixture_name##_##test_name(                             \
+        fixture_name##_fixture_state_t *fixture)
+
+/* Run a fixture-based test */
+#define RUN_TEST_F(fixture_name, test_name)                                    \
+    do {                                                                       \
+        run_test_##fixture_name##_##test_name();                               \
+    } while (0)
+
+/* Suite-level setup/teardown */
+#define SUITE_SETUP(name) static void name##_suite_setup(void)
+
+#define SUITE_TEARDOWN(name) static void name##_suite_teardown(void)
 
 #endif /* TEST_FRAMEWORK_H */

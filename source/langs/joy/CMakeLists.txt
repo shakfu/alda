@@ -47,9 +47,7 @@ target_include_directories(joy
 
 target_link_libraries(joy PUBLIC shared libremidi)
 
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(joy PRIVATE -Wall -Wextra -Wpedantic)
-endif()
+psnd_platform_add_warnings(joy)
 
 # ==============================================================================
 # Register with psnd Language System

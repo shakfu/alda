@@ -33,13 +33,8 @@ target_include_directories(bog
 
 target_link_libraries(bog PUBLIC shared)
 
-if(UNIX)
-    target_link_libraries(bog PUBLIC m)
-endif()
-
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(bog PRIVATE -Wall -Wextra -Wpedantic)
-endif()
+psnd_platform_add_math(bog PUBLIC)
+psnd_platform_add_warnings(bog)
 
 target_compile_definitions(bog PUBLIC LANG_BOG)
 

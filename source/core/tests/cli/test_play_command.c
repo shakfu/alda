@@ -4,84 +4,98 @@
  *
  * Tests that `psnd play <file>` correctly routes to the appropriate
  * language handler based on file extension.
+ *
+ * Uses fork/exec for process execution instead of system() for:
+ * - Proper exit code capture
+ * - No shell dependency
+ * - Better portability
  */
 
 #include "../test_framework.h"
+#include "test_process.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
 
 /* Path to psnd binary - set by CMake */
 #ifndef PSND_BINARY
 #define PSND_BINARY "./psnd"
 #endif
 
-/* Temp directory for test files */
-static char temp_dir[256];
+/* =============================================================================
+ * Test Suite Fixture
+ * =============================================================================
+ */
 
-/* ============================================================================
+static char temp_dir[TEST_PROC_MAX_PATH];
+
+SUITE_SETUP(play_tests) {
+    if (test_mkdtemp("psnd_test", temp_dir) != 0) {
+        fprintf(stderr, "Failed to create temp directory\n");
+        exit(1);
+    }
+}
+
+SUITE_TEARDOWN(play_tests) {
+    test_rmdir_recursive(temp_dir);
+}
+
+/* =============================================================================
  * Helper Functions
- * ============================================================================ */
-
-static void setup_temp_dir(void) {
-    snprintf(temp_dir, sizeof(temp_dir), "/tmp/psnd_test_%d", getpid());
-    mkdir(temp_dir, 0755);
-}
-
-static void cleanup_temp_dir(void) {
-    char cmd[512];
-    snprintf(cmd, sizeof(cmd), "rm -rf %s", temp_dir);
-    system(cmd);
-}
-
-static int write_temp_file(const char *filename, const char *content) {
-    char path[512];
-    snprintf(path, sizeof(path), "%s/%s", temp_dir, filename);
-    FILE *f = fopen(path, "w");
-    if (!f) return -1;
-    fputs(content, f);
-    fclose(f);
-    return 0;
-}
+ * =============================================================================
+ */
 
 static int run_psnd_play(const char *filename) {
-    char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "%s play %s/%s 2>/dev/null", PSND_BINARY, temp_dir, filename);
-    int status = system(cmd);
-    return WEXITSTATUS(status);
+    char filepath[TEST_PROC_MAX_PATH];
+    test_build_path(temp_dir, filename, filepath);
+
+    char *args[] = {
+        "psnd",
+        "play",
+        filepath,
+        NULL
+    };
+
+    return test_exec(PSND_BINARY, args);
 }
 
 static int run_psnd_play_verbose(const char *filename) {
-    char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "%s play -v %s/%s 2>&1", PSND_BINARY, temp_dir, filename);
-    int status = system(cmd);
-    return WEXITSTATUS(status);
+    char filepath[TEST_PROC_MAX_PATH];
+    test_build_path(temp_dir, filename, filepath);
+
+    char *args[] = {
+        "psnd",
+        "play",
+        "-v",
+        filepath,
+        NULL
+    };
+
+    return test_exec(PSND_BINARY, args);
 }
 
-/* ============================================================================
+/* =============================================================================
  * Joy Play Tests
- * ============================================================================ */
+ * =============================================================================
+ */
 
 TEST(play_joy_simple_expression) {
     /* Simple Joy expression that just pushes a value */
-    ASSERT_EQ(write_temp_file("test.joy", "42\n"), 0);
+    ASSERT_EQ(test_write_file(temp_dir, "test.joy", "42\n"), 0);
     int result = run_psnd_play("test.joy");
     ASSERT_EQ(result, 0);
 }
 
 TEST(play_joy_arithmetic) {
     /* Joy arithmetic expression */
-    ASSERT_EQ(write_temp_file("arith.joy", "2 3 + 4 *\n"), 0);
+    ASSERT_EQ(test_write_file(temp_dir, "arith.joy", "2 3 + 4 *\n"), 0);
     int result = run_psnd_play("arith.joy");
     ASSERT_EQ(result, 0);
 }
 
 TEST(play_joy_define) {
     /* Joy DEFINE statement */
-    ASSERT_EQ(write_temp_file("define.joy", "DEFINE square == dup *;\n5 square\n"), 0);
+    ASSERT_EQ(test_write_file(temp_dir, "define.joy", "DEFINE square == dup *;\n5 square\n"), 0);
     int result = run_psnd_play("define.joy");
     ASSERT_EQ(result, 0);
 }
@@ -94,32 +108,33 @@ TEST(play_joy_nonexistent_file) {
 
 TEST(play_joy_verbose_flag) {
     /* Verbose flag should work */
-    ASSERT_EQ(write_temp_file("verbose.joy", "1 2 +\n"), 0);
+    ASSERT_EQ(test_write_file(temp_dir, "verbose.joy", "1 2 +\n"), 0);
     int result = run_psnd_play_verbose("verbose.joy");
     ASSERT_EQ(result, 0);
 }
 
-/* ============================================================================
+/* =============================================================================
  * TR7/Scheme Play Tests
- * ============================================================================ */
+ * =============================================================================
+ */
 
 TEST(play_scheme_simple_expression) {
     /* Simple Scheme expression */
-    ASSERT_EQ(write_temp_file("test.scm", "(+ 1 2)\n"), 0);
+    ASSERT_EQ(test_write_file(temp_dir, "test.scm", "(+ 1 2)\n"), 0);
     int result = run_psnd_play("test.scm");
     ASSERT_EQ(result, 0);
 }
 
 TEST(play_scheme_define) {
     /* Scheme define */
-    ASSERT_EQ(write_temp_file("define.scm", "(define x 42)\nx\n"), 0);
+    ASSERT_EQ(test_write_file(temp_dir, "define.scm", "(define x 42)\nx\n"), 0);
     int result = run_psnd_play("define.scm");
     ASSERT_EQ(result, 0);
 }
 
 TEST(play_scheme_lambda) {
     /* Scheme lambda */
-    ASSERT_EQ(write_temp_file("lambda.scm", "((lambda (x) (* x x)) 5)\n"), 0);
+    ASSERT_EQ(test_write_file(temp_dir, "lambda.scm", "((lambda (x) (* x x)) 5)\n"), 0);
     int result = run_psnd_play("lambda.scm");
     ASSERT_EQ(result, 0);
 }
@@ -132,25 +147,26 @@ TEST(play_scheme_nonexistent_file) {
 
 TEST(play_scheme_ss_extension) {
     /* .ss extension should also work for Scheme */
-    ASSERT_EQ(write_temp_file("test.ss", "(+ 3 4)\n"), 0);
+    ASSERT_EQ(test_write_file(temp_dir, "test.ss", "(+ 3 4)\n"), 0);
     int result = run_psnd_play("test.ss");
     ASSERT_EQ(result, 0);
 }
 
-/* ============================================================================
+/* =============================================================================
  * Alda Play Tests
- * ============================================================================ */
+ * =============================================================================
+ */
 
 TEST(play_alda_simple_note) {
     /* Simple Alda note - uses no_sleep for fast execution */
-    ASSERT_EQ(write_temp_file("test.alda", "piano: c\n"), 0);
+    ASSERT_EQ(test_write_file(temp_dir, "test.alda", "piano: c\n"), 0);
     int result = run_psnd_play("test.alda");
     ASSERT_EQ(result, 0);
 }
 
 TEST(play_alda_chord) {
     /* Alda chord */
-    ASSERT_EQ(write_temp_file("chord.alda", "piano: c/e/g\n"), 0);
+    ASSERT_EQ(test_write_file(temp_dir, "chord.alda", "piano: c/e/g\n"), 0);
     int result = run_psnd_play("chord.alda");
     ASSERT_EQ(result, 0);
 }
@@ -161,33 +177,32 @@ TEST(play_alda_nonexistent_file) {
     ASSERT_NEQ(result, 0);
 }
 
-/* ============================================================================
+/* =============================================================================
  * Error Cases
- * ============================================================================ */
+ * =============================================================================
+ */
 
 TEST(play_no_file_arg) {
     /* psnd play without file should fail */
-    char cmd[256];
-    snprintf(cmd, sizeof(cmd), "%s play 2>/dev/null", PSND_BINARY);
-    int status = system(cmd);
-    int result = WEXITSTATUS(status);
+    char *args[] = {"psnd", "play", NULL};
+    int result = test_exec(PSND_BINARY, args);
     ASSERT_NEQ(result, 0);
 }
 
 TEST(play_unknown_extension) {
     /* Unknown extension should fail or fallback */
-    ASSERT_EQ(write_temp_file("test.xyz", "hello\n"), 0);
+    ASSERT_EQ(test_write_file(temp_dir, "test.xyz", "hello\n"), 0);
     int result = run_psnd_play("test.xyz");
     /* May succeed with fallback or fail - just verify it doesn't crash */
     (void)result;
 }
 
-/* ============================================================================
+/* =============================================================================
  * Test Suite
- * ============================================================================ */
+ * =============================================================================
+ */
 
-BEGIN_TEST_SUITE("psnd play command")
-    setup_temp_dir();
+BEGIN_TEST_SUITE_WITH_FIXTURE("psnd play command", play_tests)
 
     /* Joy tests */
     RUN_TEST(play_joy_simple_expression);
@@ -212,5 +227,4 @@ BEGIN_TEST_SUITE("psnd play command")
     RUN_TEST(play_no_file_arg);
     RUN_TEST(play_unknown_extension);
 
-    cleanup_temp_dir();
-END_TEST_SUITE()
+END_TEST_SUITE_WITH_FIXTURE(play_tests)

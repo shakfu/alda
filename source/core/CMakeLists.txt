@@ -86,22 +86,8 @@ if(BUILD_OSC)
     target_link_libraries(shared PRIVATE liblo_static)
 endif()
 
-if(APPLE)
-    target_link_libraries(shared PUBLIC
-        "-framework CoreMIDI"
-        "-framework CoreFoundation"
-        "-framework CoreAudio"
-        "-framework AudioToolbox"
-    )
-elseif(UNIX AND NOT APPLE)
-    target_compile_definitions(shared PRIVATE _GNU_SOURCE)
-    find_package(ALSA)
-    if(ALSA_FOUND)
-        target_link_libraries(shared PUBLIC ${ALSA_LIBRARIES})
-        target_include_directories(shared PRIVATE ${ALSA_INCLUDE_DIRS})
-    endif()
-    target_link_libraries(shared PUBLIC pthread dl m)
-endif()
+# Platform-specific audio/MIDI frameworks (uses psnd_platform.cmake)
+psnd_platform_link_audio_midi(shared PUBLIC)
 
 # Linenoise support for shared library (theme command in REPL)
 if(WITH_LINENOISE)
@@ -112,9 +98,7 @@ if(WITH_LINENOISE)
     target_link_libraries(shared PUBLIC linenoise-theme)
 endif()
 
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(shared PRIVATE -Wall -Wextra -Wpedantic)
-endif()
+psnd_platform_add_warnings(shared)
 
 # ==============================================================================
 # Loki Library (built after languages are discovered)
@@ -274,9 +258,7 @@ function(psnd_build_loki)
         message(STATUS "Lua sandbox disabled (full Lua access)")
     endif()
 
-    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(libloki PRIVATE -Wall -Wextra -pedantic)
-    endif()
+    psnd_platform_add_warnings(libloki)
 
     target_link_libraries(libloki PUBLIC
         lua
@@ -370,9 +352,7 @@ function(psnd_build_binary)
         ${PSND_ALL_LANG_INCLUDES}
     )
 
-    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(psnd_bin PRIVATE -Wall -Wextra -pedantic)
-    endif()
+    psnd_platform_add_warnings(psnd_bin)
 
     target_link_libraries(psnd_bin PRIVATE libloki)
     psnd_apply_lang_definitions(psnd_bin)

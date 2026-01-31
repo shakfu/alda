@@ -20,6 +20,100 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
 
 ## High Priority
 
+### Testing & Robustness
+
+- [x] ~~Add scanner/lexer unit tests for all languages~~ **DONE**
+  - Alda scanner: 44 tests including vulnerability tests
+  - Joy lexer: 59 tests including edge cases
+  - Bog tokenizer: 41 tests including error recovery
+  - TR7 reader: 61 tests including buffer boundary tests
+
+- [ ] Add fuzzing infrastructure
+  - Parser robustness for malformed input
+  - Consider AFL or libFuzzer integration
+  - Target: scanners, parsers, MIDI import
+
+- [x] ~~Refactor CLI tests to avoid shell spawning~~ **DONE**
+  - Replaced `system()` with `fork`/`execve` via `test_exec()` in `test_process.h`
+  - Uses `mkdtemp()` and `nftw()` for temp directory management
+  - Added `test_process.h` with reusable process execution utilities
+
+- [ ] Add missing test coverage
+  - No tests for: editor bridge, Ableton Link callbacks, shared REPL command processor
+  - Pointer/string comparisons can silently truncate in test framework
+
+- [x] ~~Expand test framework with comparison macros~~ **DONE**
+  - Added `ASSERT_GT`, `ASSERT_LT`, `ASSERT_GTE`, `ASSERT_LTE` to all test frameworks
+- [x] ~~Add test fixture support (setup/teardown)~~ **DONE**
+  - Added `FIXTURE`, `FIXTURE_SETUP`, `FIXTURE_TEARDOWN`, `TEST_F`, `RUN_TEST_F` macros
+  - Added `SUITE_SETUP`, `SUITE_TEARDOWN` for suite-level fixtures
+  - Added `BEGIN_TEST_SUITE_WITH_FIXTURE`, `END_TEST_SUITE_WITH_FIXTURE` macros
+- [x] ~~Add memory leak detection hooks~~ **DONE**
+  - Created `test_memcheck.h` with allocation tracking
+  - `MEMCHECK_MALLOC`, `MEMCHECK_FREE`, `MEMCHECK_REALLOC`, `MEMCHECK_CALLOC`, `MEMCHECK_STRDUP`
+  - `memcheck_begin()`, `memcheck_end()`, `memcheck_report()`, `ASSERT_NO_LEAKS()`
+  - `BEGIN_TEST_SUITE_MEMCHECK`, `RUN_TEST_MEMCHECK` for per-test leak checking
+  - 12 self-tests verifying leak detection functionality
+
+### Code Quality & Refactoring
+
+- [ ] Extract shared REPL loop skeleton
+  - ~150 lines of help functions still duplicated per language
+  - Interactive loop structure still duplicated (could use callback pattern)
+
+- [x] ~~Centralize platform CMake logic~~ **DONE**
+  - Created `scripts/cmake/psnd_platform.cmake` module
+  - Functions: `psnd_platform_link_audio_midi()`, `psnd_platform_add_warnings()`,
+    `psnd_platform_add_math()`, `psnd_platform_add_pthread()`, etc.
+  - Updated `source/core/CMakeLists.txt`, `source/langs/alda/CMakeLists.txt`,
+    `source/langs/joy/CMakeLists.txt`, `source/langs/bog/CMakeLists.txt`
+
+- [ ] Complete command dispatcher for all keybindings
+  - Currently `eval_line`, `play_file`, and `quit` are hardcoded in `modal.c`
+  - These commands have complex behavior (multi-press confirmation, internal functions)
+  - Refactor to allow TOML configuration of these bindings
+
+### Architecture
+
+- [x] ~~Extract buffer manager to injectable service~~ **DONE**
+  - Added `buffer_manager_t` struct with `*_in()` API variants
+  - Global `g_buffer_manager` for backwards compatibility
+  - Enables multi-editor and better testability
+
+- [ ] Wrap editor core in standalone service process (optional)
+  - Small RPC protocol (stdio JSON or gRPC)
+  - Commands: load file, save, apply keystroke, get view state
+  - Would enable embedding editor in other applications
+
+---
+
+## Medium Priority
+
+### Documentation
+
+- [ ] API reference generation
+  - Consider Doxygen for generated docs
+
+- [ ] Contributing guide
+
+- [ ] Build troubleshooting
+  - Platform-specific guidance
+
+### Editor Improvements
+
+- [ ] Split windows
+  - Already designed for in `editor_ctx_t`
+  - Requires screen rendering changes
+
+- [ ] Playback visualization
+  - Highlight currently playing region
+  - Show playback progress in status bar
+
+- [ ] Tempo tap
+  - Tap key to set tempo
+
+- [ ] Metronome toggle
+
 ### Web Host Enhancements
 
 The web host is functional with xterm.js terminal emulator. Remaining work:
@@ -36,30 +130,6 @@ The web host is functional with xterm.js terminal emulator. Remaining work:
   - Add basic auth or token-based access for remote access
   - Required before exposing to network
 
-### Architecture
-
-- [x] ~~Extract buffer manager to injectable service~~ **DONE**
-  - Added `buffer_manager_t` struct with `*_in()` API variants
-  - Global `g_buffer_manager` for backwards compatibility
-  - Enables multi-editor and better testability
-
-- [ ] Wrap editor core in standalone service process (optional)
-  - Small RPC protocol (stdio JSON or gRPC)
-  - Commands: load file, save, apply keystroke, get view state
-  - Would enable embedding editor in other applications
-
-## Medium Priority
-
-### Testing
-
-- [ ] Add scanner/lexer unit tests for all languages
-  - Alda scanner vulnerable to malformed input
-  - Joy/Bog/TR7 lexers untested
-
-- [ ] Add fuzzing infrastructure
-  - Parser robustness for malformed input
-  - Consider AFL or libFuzzer integration
-
 ### Ableton Link Integration
 
 - [ ] **Full Transport Sync** - Start/stop from any Link peer controls all
@@ -67,88 +137,15 @@ The web host is functional with xterm.js terminal emulator. Remaining work:
   - Requires interruptible playback and a "armed for playback" state
   - Most complex - requires rethinking REPL interaction model
 
-### Editor Features
-
-- [ ] Complete command dispatcher for all keybindings
-  - Currently `eval_line`, `play_file`, and `quit` are hardcoded in `modal.c`
-  - These commands have complex behavior (multi-press confirmation, internal functions)
-  - Refactor to allow TOML configuration of these bindings
-
-- [ ] Playback visualization
-  - Highlight currently playing region
-  - Show playback progress in status bar
-
-- [ ] Tempo tap
-  - Tap key to set tempo
-
-- [ ] Metronome toggle
-
-### Test Framework
-
-- [ ] Refactor CLI tests to avoid shell spawning (`tests/cli/test_play_command.c:29-62`)
-  - Tests use `system("rm -rf ...")` for cleanup and `system()` to invoke psnd
-  - Couples tests to `/bin/sh`, ignores exit codes in some branches
-  - Fix: Use `fork`/`execve` directly for binary invocation, `mkdtemp`/`nftw` for temp directory cleanup
-
-- [ ] Add missing test coverage
-  - No tests for: editor bridge, Ableton Link callbacks, shared REPL command processor
-  - Pointer/string comparisons can silently truncate in test framework
-
-- [ ] Add `ASSERT_GT`, `ASSERT_LT` macros
-
-- [ ] Add test fixture support (setup/teardown)
-
-- [ ] Add memory leak detection hooks
-
 ---
 
 ## Low Priority
-
-### Code Consolidation
-
-- [ ] Extract shared REPL loop skeleton
-  - ~150 lines of help functions still duplicated per language
-  - Interactive loop structure still duplicated (could use callback pattern)
-
-- [ ] Centralize platform CMake logic
-  - Platform detection repeated in 6+ CMakeLists.txt files
-  - Create `psnd_platform.cmake` module
 
 ### Platform Support
 
 - [ ] Windows support
   - Editor uses POSIX headers: `termios.h`, `unistd.h`, `pthread.h`
   - Options: Native Windows console API, or web editor using CodeMirror/WebSockets
-
-### Editor Features
-
-- [ ] Split windows
-  - Already designed for in `editor_ctx_t`
-  - Requires screen rendering changes
-
-- [x] ~~Expand editor highlight vocabulary for full tree-sitter support~~ **DONE**
-  - 51 HL_* types now defined in `internal.h`
-  - Full tree-sitter capture mapping in `treesitter.c`
-  - TOML themes support all token types (function, operator, punctuation, variable.builtin, etc.)
-  - See `.psnd/themes/*.toml` for complete color mappings
-
-- [ ] LSP client integration
-  - Would provide IDE-like features
-  - High complexity undertaking
-
-- [ ] Git integration
-  - Gutter diff markers
-  - Stage/commit commands
-
-### Documentation
-
-- [ ] API reference generation
-  - Consider Doxygen for generated docs
-
-- [ ] Contributing guide
-
-- [ ] Build troubleshooting
-  - Platform-specific guidance
 
 ### Future Architecture
 
@@ -165,15 +162,33 @@ The web host is functional with xterm.js terminal emulator. Remaining work:
 
 - [ ] Provide a minimal language example
 
+### Editor Features
+
+- [x] ~~Expand editor highlight vocabulary for full tree-sitter support~~ **DONE**
+  - 51 HL_* types now defined in `internal.h`
+  - Full tree-sitter capture mapping in `treesitter.c`
+  - TOML themes support all token types (function, operator, punctuation, variable.builtin, etc.)
+  - See `.psnd/themes/*.toml` for complete color mappings
+
+- [ ] LSP client integration
+  - Would provide IDE-like features
+  - High complexity undertaking
+
+- [ ] Git integration
+  - Gutter diff markers
+  - Stage/commit commands
+
 ---
 
-## Add Languages
+## Backlog: New Languages
 
 - [ ] bytebeat (see: <https://dollchan.net/bytebeat>)
 - [ ] funcbeat
 - [ ] drumbeat (see: <https://wavepot.com>)
 
-## Tracker Enhancements
+---
+
+## Backlog: Tracker Enhancements
 
 Future features for the tracker sequencer (`tracker_demo`):
 
@@ -215,7 +230,7 @@ Future features for the tracker sequencer (`tracker_demo`):
 
 ---
 
-## Feature Opportunities
+## Backlog: Feature Opportunities
 
 ### Preset Browser & Layering
 

@@ -63,27 +63,9 @@ if(BUILD_FLUID_BACKEND)
     )
 endif()
 
-# Platform-specific dependencies
-if(APPLE)
-    target_link_libraries(alda PUBLIC
-        "-framework CoreMIDI"
-        "-framework CoreFoundation"
-        "-framework CoreAudio"
-        "-framework AudioToolbox"
-    )
-elseif(UNIX AND NOT APPLE)
-    target_compile_definitions(alda PRIVATE _GNU_SOURCE)
-    find_package(ALSA)
-    if(ALSA_FOUND)
-        target_link_libraries(alda PUBLIC ${ALSA_LIBRARIES})
-        target_include_directories(alda PRIVATE ${ALSA_INCLUDE_DIRS})
-    endif()
-    target_link_libraries(alda PUBLIC pthread dl m)
-endif()
-
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(alda PRIVATE -Wall -Wextra -Wpedantic)
-endif()
+# Platform-specific dependencies (uses psnd_platform.cmake)
+psnd_platform_link_audio_midi(alda PUBLIC)
+psnd_platform_add_warnings(alda)
 
 # ==============================================================================
 # Register with psnd Language System

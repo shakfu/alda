@@ -17,6 +17,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Test Framework Expansion**: Enhanced assertion macros and test infrastructure
+  - Comparison macros: `ASSERT_GT`, `ASSERT_LT`, `ASSERT_GTE`, `ASSERT_LTE`
+  - Test fixtures: `FIXTURE`, `FIXTURE_SETUP`, `FIXTURE_TEARDOWN`, `TEST_F`, `RUN_TEST_F`
+  - Suite-level fixtures: `SUITE_SETUP`, `SUITE_TEARDOWN`, `BEGIN_TEST_SUITE_WITH_FIXTURE`
+
+- **Memory Leak Detection**: Allocation tracking for test suites (`test_memcheck.h`)
+  - Tracked allocation macros: `MEMCHECK_MALLOC`, `MEMCHECK_FREE`, `MEMCHECK_REALLOC`, `MEMCHECK_CALLOC`, `MEMCHECK_STRDUP`
+  - Session management: `memcheck_init()`, `memcheck_begin()`, `memcheck_end()`, `memcheck_report()`
+  - Statistics: `memcheck_current_bytes()`, `memcheck_peak_bytes()`, `memcheck_leak_count()`
+  - Test integration: `ASSERT_NO_LEAKS()`, `RUN_TEST_MEMCHECK()`, `BEGIN_TEST_SUITE_MEMCHECK()`
+  - 12 self-tests verifying leak detection functionality
+
+- **Process Execution Utilities**: Fork/exec helpers for CLI integration tests (`test_process.h`)
+  - `test_exec()` - Execute binary with arguments via fork/execve
+  - `test_exec_capture()` - Execute and capture stdout/stderr
+  - `test_mkdtemp()`, `test_rmdir_recursive()` - Temp directory management
+  - `test_write_file()` - Create test fixture files
+
+### Changed
+
+- **CLI Tests Refactored**: Replaced `system()` shell spawning with direct `fork`/`execve`
+  - Eliminates shell injection risks in test code
+  - Uses `test_process.h` utilities for process execution
+  - Uses `mkdtemp()` and `nftw()` for temp directory management
+
+- **CMake Platform Logic Centralized**: New `scripts/cmake/psnd_platform.cmake` module
+  - `psnd_platform_link_audio_midi()` - Platform-specific audio/MIDI libraries
+  - `psnd_platform_add_warnings()` - Compiler warning flags
+  - `psnd_platform_add_math()` - Math library linking
+  - `psnd_platform_add_pthread()` - Thread library linking
+  - Updated core, alda, joy, and bog CMakeLists.txt to use centralized functions
+
 ## [0.1.4]
 
 ### Added
