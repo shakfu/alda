@@ -21,9 +21,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - **Tree-sitter Syntax Highlighting**: Real-time syntax highlighting in REPLs and editor
   - Language-specific grammars: Alda, Joy, Scheme, Haskell, Lua, Csound
-  - 15 built-in color themes (monokai, dracula, nord, gruvbox-dark, solarized-dark, one-dark, catppuccin, tokyo-night, everforest, kanagawa, rose-pine, palenight, ayu-dark, basic16)
-  - `:theme` command to list and switch themes in all REPLs
-  - `:theme NAME` to switch to a specific theme
+  - 51 highlight types for full tree-sitter semantic granularity (functions, variables, keywords, types, operators, etc.)
+  - 15 built-in C themes (monokai, dracula, nord, gruvbox-dark, solarized-dark, one-dark, catppuccin, tokyo-night, everforest, kanagawa, rose-pine, palenight, ayu-dark, solarized-light, basic16)
+  - 17 Lua themes in `.psnd/themes/` with true RGB colors (superset of C themes plus github-light, norse)
+  - `:theme` command prefers Lua themes over C themes for better color accuracy
+  - `:theme NAME` to switch to a specific theme (applies to all open buffers)
+  - Lua theme API: `loki.set_theme({...})` with 51 semantic token types
+  - Custom themes: create `.psnd/themes/<name>.lua` returning a function that calls `loki.set_theme()`
   - Theme colors apply to REPL input highlighting
   - Build with `-DWITH_LINENOISE=ON` (enabled by default)
 

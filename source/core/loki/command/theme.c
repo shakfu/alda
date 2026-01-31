@@ -1,6 +1,7 @@
 /* theme.c - Theme switching command
  *
  * Provides :theme command to switch syntax highlighting themes.
+ * Tries Lua themes first (.psnd/themes/*.lua), falls back to C built-ins.
  * Only available when built with linenoise (WITH_LINENOISE).
  */
 
@@ -9,6 +10,45 @@
 
 #ifdef LOKI_USE_LINENOISE
 #include <syntax/theme.h>
+#include "lua.h"
+#include "lauxlib.h"
+#endif
+
+#ifdef LOKI_USE_LINENOISE
+/* Try to load a Lua theme by calling theme.load(name).
+ * Returns 1 if successful, 0 if theme not found or load failed. */
+static int try_load_lua_theme(editor_ctx_t *ctx, const char *name) {
+    lua_State *L = ctx->lua_host ? ctx->lua_host->L : NULL;
+    if (!L) return 0;
+
+    /* Get the 'theme' global table */
+    lua_getglobal(L, "theme");
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        return 0;
+    }
+
+    /* Get theme.load function */
+    lua_getfield(L, -1, "load");
+    if (!lua_isfunction(L, -1)) {
+        lua_pop(L, 2);
+        return 0;
+    }
+
+    /* Call theme.load(name) */
+    lua_pushstring(L, name);
+    if (lua_pcall(L, 1, 2, 0) != LUA_OK) {
+        /* Lua error */
+        lua_pop(L, 2);  /* Pop error message and theme table */
+        return 0;
+    }
+
+    /* theme.load returns: true on success, or nil + error_message on failure */
+    int success = lua_toboolean(L, -2);
+    lua_pop(L, 3);  /* Pop result, error/nil, and theme table */
+
+    return success;
+}
 #endif
 
 int cmd_theme(editor_ctx_t *ctx, const char *args) {
@@ -16,31 +56,50 @@ int cmd_theme(editor_ctx_t *ctx, const char *args) {
     /* No args: list available themes */
     if (!args || !args[0]) {
         const char **names = theme_list();
-        const syntax_theme_t *current = theme_get();
-
-        editor_set_status_msg(ctx, "Themes: ");
 
         /* Build theme list string */
         char buf[512] = "Themes: ";
         size_t pos = strlen(buf);
 
         for (int i = 0; names[i]; i++) {
-            int is_current = (current && strcmp(current->name, names[i]) == 0);
-            int len = snprintf(buf + pos, sizeof(buf) - pos, "%s%s%s%s",
+            int len = snprintf(buf + pos, sizeof(buf) - pos, "%s%s",
                                i > 0 ? ", " : "",
-                               is_current ? "[" : "",
-                               names[i],
-                               is_current ? "]" : "");
+                               names[i]);
             if (len > 0 && pos + len < sizeof(buf)) {
                 pos += len;
             }
+        }
+
+        /* Add note about Lua themes */
+        int note_len = snprintf(buf + pos, sizeof(buf) - pos,
+                                " (+ .psnd/themes/*.lua)");
+        if (note_len > 0 && pos + note_len < sizeof(buf)) {
+            pos += note_len;
         }
 
         editor_set_status_msg(ctx, "%s", buf);
         return 1;
     }
 
-    /* Find and set the theme */
+    /* First, try loading as a Lua theme */
+    if (try_load_lua_theme(ctx, args)) {
+        /* Apply theme colors to all other open buffers */
+        int buffer_ids[MAX_BUFFERS];
+        int count = buffer_get_list(buffer_ids);
+        for (int i = 0; i < count; i++) {
+            editor_ctx_t *buf_ctx = buffer_get(buffer_ids[i]);
+            if (buf_ctx && buf_ctx != ctx) {
+                /* Copy colors from current ctx to other buffers */
+                memcpy(buf_ctx->view.colors, ctx->view.colors,
+                       sizeof(ctx->view.colors));
+                buf_ctx->model.dirty++;
+            }
+        }
+        editor_set_status_msg(ctx, "Theme set to: %s (Lua)", args);
+        return 1;
+    }
+
+    /* Fall back to C built-in theme */
     const syntax_theme_t *theme = theme_find(args);
     if (!theme) {
         editor_set_status_msg(ctx, "Unknown theme: %s", args);

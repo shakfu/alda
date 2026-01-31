@@ -1114,7 +1114,7 @@ static const char *theme_names[] = {
 };
 
 unsigned char theme_color(syntax_token_t token) {
-    const syntax_theme_t *theme = current_theme ? current_theme : &theme_monokai;
+    const syntax_theme_t *theme = current_theme ? current_theme : &theme_nord;
 
     if (token < 0 || token >= TOK_COUNT) {
         return 0;

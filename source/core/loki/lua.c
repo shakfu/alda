@@ -37,6 +37,7 @@
 #include "loki/link.h"       /* Ableton Link integration */
 #include "export.h"          /* MIDI export control */
 #include "buffers.h"    /* Buffer management for buffer_get_current() */
+#include "syntax.h"     /* syntax_name_to_code() for theme color mapping */
 #include "shared/context.h"  /* SharedContext for launch_quantize */
 #include "shared/midi/midi.h"  /* MIDI port functions */
 #include "shared/osc/osc.h"   /* OSC functions */
@@ -172,18 +173,11 @@ static int lua_loki_get_filename(lua_State *L) {
     return 1;
 }
 
-/* Helper: Map color name to HL_* constant */
+/* Helper: Map color name to HL_* constant
+ * Delegates to syntax_name_to_code() which supports all 51 HL_* types.
+ * See hl_types.h for the full list of supported names. */
 static int color_name_to_hl(const char *name) {
-    if (strcasecmp(name, "normal") == 0) return HL_NORMAL;
-    if (strcasecmp(name, "nonprint") == 0) return HL_NONPRINT;
-    if (strcasecmp(name, "comment") == 0) return HL_COMMENT;
-    if (strcasecmp(name, "mlcomment") == 0) return HL_MLCOMMENT;
-    if (strcasecmp(name, "keyword1") == 0) return HL_KEYWORD1;
-    if (strcasecmp(name, "keyword2") == 0) return HL_KEYWORD2;
-    if (strcasecmp(name, "string") == 0) return HL_STRING;
-    if (strcasecmp(name, "number") == 0) return HL_NUMBER;
-    if (strcasecmp(name, "match") == 0) return HL_MATCH;
-    return -1;
+    return syntax_name_to_code(name);
 }
 
 /* Lua API: loki.set_color(name, {r=R, g=G, b=B}) - Set syntax highlight color */

@@ -75,6 +75,34 @@ int syntax_name_to_code(const char *name) {
     if (strcasecmp(name, "keyword_function") == 0) return HL_KEYWORD_FUNCTION;
     if (strcasecmp(name, "keyword_return") == 0) return HL_KEYWORD_RETURN;
     if (strcasecmp(name, "constant_builtin") == 0) return HL_CONSTANT_BUILTIN;
+    /* Additional extended types (24-50) */
+    if (strcasecmp(name, "variable") == 0) return HL_VARIABLE;
+    if (strcasecmp(name, "variable_field") == 0) return HL_VARIABLE_FIELD;
+    if (strcasecmp(name, "variable_property") == 0) return HL_VARIABLE_PROPERTY;
+    if (strcasecmp(name, "keyword_operator") == 0) return HL_KEYWORD_OPERATOR;
+    if (strcasecmp(name, "keyword_import") == 0) return HL_KEYWORD_IMPORT;
+    if (strcasecmp(name, "keyword_type") == 0) return HL_KEYWORD_TYPE;
+    if (strcasecmp(name, "keyword_modifier") == 0) return HL_KEYWORD_MODIFIER;
+    if (strcasecmp(name, "string_escape") == 0) return HL_STRING_ESCAPE;
+    if (strcasecmp(name, "string_regex") == 0) return HL_STRING_REGEX;
+    if (strcasecmp(name, "string_special") == 0) return HL_STRING_SPECIAL;
+    if (strcasecmp(name, "number_float") == 0) return HL_NUMBER_FLOAT;
+    if (strcasecmp(name, "boolean") == 0) return HL_BOOLEAN;
+    if (strcasecmp(name, "constant") == 0) return HL_CONSTANT;
+    if (strcasecmp(name, "comment_doc") == 0) return HL_COMMENT_DOC;
+    if (strcasecmp(name, "function_method") == 0) return HL_FUNCTION_METHOD;
+    if (strcasecmp(name, "function_macro") == 0) return HL_FUNCTION_MACRO;
+    if (strcasecmp(name, "type") == 0) return HL_TYPE;
+    if (strcasecmp(name, "type_builtin") == 0) return HL_TYPE_BUILTIN;
+    if (strcasecmp(name, "type_parameter") == 0) return HL_TYPE_PARAMETER;
+    if (strcasecmp(name, "type_qualifier") == 0) return HL_TYPE_QUALIFIER;
+    if (strcasecmp(name, "punctuation_bracket") == 0) return HL_PUNCTUATION_BRACKET;
+    if (strcasecmp(name, "punctuation_delimiter") == 0) return HL_PUNCTUATION_DELIMITER;
+    if (strcasecmp(name, "module") == 0) return HL_MODULE;
+    if (strcasecmp(name, "tag_attribute") == 0) return HL_TAG_ATTRIBUTE;
+    if (strcasecmp(name, "preprocessor") == 0) return HL_PREPROCESSOR;
+    if (strcasecmp(name, "error") == 0) return HL_ERROR;
+    if (strcasecmp(name, "warning") == 0) return HL_WARNING;
     return -1;
 }
 
@@ -432,7 +460,122 @@ void syntax_apply_theme_colors(editor_ctx_t *ctx) {
 
     /* Constants */
     set_color_from_tok(ctx, HL_CONSTANT_BUILTIN, TOK_CONSTANT_BUILTIN);
+
+    /* Additional extended types (24-50) */
+
+    /* Variables */
+    set_color_from_tok(ctx, HL_VARIABLE, TOK_VARIABLE);
+    set_color_from_tok(ctx, HL_VARIABLE_FIELD, TOK_VARIABLE_FIELD);
+    set_color_from_tok(ctx, HL_VARIABLE_PROPERTY, TOK_VARIABLE_PROPERTY);
+
+    /* Additional keyword subtypes */
+    set_color_from_tok(ctx, HL_KEYWORD_OPERATOR, TOK_KEYWORD_OPERATOR);
+    set_color_from_tok(ctx, HL_KEYWORD_IMPORT, TOK_KEYWORD_IMPORT);
+    set_color_from_tok(ctx, HL_KEYWORD_TYPE, TOK_KEYWORD_TYPE);
+    set_color_from_tok(ctx, HL_KEYWORD_MODIFIER, TOK_KEYWORD_MODIFIER);
+
+    /* String subtypes */
+    set_color_from_tok(ctx, HL_STRING_ESCAPE, TOK_STRING_ESCAPE);
+    set_color_from_tok(ctx, HL_STRING_REGEX, TOK_STRING_REGEX);
+    set_color_from_tok(ctx, HL_STRING_SPECIAL, TOK_STRING_SPECIAL);
+
+    /* Number subtypes */
+    set_color_from_tok(ctx, HL_NUMBER_FLOAT, TOK_NUMBER_FLOAT);
+
+    /* Literals */
+    set_color_from_tok(ctx, HL_BOOLEAN, TOK_BOOLEAN);
+    set_color_from_tok(ctx, HL_CONSTANT, TOK_CONSTANT);
+
+    /* Comment subtypes */
+    set_color_from_tok(ctx, HL_COMMENT_DOC, TOK_COMMENT_DOC);
+
+    /* Function subtypes */
+    set_color_from_tok(ctx, HL_FUNCTION_METHOD, TOK_FUNCTION_METHOD);
+    set_color_from_tok(ctx, HL_FUNCTION_MACRO, TOK_FUNCTION_MACRO);
+
+    /* Types */
+    set_color_from_tok(ctx, HL_TYPE, TOK_TYPE);
+    set_color_from_tok(ctx, HL_TYPE_BUILTIN, TOK_TYPE_BUILTIN);
+    set_color_from_tok(ctx, HL_TYPE_PARAMETER, TOK_TYPE_PARAMETER);
+    set_color_from_tok(ctx, HL_TYPE_QUALIFIER, TOK_TYPE_QUALIFIER);
+
+    /* Punctuation subtypes */
+    set_color_from_tok(ctx, HL_PUNCTUATION_BRACKET, TOK_PUNCTUATION_BRACKET);
+    set_color_from_tok(ctx, HL_PUNCTUATION_DELIMITER, TOK_PUNCTUATION_DELIMITER);
+
+    /* Additional special types */
+    set_color_from_tok(ctx, HL_MODULE, TOK_MODULE);
+    set_color_from_tok(ctx, HL_TAG_ATTRIBUTE, TOK_TAG_ATTRIBUTE);
+    set_color_from_tok(ctx, HL_PREPROCESSOR, TOK_PREPROCESSOR);
+
+    /* Errors and warnings */
+    set_color_from_tok(ctx, HL_ERROR, TOK_ERROR);
+    set_color_from_tok(ctx, HL_WARNING, TOK_WARNING);
 }
+#endif
+
+/* Fallback RGB colors for non-linenoise builds.
+ * Indexed by HL_* constants from hl_types.h.
+ * Format: {R, G, B} */
+#ifndef LOKI_USE_LINENOISE
+static const int hl_fallback_colors[HL_TYPE_COUNT][3] = {
+    /* Base types (0-8) */
+    [HL_NORMAL]             = {200, 200, 200},  /* Light gray */
+    [HL_NONPRINT]           = {100, 100, 100},  /* Dark gray */
+    [HL_COMMENT]            = {100, 100, 100},  /* Dark gray */
+    [HL_MLCOMMENT]          = {100, 100, 100},  /* Dark gray */
+    [HL_KEYWORD1]           = {220, 100, 220},  /* Magenta */
+    [HL_KEYWORD2]           = {100, 220, 220},  /* Cyan */
+    [HL_STRING]             = {220, 220, 100},  /* Yellow */
+    [HL_NUMBER]             = {200, 100, 200},  /* Purple */
+    [HL_MATCH]              = {100, 150, 220},  /* Blue */
+
+    /* Extended types (9-23) */
+    [HL_FUNCTION]           = { 80, 180, 220},  /* Blue/cyan */
+    [HL_FUNCTION_BUILTIN]   = {100, 200, 240},  /* Bright cyan */
+    [HL_FUNCTION_CALL]      = {120, 180, 200},  /* Muted cyan */
+    [HL_VARIABLE_BUILTIN]   = {220, 120, 100},  /* Orange/red */
+    [HL_VARIABLE_PARAMETER] = {220, 160, 100},  /* Light orange */
+    [HL_OPERATOR]           = {220, 220, 220},  /* White/light gray */
+    [HL_PUNCTUATION]        = {150, 150, 150},  /* Dimmer gray */
+    [HL_CONSTRUCTOR]        = {100, 220, 180},  /* Green/teal */
+    [HL_NAMESPACE]          = {180, 120, 220},  /* Purple */
+    [HL_LABEL]              = {220, 200, 100},  /* Yellow/gold */
+    [HL_TAG]                = {100, 150, 220},  /* Blue */
+    [HL_KEYWORD_CONTROL]    = {220, 100, 220},  /* Magenta */
+    [HL_KEYWORD_FUNCTION]   = {200, 100, 200},  /* Magenta variant */
+    [HL_KEYWORD_RETURN]     = {240, 120, 240},  /* Bright magenta */
+    [HL_CONSTANT_BUILTIN]   = {100, 220, 220},  /* Cyan */
+
+    /* Additional extended types (24-50) */
+    [HL_VARIABLE]           = {180, 180, 200},  /* Light foreground */
+    [HL_VARIABLE_FIELD]     = {200, 140, 100},  /* Orange variant */
+    [HL_VARIABLE_PROPERTY]  = {200, 150, 110},  /* Similar to field */
+    [HL_KEYWORD_OPERATOR]   = {220, 100, 200},  /* Magenta */
+    [HL_KEYWORD_IMPORT]     = {100, 200, 180},  /* Cyan/teal */
+    [HL_KEYWORD_TYPE]       = {100, 220, 220},  /* Cyan */
+    [HL_KEYWORD_MODIFIER]   = {180, 100, 200},  /* Magenta variant */
+    [HL_STRING_ESCAPE]      = {240, 140, 100},  /* Bright orange/red */
+    [HL_STRING_REGEX]       = {220, 160,  80},  /* Orange */
+    [HL_STRING_SPECIAL]     = {200, 220, 120},  /* Yellow/green */
+    [HL_NUMBER_FLOAT]       = {200, 100, 200},  /* Same as number */
+    [HL_BOOLEAN]            = {140, 180, 220},  /* Cyan/purple */
+    [HL_CONSTANT]           = {100, 200, 200},  /* Cyan */
+    [HL_COMMENT_DOC]        = {120, 140, 120},  /* Brighter comment */
+    [HL_FUNCTION_METHOD]    = {100, 180, 220},  /* Cyan variant */
+    [HL_FUNCTION_MACRO]     = {120, 200, 240},  /* Brighter cyan */
+    [HL_TYPE]               = {100, 220, 220},  /* Cyan */
+    [HL_TYPE_BUILTIN]       = {120, 240, 240},  /* Brighter cyan */
+    [HL_TYPE_PARAMETER]     = {100, 200, 180},  /* Teal */
+    [HL_TYPE_QUALIFIER]     = {180, 120, 200},  /* Magenta variant */
+    [HL_PUNCTUATION_BRACKET]   = {170, 170, 170},  /* Brighter gray */
+    [HL_PUNCTUATION_DELIMITER] = {150, 150, 150},  /* Gray */
+    [HL_MODULE]             = {180, 120, 220},  /* Purple */
+    [HL_TAG_ATTRIBUTE]      = {220, 200, 100},  /* Yellow/gold */
+    [HL_PREPROCESSOR]       = {200, 100, 180},  /* Magenta */
+    [HL_ERROR]              = {240,  80,  80},  /* Red */
+    [HL_WARNING]            = {240, 200,  80},  /* Yellow/orange */
+};
 #endif
 
 /* Initialize default syntax highlighting colors.
@@ -443,57 +586,11 @@ void syntax_init_default_colors(editor_ctx_t *ctx) {
     /* Use colors from the current theme */
     syntax_apply_theme_colors(ctx);
 #else
-    /* Fallback: hardcoded colors matching original appearance */
-    /* Base types (0-8) */
-    /* HL_NORMAL */
-    ctx->view.colors[0].r = 200; ctx->view.colors[0].g = 200; ctx->view.colors[0].b = 200;
-    /* HL_NONPRINT */
-    ctx->view.colors[1].r = 100; ctx->view.colors[1].g = 100; ctx->view.colors[1].b = 100;
-    /* HL_COMMENT */
-    ctx->view.colors[2].r = 100; ctx->view.colors[2].g = 100; ctx->view.colors[2].b = 100;
-    /* HL_MLCOMMENT */
-    ctx->view.colors[3].r = 100; ctx->view.colors[3].g = 100; ctx->view.colors[3].b = 100;
-    /* HL_KEYWORD1 */
-    ctx->view.colors[4].r = 220; ctx->view.colors[4].g = 100; ctx->view.colors[4].b = 220;
-    /* HL_KEYWORD2 */
-    ctx->view.colors[5].r = 100; ctx->view.colors[5].g = 220; ctx->view.colors[5].b = 220;
-    /* HL_STRING */
-    ctx->view.colors[6].r = 220; ctx->view.colors[6].g = 220; ctx->view.colors[6].b = 100;
-    /* HL_NUMBER */
-    ctx->view.colors[7].r = 200; ctx->view.colors[7].g = 100; ctx->view.colors[7].b = 200;
-    /* HL_MATCH */
-    ctx->view.colors[8].r = 100; ctx->view.colors[8].g = 150; ctx->view.colors[8].b = 220;
-
-    /* Extended types (9-23) - fallback colors */
-    /* HL_FUNCTION - blue/cyan */
-    ctx->view.colors[9].r = 80; ctx->view.colors[9].g = 180; ctx->view.colors[9].b = 220;
-    /* HL_FUNCTION_BUILTIN - brighter cyan */
-    ctx->view.colors[10].r = 100; ctx->view.colors[10].g = 200; ctx->view.colors[10].b = 240;
-    /* HL_FUNCTION_CALL - slightly muted cyan */
-    ctx->view.colors[11].r = 120; ctx->view.colors[11].g = 180; ctx->view.colors[11].b = 200;
-    /* HL_VARIABLE_BUILTIN - orange/red for self/this */
-    ctx->view.colors[12].r = 220; ctx->view.colors[12].g = 120; ctx->view.colors[12].b = 100;
-    /* HL_VARIABLE_PARAMETER - light orange */
-    ctx->view.colors[13].r = 220; ctx->view.colors[13].g = 160; ctx->view.colors[13].b = 100;
-    /* HL_OPERATOR - white/light gray */
-    ctx->view.colors[14].r = 220; ctx->view.colors[14].g = 220; ctx->view.colors[14].b = 220;
-    /* HL_PUNCTUATION - dimmer gray */
-    ctx->view.colors[15].r = 150; ctx->view.colors[15].g = 150; ctx->view.colors[15].b = 150;
-    /* HL_CONSTRUCTOR - green/teal */
-    ctx->view.colors[16].r = 100; ctx->view.colors[16].g = 220; ctx->view.colors[16].b = 180;
-    /* HL_NAMESPACE - purple */
-    ctx->view.colors[17].r = 180; ctx->view.colors[17].g = 120; ctx->view.colors[17].b = 220;
-    /* HL_LABEL - yellow/gold */
-    ctx->view.colors[18].r = 220; ctx->view.colors[18].g = 200; ctx->view.colors[18].b = 100;
-    /* HL_TAG - blue */
-    ctx->view.colors[19].r = 100; ctx->view.colors[19].g = 150; ctx->view.colors[19].b = 220;
-    /* HL_KEYWORD_CONTROL - magenta (like keyword1) */
-    ctx->view.colors[20].r = 220; ctx->view.colors[20].g = 100; ctx->view.colors[20].b = 220;
-    /* HL_KEYWORD_FUNCTION - magenta variant */
-    ctx->view.colors[21].r = 200; ctx->view.colors[21].g = 100; ctx->view.colors[21].b = 200;
-    /* HL_KEYWORD_RETURN - bright magenta */
-    ctx->view.colors[22].r = 240; ctx->view.colors[22].g = 120; ctx->view.colors[22].b = 240;
-    /* HL_CONSTANT_BUILTIN - cyan (like keyword2) */
-    ctx->view.colors[23].r = 100; ctx->view.colors[23].g = 220; ctx->view.colors[23].b = 220;
+    /* Apply fallback colors from static array */
+    for (int i = 0; i < HL_TYPE_COUNT; i++) {
+        ctx->view.colors[i].r = hl_fallback_colors[i][0];
+        ctx->view.colors[i].g = hl_fallback_colors[i][1];
+        ctx->view.colors[i].b = hl_fallback_colors[i][2];
+    }
 #endif
 }

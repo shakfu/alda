@@ -15,7 +15,7 @@ All are practical for daily live-coding, REPL sketches, and headless playback. T
 ## Features
 
 - **Vim-style editor** with INSERT/NORMAL modes, live evaluation shortcuts, and Lua scripting (built on [loki](https://github.com/shakfu/loki), a fork of [kilo](https://github.com/antirez/kilo))
-- **Tree-sitter syntax highlighting** in REPLs with 15 color themes (monokai, dracula, nord, gruvbox, solarized, catppuccin, tokyo-night, and more)
+- **Tree-sitter syntax highlighting** in REPLs with 17 Lua themes (monokai, dracula, nord, gruvbox, solarized, catppuccin, tokyo-night, kanagawa, and more) plus custom theme support via `.psnd/themes/`
 - **MIDI tracker/step sequencer** with terminal UI, plugin-based cell notation, and pattern looping
 - **Native webview mode** for a self-contained GUI window without requiring a browser (optional)
 - **Web-based editor** accessible via browser using xterm.js terminal emulator (optional)
@@ -1286,6 +1286,43 @@ CSD files contain multiple sections with different syntax. psnd detects these se
 - **`<CsOptions>`** - Command-line flag highlighting
 
 Section tags themselves are highlighted as keywords, and section state is tracked across lines.
+
+### Color Themes
+
+psnd supports 17 color themes with true RGB colors. Use `:theme` to list available themes and `:theme NAME` to switch.
+
+**Built-in themes**: ayu-dark, basic16, catppuccin, dracula, everforest, github-light, gruvbox-dark, kanagawa, monokai, nord, norse, one-dark, palenight, rose-pine, solarized-dark, solarized-light, tokyo-night
+
+**Custom themes**: Create `.psnd/themes/<name>.lua` with:
+
+```lua
+-- Example: .psnd/themes/my-theme.lua
+return function()
+    loki.set_theme({
+        -- Base types
+        normal    = {r=200, g=200, b=200},
+        comment   = {r=128, g=128, b=128},
+        keyword1  = {r=220, g=100, b=220},
+        keyword2  = {r=100, g=200, b=200},
+        string    = {r=150, g=200, b=100},
+        number    = {r=200, g=150, b=100},
+
+        -- Extended types (51 total for full tree-sitter support)
+        ["function"]      = {r=100, g=150, b=220},
+        function_builtin  = {r=100, g=200, b=200},
+        variable          = {r=200, g=200, b=200},
+        variable_builtin  = {r=220, g=100, b=100},
+        type              = {r=200, g=180, b=100},
+        operator          = {r=220, g=100, b=220},
+        -- ... see existing themes for all 51 types
+    })
+    if loki.status then
+        loki.status("My theme loaded")
+    end
+end
+```
+
+The `:theme` command prefers Lua themes over C built-ins for better color accuracy (true RGB vs 256-color approximations).
 
 ## Scala Scale Files (Microtuning)
 

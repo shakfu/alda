@@ -175,15 +175,27 @@ static int capture_to_hl(const char *capture_name, uint32_t len) {
             if (sublen >= 6 && strncmp(subtype, "return", 6) == 0) {
                 return HL_KEYWORD_RETURN;
             }
-            /* Operator keywords (and, or, not) - use generic keyword */
+            /* Operator keywords (and, or, not) */
             if (sublen >= 8 && strncmp(subtype, "operator", 8) == 0) {
-                return HL_KEYWORD1;
+                return HL_KEYWORD_OPERATOR;
+            }
+            /* Import keywords (import, require, use) */
+            if (sublen >= 6 && strncmp(subtype, "import", 6) == 0) {
+                return HL_KEYWORD_IMPORT;
+            }
+            /* Type keywords (type, class, struct) */
+            if (sublen >= 4 && strncmp(subtype, "type", 4) == 0) {
+                return HL_KEYWORD_TYPE;
+            }
+            /* Modifier keywords (public, private, static) */
+            if (sublen >= 8 && strncmp(subtype, "modifier", 8) == 0) {
+                return HL_KEYWORD_MODIFIER;
             }
         }
         return HL_KEYWORD1;  /* Generic keyword */
     }
 
-    /* Functions - check subtypes for builtin/call */
+    /* Functions - check subtypes for builtin/call/method/macro */
     if (len >= 8 && strncmp(capture_name, "function", 8) == 0) {
         if (len > 9) {
             const char *subtype = capture_name + 9;  /* Skip "function." */
@@ -195,16 +207,16 @@ static int capture_to_hl(const char *capture_name, uint32_t len) {
                 return HL_FUNCTION_CALL;
             }
             if (sublen >= 6 && strncmp(subtype, "method", 6) == 0) {
-                return HL_FUNCTION_CALL;  /* Methods treated as calls */
+                return HL_FUNCTION_METHOD;
             }
             if (sublen >= 5 && strncmp(subtype, "macro", 5) == 0) {
-                return HL_FUNCTION_BUILTIN;  /* Macros treated as builtins */
+                return HL_FUNCTION_MACRO;
             }
         }
         return HL_FUNCTION;  /* Function definition */
     }
 
-    /* Variables - check for builtin and parameter */
+    /* Variables - check for builtin, parameter, field, property */
     if (len >= 8 && strncmp(capture_name, "variable", 8) == 0) {
         if (len > 9) {
             const char *subtype = capture_name + 9;  /* Skip "variable." */
@@ -215,8 +227,14 @@ static int capture_to_hl(const char *capture_name, uint32_t len) {
             if (sublen >= 9 && strncmp(subtype, "parameter", 9) == 0) {
                 return HL_VARIABLE_PARAMETER;
             }
+            if (sublen >= 5 && strncmp(subtype, "field", 5) == 0) {
+                return HL_VARIABLE_FIELD;
+            }
+            if (sublen >= 8 && strncmp(subtype, "property", 8) == 0) {
+                return HL_VARIABLE_PROPERTY;
+            }
         }
-        return HL_NORMAL;  /* Regular variables */
+        return HL_VARIABLE;  /* Regular variables */
     }
 
     /* Constants - check for builtin (nil, null, etc.) */
@@ -228,32 +246,72 @@ static int capture_to_hl(const char *capture_name, uint32_t len) {
                 return HL_CONSTANT_BUILTIN;
             }
         }
-        return HL_KEYWORD2;  /* Other constants */
+        return HL_CONSTANT;  /* General constants */
     }
 
-    /* Comments */
+    /* Comments - check for doc comments */
     if (len >= 7 && strncmp(capture_name, "comment", 7) == 0) {
+        if (len > 8) {
+            const char *subtype = capture_name + 8;  /* Skip "comment." */
+            uint32_t sublen = len - 8;
+            if (sublen >= 3 && strncmp(subtype, "doc", 3) == 0) {
+                return HL_COMMENT_DOC;
+            }
+        }
         return HL_COMMENT;
     }
 
-    /* Strings */
+    /* Strings - check for escape, regex, special */
     if (len >= 6 && strncmp(capture_name, "string", 6) == 0) {
+        if (len > 7) {
+            const char *subtype = capture_name + 7;  /* Skip "string." */
+            uint32_t sublen = len - 7;
+            if (sublen >= 6 && strncmp(subtype, "escape", 6) == 0) {
+                return HL_STRING_ESCAPE;
+            }
+            if (sublen >= 5 && strncmp(subtype, "regex", 5) == 0) {
+                return HL_STRING_REGEX;
+            }
+            if (sublen >= 7 && strncmp(subtype, "special", 7) == 0) {
+                return HL_STRING_SPECIAL;
+            }
+        }
         return HL_STRING;
     }
 
-    /* Numbers */
+    /* Numbers - check for float */
     if (len >= 6 && strncmp(capture_name, "number", 6) == 0) {
+        if (len > 7) {
+            const char *subtype = capture_name + 7;  /* Skip "number." */
+            uint32_t sublen = len - 7;
+            if (sublen >= 5 && strncmp(subtype, "float", 5) == 0) {
+                return HL_NUMBER_FLOAT;
+            }
+        }
         return HL_NUMBER;
     }
 
     /* Booleans */
     if (len >= 7 && strncmp(capture_name, "boolean", 7) == 0) {
-        return HL_KEYWORD2;
+        return HL_BOOLEAN;
     }
 
-    /* Types */
+    /* Types - check for builtin, parameter, qualifier */
     if (len >= 4 && strncmp(capture_name, "type", 4) == 0) {
-        return HL_KEYWORD2;
+        if (len > 5) {
+            const char *subtype = capture_name + 5;  /* Skip "type." */
+            uint32_t sublen = len - 5;
+            if (sublen >= 7 && strncmp(subtype, "builtin", 7) == 0) {
+                return HL_TYPE_BUILTIN;
+            }
+            if (sublen >= 9 && strncmp(subtype, "parameter", 9) == 0) {
+                return HL_TYPE_PARAMETER;
+            }
+            if (sublen >= 9 && strncmp(subtype, "qualifier", 9) == 0) {
+                return HL_TYPE_QUALIFIER;
+            }
+        }
+        return HL_TYPE;
     }
 
     /* Operators */
@@ -261,8 +319,18 @@ static int capture_to_hl(const char *capture_name, uint32_t len) {
         return HL_OPERATOR;
     }
 
-    /* Punctuation - brackets and delimiters */
+    /* Punctuation - check for bracket, delimiter */
     if (len >= 11 && strncmp(capture_name, "punctuation", 11) == 0) {
+        if (len > 12) {
+            const char *subtype = capture_name + 12;  /* Skip "punctuation." */
+            uint32_t sublen = len - 12;
+            if (sublen >= 7 && strncmp(subtype, "bracket", 7) == 0) {
+                return HL_PUNCTUATION_BRACKET;
+            }
+            if (sublen >= 9 && strncmp(subtype, "delimiter", 9) == 0) {
+                return HL_PUNCTUATION_DELIMITER;
+            }
+        }
         return HL_PUNCTUATION;
     }
 
@@ -271,12 +339,14 @@ static int capture_to_hl(const char *capture_name, uint32_t len) {
         return HL_CONSTRUCTOR;
     }
 
-    /* Namespaces/modules */
+    /* Namespaces */
     if (len >= 9 && strncmp(capture_name, "namespace", 9) == 0) {
         return HL_NAMESPACE;
     }
+
+    /* Modules */
     if (len >= 6 && strncmp(capture_name, "module", 6) == 0) {
-        return HL_NAMESPACE;
+        return HL_MODULE;
     }
 
     /* Labels */
@@ -284,9 +354,31 @@ static int capture_to_hl(const char *capture_name, uint32_t len) {
         return HL_LABEL;
     }
 
-    /* Tags (HTML, XML) */
+    /* Tags (HTML, XML) - check for attribute */
     if (len >= 3 && strncmp(capture_name, "tag", 3) == 0) {
+        if (len > 4) {
+            const char *subtype = capture_name + 4;  /* Skip "tag." */
+            uint32_t sublen = len - 4;
+            if (sublen >= 9 && strncmp(subtype, "attribute", 9) == 0) {
+                return HL_TAG_ATTRIBUTE;
+            }
+        }
         return HL_TAG;
+    }
+
+    /* Preprocessor directives */
+    if (len >= 12 && strncmp(capture_name, "preprocessor", 12) == 0) {
+        return HL_PREPROCESSOR;
+    }
+
+    /* Errors */
+    if (len >= 5 && strncmp(capture_name, "error", 5) == 0) {
+        return HL_ERROR;
+    }
+
+    /* Warnings */
+    if (len >= 7 && strncmp(capture_name, "warning", 7) == 0) {
+        return HL_WARNING;
     }
 
     return HL_NORMAL;
