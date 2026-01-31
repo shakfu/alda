@@ -31,29 +31,21 @@ end
 -- Load Core Modules
 -- ==============================================================================
 
--- Load language definitions (lazy loading - loads on file open)
-languages = require("languages")
-local ext_count = languages.init()
+-- Note: Language definitions and themes are now loaded via TOML (C code)
+-- See .psnd/languages/*.toml and .psnd/themes/*.toml
+-- Theme is set via [editor] theme = "..." in .psnd/config.toml
 
--- Load theme utilities
-theme = require("theme")
-
--- Load Alda integration module
-alda = require("alda")
+-- Load Alda integration module (for Lua API extensions)
+local alda_ok, alda = pcall(require, "alda")
+if not alda_ok then alda = nil end
 
 -- ==============================================================================
 -- Editor Settings
 -- ==============================================================================
 
 if MODE == "editor" then
-    -- Load a color theme
-    local ok, err = theme.load("nord")
-    if not ok and err then
-        loki.status("Theme: " .. tostring(err))
-    end
-
-    -- Enable line numbers (added in latest version)
-    loki.line_numbers(true)
+    -- Line numbers are now set via config.toml: line_numbers = true
+    -- Theme is now set via config.toml: theme = "nord"
 end
 
 -- ==============================================================================
@@ -165,9 +157,5 @@ end
 -- ==============================================================================
 
 if MODE == "editor" then
-    if ext_count > 0 then
-        loki.status(string.format("Psnd ready. %d language extensions available.", ext_count))
-    else
-        loki.status("Psnd ready. Press Ctrl-L for Lua REPL.")
-    end
+    loki.status("Psnd ready. Press Ctrl-L for Lua REPL.")
 end

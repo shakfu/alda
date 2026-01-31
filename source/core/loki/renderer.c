@@ -296,6 +296,98 @@ static void terminal_render_repl(Renderer *r, const ReplInfo *info, int width) {
     }
 }
 
+static void terminal_render_picker(Renderer *r, const PickerInfo *info, int width, int height) {
+    TerminalRendererData *data = (TerminalRendererData *)r->data;
+    struct abuf *ab = &data->ab;
+
+    /* Clear screen and go home */
+    terminal_buffer_append(ab, "\x1b[H", 3);
+    terminal_buffer_append(ab, "\x1b[2J", 4);
+
+    /* Render title bar (reverse video) */
+    terminal_buffer_append(ab, "\x1b[7m", 4);
+    if (info->title) {
+        int title_len = strlen(info->title);
+        int padding = (width - title_len) / 2;
+        for (int i = 0; i < padding; i++) {
+            terminal_buffer_append(ab, " ", 1);
+        }
+        if (title_len > width) title_len = width;
+        terminal_buffer_append(ab, info->title, title_len);
+        for (int i = padding + title_len; i < width; i++) {
+            terminal_buffer_append(ab, " ", 1);
+        }
+    } else {
+        for (int i = 0; i < width; i++) {
+            terminal_buffer_append(ab, " ", 1);
+        }
+    }
+    terminal_buffer_append(ab, "\x1b[0m", 4);
+    terminal_buffer_append(ab, "\r\n", 2);
+
+    /* Render items */
+    int visible = info->visible_rows;
+    if (visible > height - 3) visible = height - 3;
+    if (visible < 1) visible = 1;
+
+    for (int i = 0; i < visible; i++) {
+        int item_idx = info->scroll_offset + i;
+        int is_selected = (item_idx == info->selected_index);
+
+        /* Clear line */
+        terminal_buffer_append(ab, "\x1b[0K", 4);
+
+        if (item_idx < info->item_count) {
+            const char *item = info->items[item_idx];
+            int item_len = item ? strlen(item) : 0;
+
+            /* Selection indicator */
+            if (is_selected) {
+                terminal_buffer_append(ab, "\x1b[7m", 4);  /* Reverse video */
+                terminal_buffer_append(ab, "> ", 2);
+            } else {
+                terminal_buffer_append(ab, "  ", 2);
+            }
+
+            /* Item text (truncate if needed) */
+            int max_item_width = width - 3;
+            if (item_len > max_item_width) item_len = max_item_width;
+            if (item && item_len > 0) {
+                terminal_buffer_append(ab, item, item_len);
+            }
+
+            /* Pad to full width for reverse video */
+            if (is_selected) {
+                for (int j = item_len + 2; j < width; j++) {
+                    terminal_buffer_append(ab, " ", 1);
+                }
+                terminal_buffer_append(ab, "\x1b[0m", 4);  /* Reset */
+            }
+        }
+
+        terminal_buffer_append(ab, "\r\n", 2);
+    }
+
+    /* Fill remaining rows with blank lines */
+    int rows_used = 1 + visible;  /* Title + items */
+    for (int i = rows_used; i < height - 2; i++) {
+        terminal_buffer_append(ab, "\x1b[0K\r\n", 6);
+    }
+
+    /* Render status bar */
+    terminal_buffer_append(ab, "\x1b[7m", 4);
+    char status[80];
+    int status_len = snprintf(status, sizeof(status),
+        " %d/%d | j/k:move ENTER:select ESC:cancel",
+        info->selected_index + 1, info->item_count);
+    if (status_len > width) status_len = width;
+    terminal_buffer_append(ab, status, status_len);
+    for (int i = status_len; i < width; i++) {
+        terminal_buffer_append(ab, " ", 1);
+    }
+    terminal_buffer_append(ab, "\x1b[0m", 4);
+}
+
 static void terminal_set_cursor(Renderer *r, int row, int col) {
     TerminalRendererData *data = (TerminalRendererData *)r->data;
     char buf[32];
@@ -359,6 +451,7 @@ Renderer *terminal_renderer_create(void) {
     r->render_status = terminal_render_status;
     r->render_message = terminal_render_message;
     r->render_repl = terminal_render_repl;
+    r->render_picker = terminal_render_picker;
     r->set_cursor = terminal_set_cursor;
     r->show_cursor = terminal_show_cursor;
     r->hide_cursor = terminal_hide_cursor;
@@ -402,6 +495,10 @@ static void null_render_repl(Renderer *r, const ReplInfo *info, int width) {
     (void)r; (void)info; (void)width;
 }
 
+static void null_render_picker(Renderer *r, const PickerInfo *info, int width, int height) {
+    (void)r; (void)info; (void)width; (void)height;
+}
+
 static void null_set_cursor(Renderer *r, int row, int col) {
     (void)r; (void)row; (void)col;
 }
@@ -435,6 +532,7 @@ Renderer *null_renderer_create(void) {
     r->render_status = null_render_status;
     r->render_message = null_render_message;
     r->render_repl = null_render_repl;
+    r->render_picker = null_render_picker;
     r->set_cursor = null_set_cursor;
     r->show_cursor = null_show_cursor;
     r->hide_cursor = null_hide_cursor;

@@ -98,6 +98,12 @@ int cmd_plugin(editor_ctx_t *ctx, const char *args) {
             return 0;
         }
 
+        /* IMPORTANT: After buffer_switch(), ctx is stale - refresh it */
+        ctx = buffer_get_current();
+        if (!ctx) {
+            return 0;
+        }
+
         /* Verify buffer switch worked */
         int current_id = buffer_get_current_id();
         if (current_id != buf_id) {
@@ -105,11 +111,8 @@ int cmd_plugin(editor_ctx_t *ctx, const char *args) {
             return 0;
         }
 
-        editor_ctx_t *preset_ctx = buffer_get_current();
-        if (!preset_ctx) {
-            editor_set_status_msg(ctx, "Failed to switch to preset buffer");
-            return 0;
-        }
+        /* Use ctx as preset_ctx since we've already refreshed it */
+        editor_ctx_t *preset_ctx = ctx;
 
         /* Clear initial empty row and add content */
         if (preset_ctx->model.numrows > 0) {

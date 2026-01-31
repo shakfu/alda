@@ -290,8 +290,20 @@ Ex Commands (press `:` in NORMAL mode):
 | `:link` | Toggle Ableton Link |
 | `:csd` | Toggle Csound synthesis |
 | `:export FILE` | Export to MIDI file |
-| `:theme` | List color themes |
-| `:theme NAME` | Switch color theme |
+| `:theme` | Open theme picker (full-screen selection) |
+| `:theme NAME` | Switch to named color theme |
+| `:plugin presets` | Open preset picker (for loaded plugins) |
+
+Picker Keybindings (when picker is open):
+
+| Key | Action |
+|-----|--------|
+| `j` / `DOWN` | Move selection down |
+| `k` / `UP` | Move selection up |
+| `g` / `G` | Go to top / bottom |
+| `CTRL-D` / `CTRL-U` | Page down / up |
+| `ENTER` | Select item |
+| `ESC` / `q` | Cancel |
 
 ### Play Mode
 
@@ -399,15 +411,16 @@ soundfont = ""           # Path to SoundFont (empty = default GM)
 enabled = false          # Ableton Link sync
 tempo = 120              # Default tempo
 
+# Available commands: save, find, stop, lua_repl, new_buffer, copy, word_wrap
+# Note: quit, eval_line, play_file have special built-in handling
 [keybindings]
 "ctrl-s" = "save"
-"ctrl-q" = "quit"
-"ctrl-e" = "eval_line"
-"ctrl-p" = "play_file"
 "ctrl-g" = "stop"
 "ctrl-f" = "find"
 "ctrl-l" = "lua_repl"    # Only works when Lua is enabled
 "ctrl-t" = "new_buffer"
+"ctrl-c" = "copy"
+"ctrl-w" = "word_wrap"
 ```
 
 ### Lua Scripting (Opt-in)

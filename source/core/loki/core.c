@@ -46,6 +46,7 @@ see LICENSE.
 #include "indent.h"
 #include "lang_bridge.h"
 #include "loki/link.h"
+#include "picker.h"
 
 void editor_set_status_msg(editor_ctx_t *ctx, const char *fmt, ...) {
     if (!ctx) return;
@@ -610,6 +611,24 @@ static int build_render_segments(editor_ctx_t *ctx, t_erow *row, int row_idx,
  * This is the abstract rendering path that doesn't emit VT100 directly. */
 static void editor_refresh_screen_via_renderer(editor_ctx_t *ctx) {
     Renderer *r = ctx->renderer;
+
+    /* Handle picker mode separately */
+    if (ctx->view.mode == MODE_PICKER && r->render_picker) {
+        r->begin_frame(r, ctx->view.screencols, ctx->view.screenrows);
+        PickerInfo picker_info = {
+            .title = ctx->view.picker.title,
+            .items = ctx->view.picker.items,
+            .item_count = ctx->view.picker.item_count,
+            .selected_index = ctx->view.picker.selected_index,
+            .scroll_offset = ctx->view.picker.scroll_offset,
+            .visible_rows = ctx->view.screenrows - 3,
+        };
+        r->render_picker(r, &picker_info, ctx->view.screencols, ctx->view.screenrows);
+        r->hide_cursor(r);
+        r->end_frame(r);
+        return;
+    }
+
     int tabs_showing = (buffer_count() > 1) ? 1 : 0;
     int available_rows = ctx->view.screenrows - tabs_showing;
 

@@ -200,6 +200,19 @@ typedef struct EditorView {
     /* Status */
     char statusmsg[80];       /* Status message */
     time_t statusmsg_time;    /* Status message timestamp */
+
+    /* Picker state (for MODE_PICKER) */
+    struct {
+        const char **items;         /* Item strings (not owned) */
+        int item_count;
+        int selected_index;
+        int scroll_offset;
+        const char *title;
+        void (*on_select)(editor_ctx_t *ctx, int index, void *data);
+        void (*on_cancel)(editor_ctx_t *ctx);
+        void *user_data;
+        EditorMode prev_mode;       /* Mode to restore on close */
+    } picker;
 } EditorView;
 
 /* Editor context - one instance per editor viewport/buffer.

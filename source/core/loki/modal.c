@@ -38,6 +38,8 @@
 #include "undo.h"
 #include "buffers.h"
 #include "lang_bridge.h"
+#include "keybind.h"
+#include "picker.h"
 #ifdef BUILD_CSOUND_BACKEND
 #include "shared/audio/audio.h"  /* For CSD file playback */
 #endif
@@ -1068,6 +1070,13 @@ void modal_process_event(editor_ctx_t *ctx, const EditorEvent *event) {
         exit(0);
     }
 
+    /* Try configurable keybindings first (from config.toml)
+     * This allows users to override default keybindings */
+    if (keybind_try_handle(ctx, 0, c)) {
+        quit_times = KILO_QUIT_TIMES;
+        return;
+    }
+
     /* Handle buffer operations globally */
     if (c == CTRL_T) {
         /* Create new buffer */
@@ -1102,6 +1111,9 @@ void modal_process_event(editor_ctx_t *ctx, const EditorEvent *event) {
             break;
         case MODE_COMMAND:
             command_mode_handle_key(ctx, 0, c);
+            break;
+        case MODE_PICKER:
+            picker_handle_key(ctx, c);
             break;
     }
 

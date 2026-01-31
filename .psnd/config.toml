@@ -34,14 +34,28 @@ tempo = 120
 
 # Keybindings
 # Format: "key" = "command"
-# Available modifiers: ctrl-, alt-, shift-
-# See :help keybindings for available commands
+# Keys: ctrl-a through ctrl-z (except ctrl-i/tab, ctrl-m/enter)
+#
+# Configurable commands (can be rebound):
+#   save       - Save current file
+#   find       - Search in file (terminal only)
+#   stop       - Stop playback
+#   lua_repl   - Toggle Lua REPL (requires lua.enabled = true)
+#   new_buffer - Create new buffer
+#   copy       - Copy selection to clipboard
+#   word_wrap  - Toggle word wrap
+#
+# Built-in commands (always work, can't be rebound):
+#   Ctrl-Q     - Quit (with unsaved changes confirmation)
+#   Ctrl-E     - Evaluate selection/line
+#   Ctrl-P     - Play entire file
+#   Ctrl-X     - Prefix for buffer commands (Ctrl-X n/p/k)
+#
 [keybindings]
 "ctrl-s" = "save"
-"ctrl-q" = "quit"
-"ctrl-e" = "eval_line"
-"ctrl-p" = "play_file"
 "ctrl-g" = "stop"
 "ctrl-f" = "find"
 "ctrl-l" = "lua_repl"
 "ctrl-t" = "new_buffer"
+"ctrl-c" = "copy"
+"ctrl-w" = "word_wrap"

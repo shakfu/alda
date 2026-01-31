@@ -133,6 +133,7 @@ function(psnd_build_loki)
         ${PSND_CORE_DIR}/loki/config.c
         ${PSND_CORE_DIR}/loki/theme_toml.c
         ${PSND_CORE_DIR}/loki/lang_toml.c
+        ${PSND_CORE_DIR}/loki/keybind.c
         ${PSND_CORE_DIR}/loki/editor.c
         ${PSND_CORE_DIR}/loki/syntax.c
         ${PSND_CORE_DIR}/loki/indent.c
@@ -142,6 +143,7 @@ function(psnd_build_loki)
         ${PSND_CORE_DIR}/loki/modal.c
         ${PSND_CORE_DIR}/loki/event.c
         ${PSND_CORE_DIR}/loki/renderer.c
+        ${PSND_CORE_DIR}/loki/picker.c
         ${PSND_CORE_DIR}/loki/command.c
         ${PSND_CORE_DIR}/loki/command/file.c
         ${PSND_CORE_DIR}/loki/command/basic.c

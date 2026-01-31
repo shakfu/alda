@@ -31,6 +31,7 @@
 #include "config.h"
 #include "theme_toml.h"
 #include "lang_toml.h"
+#include "keybind.h"
 #ifdef LOKI_USE_LINENOISE
 #include "treesitter.h"
 #endif
@@ -430,6 +431,9 @@ int loki_editor_main(int argc, char **argv) {
 
     /* Load TOML language definitions (for syntax highlighting without Lua) */
     lang_toml_load_all();
+
+    /* Initialize configurable keybindings */
+    keybind_init();
 
     /* Initialize LuaHost only if Lua is enabled in config */
     LuaHost *lua_host = NULL;

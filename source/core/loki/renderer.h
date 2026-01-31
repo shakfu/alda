@@ -83,6 +83,20 @@ typedef struct {
     int max_display_lines;      /* Maximum lines to display */
 } ReplInfo;
 
+/* ======================= Picker Info ====================================== */
+
+/**
+ * PickerInfo - Information for picker (selection) UI rendering.
+ */
+typedef struct {
+    const char *title;          /* Picker title */
+    const char **items;         /* Array of item strings */
+    int item_count;             /* Number of items */
+    int selected_index;         /* Currently selected item (0-based) */
+    int scroll_offset;          /* First visible item index */
+    int visible_rows;           /* Number of visible rows */
+} PickerInfo;
+
 /* ======================= Renderer Interface =============================== */
 
 /**
@@ -164,6 +178,15 @@ struct Renderer {
      * @param width  Available width
      */
     void (*render_repl)(Renderer *r, const ReplInfo *info, int width);
+
+    /**
+     * Render the picker (selection) UI.
+     * @param r      Renderer instance
+     * @param info   Picker information
+     * @param width  Available width
+     * @param height Available height
+     */
+    void (*render_picker)(Renderer *r, const PickerInfo *info, int width, int height);
 
     /* ==================== Cursor Management ==================== */
 

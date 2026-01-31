@@ -14,41 +14,31 @@
 /* Forward declarations */
 void editor_insert_row(editor_ctx_t *ctx, int at, char *s, size_t len);
 
-/* Buffer entry - wraps an editor context with metadata */
-typedef struct {
-    editor_ctx_t ctx;       /* Editor context for this buffer */
-    int id;                 /* Unique buffer ID */
-    int active;             /* 1 if this slot is in use, 0 if free */
-    char display_name[64];  /* Cached display name for tabs */
-} buffer_entry_t;
-
-/* Global buffer state */
-static struct {
-    buffer_entry_t buffers[MAX_BUFFERS];  /* Array of buffer slots */
-    int current_buffer_id;                /* ID of currently active buffer */
-    int next_id;                          /* Next ID to assign */
-    int initialized;                      /* 1 if buffers_init() was called */
-} buffer_state = {0};
+/* Global buffer manager instance */
+static buffer_manager_t default_buffer_manager = {0};
+buffer_manager_t *g_buffer_manager = &default_buffer_manager;
 
 /* ======================== Helper Functions ======================== */
 
-/* Find buffer entry by ID
+/* Find buffer entry by ID in a specific manager
  * Returns: Pointer to buffer entry, or NULL if not found */
-static buffer_entry_t *find_buffer(int buffer_id) {
+static buffer_entry_t *find_buffer_in(buffer_manager_t *mgr, int buffer_id) {
+    if (!mgr) return NULL;
     for (int i = 0; i < MAX_BUFFERS; i++) {
-        if (buffer_state.buffers[i].active && buffer_state.buffers[i].id == buffer_id) {
-            return &buffer_state.buffers[i];
+        if (mgr->buffers[i].active && mgr->buffers[i].id == buffer_id) {
+            return &mgr->buffers[i];
         }
     }
     return NULL;
 }
 
-/* Find first free buffer slot
+/* Find first free buffer slot in a specific manager
  * Returns: Pointer to free slot, or NULL if all slots full */
-static buffer_entry_t *find_free_slot(void) {
+static buffer_entry_t *find_free_slot_in(buffer_manager_t *mgr) {
+    if (!mgr) return NULL;
     for (int i = 0; i < MAX_BUFFERS; i++) {
-        if (!buffer_state.buffers[i].active) {
-            return &buffer_state.buffers[i];
+        if (!mgr->buffers[i].active) {
+            return &mgr->buffers[i];
         }
     }
     return NULL;
@@ -74,23 +64,52 @@ static void update_display_name(buffer_entry_t *buf) {
     }
 }
 
-/* ======================== Initialization ======================== */
+/* ======================== Buffer Manager API ======================== */
 
-int buffers_init(editor_ctx_t *initial_ctx) {
-    if (buffer_state.initialized) {
+buffer_manager_t *buffer_manager_create(void) {
+    buffer_manager_t *mgr = calloc(1, sizeof(buffer_manager_t));
+    if (!mgr) return NULL;
+    mgr->current_buffer_id = -1;
+    mgr->next_id = 1;
+    return mgr;
+}
+
+void buffer_manager_destroy(buffer_manager_t *mgr) {
+    if (!mgr || !mgr->initialized) return;
+
+    /* Free all active buffers */
+    for (int i = 0; i < MAX_BUFFERS; i++) {
+        if (mgr->buffers[i].active) {
+            /* Note: Don't free lua_host here - it's shared and freed separately */
+            mgr->buffers[i].ctx.lua_host = NULL;
+            editor_ctx_free(&mgr->buffers[i].ctx);
+            mgr->buffers[i].active = 0;
+        }
+    }
+
+    /* Reset buffer manager state completely */
+    mgr->initialized = 0;
+    mgr->current_buffer_id = 0;
+    mgr->next_id = 1;
+    mgr->shared_lua_host = NULL;
+    mgr->shared_ctx = NULL;
+}
+
+int buffer_manager_init(buffer_manager_t *mgr, editor_ctx_t *initial_ctx) {
+    if (!mgr || mgr->initialized) {
         return -1;  /* Already initialized */
     }
 
     /* Initialize buffer array */
-    memset(buffer_state.buffers, 0, sizeof(buffer_state.buffers));
-    buffer_state.current_buffer_id = -1;
-    buffer_state.next_id = 1;
-    buffer_state.initialized = 1;
+    memset(mgr->buffers, 0, sizeof(mgr->buffers));
+    mgr->current_buffer_id = -1;
+    mgr->next_id = 1;
+    mgr->initialized = 1;
 
     /* Create first buffer using the provided context */
-    buffer_entry_t *first = &buffer_state.buffers[0];
+    buffer_entry_t *first = &mgr->buffers[0];
     first->active = 1;
-    first->id = buffer_state.next_id++;
+    first->id = mgr->next_id++;
 
     /* Initialize fresh context and copy only essential state from initial_ctx */
     editor_ctx_init(&first->ctx);
@@ -100,6 +119,7 @@ int buffers_init(editor_ctx_t *initial_ctx) {
     first->ctx.view.screenrows = initial_ctx->view.screenrows;
     first->ctx.view.screenrows_total = initial_ctx->view.screenrows_total;
     first->ctx.lua_host = initial_ctx->lua_host;  /* Share Lua host across buffers */
+    mgr->shared_lua_host = initial_ctx->lua_host;
     memcpy(first->ctx.view.colors, initial_ctx->view.colors, sizeof(first->ctx.view.colors));
 
     /* Copy display settings */
@@ -126,47 +146,38 @@ int buffers_init(editor_ctx_t *initial_ctx) {
     first->ctx.view.coloff = initial_ctx->view.coloff;
 
     update_display_name(first);
-    buffer_state.current_buffer_id = first->id;
+    mgr->current_buffer_id = first->id;
 
     return 0;
 }
 
+/* ======================== Initialization (Global Wrappers) ======================== */
+
+int buffers_init(editor_ctx_t *initial_ctx) {
+    return buffer_manager_init(g_buffer_manager, initial_ctx);
+}
+
 void buffers_free(void) {
-    if (!buffer_state.initialized) return;
-
-    /* Free all active buffers */
-    for (int i = 0; i < MAX_BUFFERS; i++) {
-        if (buffer_state.buffers[i].active) {
-            /* Note: Don't free lua_host here - it's shared and freed separately */
-            buffer_state.buffers[i].ctx.lua_host = NULL;
-            editor_ctx_free(&buffer_state.buffers[i].ctx);
-            buffer_state.buffers[i].active = 0;
-        }
-    }
-
-    /* Reset buffer manager state completely */
-    buffer_state.initialized = 0;
-    buffer_state.current_buffer_id = 0;
-    buffer_state.next_id = 1;
+    buffer_manager_destroy(g_buffer_manager);
 }
 
 /* ======================== Buffer Operations ======================== */
 
-int buffer_create(const char *filename) {
-    if (!buffer_state.initialized) return -1;
+int buffer_create_in(buffer_manager_t *mgr, const char *filename) {
+    if (!mgr || !mgr->initialized) return -1;
 
     /* Get current buffer context to copy terminal state BEFORE creating new one */
-    editor_ctx_t *template_ctx = buffer_get_current();
+    editor_ctx_t *template_ctx = buffer_get_current_in(mgr);
 
     /* Find free slot */
-    buffer_entry_t *buf = find_free_slot();
+    buffer_entry_t *buf = find_free_slot_in(mgr);
     if (!buf) {
         return -1;  /* No free slots */
     }
 
     /* Initialize new buffer */
     buf->active = 1;
-    buf->id = buffer_state.next_id++;
+    buf->id = mgr->next_id++;
 
     /* Initialize editor context */
     editor_ctx_init(&buf->ctx);
@@ -181,6 +192,8 @@ int buffer_create(const char *filename) {
         memcpy(buf->ctx.view.colors, template_ctx->view.colors, sizeof(buf->ctx.view.colors));
         /* Copy display settings */
         buf->ctx.view.line_numbers = template_ctx->view.line_numbers;
+    } else if (mgr->shared_lua_host) {
+        buf->ctx.lua_host = mgr->shared_lua_host;
     }
 
     /* Initialize undo system for new buffer */
@@ -206,10 +219,14 @@ int buffer_create(const char *filename) {
     return buf->id;
 }
 
-int buffer_close(int buffer_id, int force) {
-    if (!buffer_state.initialized) return -1;
+int buffer_create(const char *filename) {
+    return buffer_create_in(g_buffer_manager, filename);
+}
 
-    buffer_entry_t *buf = find_buffer(buffer_id);
+int buffer_close(int buffer_id, int force) {
+    if (!g_buffer_manager || !g_buffer_manager->initialized) return -1;
+
+    buffer_entry_t *buf = find_buffer_in(g_buffer_manager, buffer_id);
     if (!buf) return -1;
 
     /* Check for unsaved changes */
@@ -223,7 +240,7 @@ int buffer_close(int buffer_id, int force) {
     }
 
     /* If closing current buffer, switch to another first */
-    if (buffer_id == buffer_state.current_buffer_id) {
+    if (buffer_id == g_buffer_manager->current_buffer_id) {
         /* Try to switch to next buffer */
         int next_id = buffer_next();
         if (next_id == buffer_id) {
@@ -239,17 +256,17 @@ int buffer_close(int buffer_id, int force) {
     return 0;
 }
 
-int buffer_switch(int buffer_id) {
-    if (!buffer_state.initialized) return -1;
+int buffer_switch_in(buffer_manager_t *mgr, int buffer_id) {
+    if (!mgr || !mgr->initialized) return -1;
 
-    buffer_entry_t *buf = find_buffer(buffer_id);
+    buffer_entry_t *buf = find_buffer_in(mgr, buffer_id);
     if (!buf) return -1;
 
     /* Save current state before switching */
     buffers_save_current_state();
 
     /* Switch to new buffer */
-    buffer_state.current_buffer_id = buffer_id;
+    mgr->current_buffer_id = buffer_id;
 
     /* Restore new buffer state */
     buffers_restore_state(&buf->ctx);
@@ -257,31 +274,35 @@ int buffer_switch(int buffer_id) {
     return 0;
 }
 
+int buffer_switch(int buffer_id) {
+    return buffer_switch_in(g_buffer_manager, buffer_id);
+}
+
 int buffer_next(void) {
-    if (!buffer_state.initialized || buffer_count() == 0) return -1;
+    if (!g_buffer_manager || !g_buffer_manager->initialized || buffer_count() == 0) return -1;
 
     int found_current = 0;
 
     /* Find next active buffer after current */
     for (int i = 0; i < MAX_BUFFERS; i++) {
-        if (!buffer_state.buffers[i].active) continue;
+        if (!g_buffer_manager->buffers[i].active) continue;
 
         if (found_current) {
             /* Found next buffer */
-            buffer_switch(buffer_state.buffers[i].id);
-            return buffer_state.buffers[i].id;
+            buffer_switch(g_buffer_manager->buffers[i].id);
+            return g_buffer_manager->buffers[i].id;
         }
 
-        if (buffer_state.buffers[i].id == buffer_state.current_buffer_id) {
+        if (g_buffer_manager->buffers[i].id == g_buffer_manager->current_buffer_id) {
             found_current = 1;
         }
     }
 
     /* Wrap around to first buffer */
     for (int i = 0; i < MAX_BUFFERS; i++) {
-        if (buffer_state.buffers[i].active) {
-            buffer_switch(buffer_state.buffers[i].id);
-            return buffer_state.buffers[i].id;
+        if (g_buffer_manager->buffers[i].active) {
+            buffer_switch(g_buffer_manager->buffers[i].id);
+            return g_buffer_manager->buffers[i].id;
         }
     }
 
@@ -289,15 +310,15 @@ int buffer_next(void) {
 }
 
 int buffer_prev(void) {
-    if (!buffer_state.initialized || buffer_count() == 0) return -1;
+    if (!g_buffer_manager || !g_buffer_manager->initialized || buffer_count() == 0) return -1;
 
     int prev_id = -1;
 
     /* Find previous active buffer before current */
     for (int i = 0; i < MAX_BUFFERS; i++) {
-        if (!buffer_state.buffers[i].active) continue;
+        if (!g_buffer_manager->buffers[i].active) continue;
 
-        if (buffer_state.buffers[i].id == buffer_state.current_buffer_id) {
+        if (g_buffer_manager->buffers[i].id == g_buffer_manager->current_buffer_id) {
             /* Found current, prev_id has previous */
             if (prev_id != -1) {
                 buffer_switch(prev_id);
@@ -306,14 +327,14 @@ int buffer_prev(void) {
             break;
         }
 
-        prev_id = buffer_state.buffers[i].id;
+        prev_id = g_buffer_manager->buffers[i].id;
     }
 
     /* Wrap around to last buffer */
     for (int i = MAX_BUFFERS - 1; i >= 0; i--) {
-        if (buffer_state.buffers[i].active) {
-            buffer_switch(buffer_state.buffers[i].id);
-            return buffer_state.buffers[i].id;
+        if (g_buffer_manager->buffers[i].active) {
+            buffer_switch(g_buffer_manager->buffers[i].id);
+            return g_buffer_manager->buffers[i].id;
         }
     }
 
@@ -322,55 +343,71 @@ int buffer_prev(void) {
 
 /* ======================== Query Functions ======================== */
 
-editor_ctx_t *buffer_get_current(void) {
-    if (!buffer_state.initialized) return NULL;
+editor_ctx_t *buffer_get_current_in(buffer_manager_t *mgr) {
+    if (!mgr || !mgr->initialized) return NULL;
 
-    buffer_entry_t *buf = find_buffer(buffer_state.current_buffer_id);
+    buffer_entry_t *buf = find_buffer_in(mgr, mgr->current_buffer_id);
+    return buf ? &buf->ctx : NULL;
+}
+
+editor_ctx_t *buffer_get_current(void) {
+    return buffer_get_current_in(g_buffer_manager);
+}
+
+editor_ctx_t *buffer_get_in(buffer_manager_t *mgr, int buffer_id) {
+    if (!mgr || !mgr->initialized) return NULL;
+
+    buffer_entry_t *buf = find_buffer_in(mgr, buffer_id);
     return buf ? &buf->ctx : NULL;
 }
 
 editor_ctx_t *buffer_get(int buffer_id) {
-    if (!buffer_state.initialized) return NULL;
+    return buffer_get_in(g_buffer_manager, buffer_id);
+}
 
-    buffer_entry_t *buf = find_buffer(buffer_id);
-    return buf ? &buf->ctx : NULL;
+int buffer_get_current_id_in(buffer_manager_t *mgr) {
+    return (mgr && mgr->initialized) ? mgr->current_buffer_id : -1;
 }
 
 int buffer_get_current_id(void) {
-    return buffer_state.initialized ? buffer_state.current_buffer_id : -1;
+    return buffer_get_current_id_in(g_buffer_manager);
 }
 
-int buffer_count(void) {
-    if (!buffer_state.initialized) return 0;
+int buffer_count_in(buffer_manager_t *mgr) {
+    if (!mgr || !mgr->initialized) return 0;
 
     int count = 0;
     for (int i = 0; i < MAX_BUFFERS; i++) {
-        if (buffer_state.buffers[i].active) {
+        if (mgr->buffers[i].active) {
             count++;
         }
     }
     return count;
 }
 
+int buffer_count(void) {
+    return buffer_count_in(g_buffer_manager);
+}
+
 int buffer_get_list(int *ids) {
-    if (!buffer_state.initialized || !ids) return 0;
+    if (!g_buffer_manager || !g_buffer_manager->initialized || !ids) return 0;
 
     int count = 0;
     for (int i = 0; i < MAX_BUFFERS && count < MAX_BUFFERS; i++) {
-        if (buffer_state.buffers[i].active) {
-            ids[count++] = buffer_state.buffers[i].id;
+        if (g_buffer_manager->buffers[i].active) {
+            ids[count++] = g_buffer_manager->buffers[i].id;
         }
     }
     return count;
 }
 
 const char *buffer_get_display_name(int buffer_id) {
-    buffer_entry_t *buf = find_buffer(buffer_id);
+    buffer_entry_t *buf = find_buffer_in(g_buffer_manager, buffer_id);
     return buf ? buf->display_name : NULL;
 }
 
 int buffer_is_modified(int buffer_id) {
-    buffer_entry_t *buf = find_buffer(buffer_id);
+    buffer_entry_t *buf = find_buffer_in(g_buffer_manager, buffer_id);
     if (!buf) return -1;
     return buf->ctx.model.dirty ? 1 : 0;
 }
@@ -392,7 +429,7 @@ void buffers_restore_state(editor_ctx_t *ctx) {
 /* ======================== Utility Functions ======================== */
 
 void buffer_update_display_name(int buffer_id) {
-    buffer_entry_t *buf = find_buffer(buffer_id);
+    buffer_entry_t *buf = find_buffer_in(g_buffer_manager, buffer_id);
     if (buf) {
         update_display_name(buf);
     }
@@ -401,7 +438,7 @@ void buffer_update_display_name(int buffer_id) {
 /* ======================== Rendering ======================== */
 
 void buffers_render_tabs(struct abuf *ab, int max_width) {
-    if (!buffer_state.initialized || !ab) return;
+    if (!g_buffer_manager || !g_buffer_manager->initialized || !ab) return;
 
     int count = buffer_count();
     if (count <= 1) {
@@ -413,10 +450,10 @@ void buffers_render_tabs(struct abuf *ab, int max_width) {
 
     /* Render each active buffer as a simple numbered tab: [1] [2] [3] */
     for (int i = 0; i < MAX_BUFFERS; i++) {
-        if (!buffer_state.buffers[i].active) continue;
+        if (!g_buffer_manager->buffers[i].active) continue;
 
-        buffer_entry_t *buf = &buffer_state.buffers[i];
-        int is_current = (buf->id == buffer_state.current_buffer_id);
+        buffer_entry_t *buf = &g_buffer_manager->buffers[i];
+        int is_current = (buf->id == g_buffer_manager->current_buffer_id);
 
         /* Highlight current tab with reverse video */
         if (is_current) {
@@ -442,7 +479,7 @@ void buffers_render_tabs(struct abuf *ab, int max_width) {
 
 /* Get tab info for renderer abstraction */
 int buffers_get_tab_info(char ***tabs, int *tab_count, int *active_tab) {
-    if (!buffer_state.initialized || !tabs || !tab_count || !active_tab) {
+    if (!g_buffer_manager || !g_buffer_manager->initialized || !tabs || !tab_count || !active_tab) {
         return -1;
     }
 
@@ -461,9 +498,9 @@ int buffers_get_tab_info(char ***tabs, int *tab_count, int *active_tab) {
     int idx = 0;
     int active_idx = 0;
     for (int i = 0; i < MAX_BUFFERS && idx < count; i++) {
-        if (!buffer_state.buffers[i].active) continue;
+        if (!g_buffer_manager->buffers[i].active) continue;
 
-        buffer_entry_t *buf = &buffer_state.buffers[i];
+        buffer_entry_t *buf = &g_buffer_manager->buffers[i];
 
         /* Create label: "[N]" format */
         labels[idx] = malloc(8);
@@ -475,7 +512,7 @@ int buffers_get_tab_info(char ***tabs, int *tab_count, int *active_tab) {
         }
         snprintf(labels[idx], 8, "[%d]", buf->id);
 
-        if (buf->id == buffer_state.current_buffer_id) {
+        if (buf->id == g_buffer_manager->current_buffer_id) {
             active_idx = idx;
         }
         idx++;

@@ -4,88 +4,17 @@
 
 ### `:plugin presets` buffer switch not working
 
-**Status:** Unresolved
+**Status:** Resolved (2026-01-31)
 
-**Description:** The `:plugin presets` command is intended to open a new scratch buffer displaying all plugin presets, allowing users to scroll through and view the full list. The command executes without errors, but the new buffer does not appear - the editor stays on the original buffer.
+**Root cause:** After `buffer_switch()` in `command/plugin.c`, the local `ctx` pointer was stale - it still pointed to the old buffer's context. Subsequent operations like `editor_set_status_msg(ctx, ...)` were modifying the wrong buffer.
 
-**Expected behavior:**
-1. User types `:plugin presets` and presses Enter
-2. A new buffer opens showing:
-   - Plugin name header
-   - Total preset count and current preset number
-   - Full list of presets with indices (e.g., `*   42: Warm Pad` where `*` marks current)
-3. User can scroll through presets, then close buffer with `:q`
+**Fix:** Refresh the context pointer after buffer switch:
+```c
+buffer_switch(buf_id);
+ctx = buffer_get_current();  /* Refresh stale pointer */
+```
 
-**Actual behavior:** Command returns success but display doesn't change. The original file buffer remains visible.
-
-**Root cause analysis:**
-
-The issue appears to be related to how buffer switching interacts with command mode exit:
-
-1. In `command/plugin.c`, the `:plugin presets` handler:
-   - Calls `buffer_create(NULL)` to create a new empty buffer
-   - Calls `buffer_switch(buf_id)` to switch to the new buffer
-   - Gets new context via `preset_ctx = buffer_get_current()`
-   - Populates the buffer with preset data via `editor_insert_row()`
-   - Sets `preset_ctx->view.mode = MODE_NORMAL`
-   - Returns success (1)
-
-2. In `command.c:command_mode_handle_key()`, after the command handler returns:
-   - `command_mode_exit(ctx)` is called with the ORIGINAL context
-   - This sets `ctx->view.mode = MODE_NORMAL` on the OLD buffer
-   - Clears the status message on the OLD buffer
-
-3. In `editor.c` main loop:
-   - Each iteration calls `ctx = buffer_get_current()` which SHOULD return the new buffer
-   - Calls `editor_refresh_screen(ctx)` which SHOULD render the new buffer
-
-**What was tried:**
-1. Verified `buffer_create()` returns valid buffer ID (checked object file symbols)
-2. Verified `buffer_switch()` updates `buffer_state.current_buffer_id`
-3. Added explicit `preset_ctx->view.mode = MODE_NORMAL` after buffer switch
-4. Confirmed all code is compiled in (strings present in binary)
-5. Clean rebuild with `BUILD_MINIHOST_BACKEND=ON`
-6. Added explicit error checking for `buffer_switch()` return value in plugin.c
-7. Created comprehensive unit test `buffer_command_workflow` that simulates the exact workflow - test passes, confirming buffer management works correctly in isolation
-
-**Analysis (2026-01-24):**
-The buffer management code is correct. A new unit test in `test_buffers.c` simulates exactly what `:plugin presets` does:
-- Create buffer, switch to it, delete initial row, insert content rows
-- All operations complete successfully and `buffer_get_current()` returns the correct context
-
-**Systematic investigation of potential causes:**
-
-| Hypothesis | Finding | Evidence |
-|------------|---------|----------|
-| Minihost plugin | **Not the cause** | Plugin functions are pure read-only queries. Audio runs in separate thread with proper mutex isolation. No editor state modification. |
-| Async event queue | **Not the cause** | All handlers call Lua callbacks or evaluate specific buffers by ID. None modify `current_buffer_id`. |
-| Terminal rendering | **Not the cause** | Both renderer and VT100 paths work correctly. `command_mode_exit` only modifies mode/status on OLD context. |
-
-**Improvements made:**
-- Added explicit error checking for `buffer_switch()` return value
-- Added runtime verification that buffer ID matches after switch
-- Status messages now include diagnostic info on failure
-
-**Remaining possibilities:**
-1. Environment-specific - Bug only manifests with specific plugins or terminal emulators
-2. Timing-related - Possible race condition in real-world conditions
-3. Already fixed - The bug may have been resolved by other changes
-
-**Ruled out:**
-1. ~~`buffer_switch()` may not properly save/restore state between buffers~~ (confirmed working via unit test)
-2. ~~The `ctx` passed to command handler may be cached somewhere else~~ (code trace shows ctx is local variable)
-3. ~~Screen refresh may be using a stale context pointer~~ (main loop fetches ctx each iteration)
-4. ~~Buffer initialization may be incomplete (missing screen dimensions, etc.)~~ (confirmed working via unit test)
-5. ~~The command handler's return may trigger additional processing that resets state~~ (no such code exists)
-6. ~~Async event queue dispatch has side effects~~ (handlers don't modify buffer state)
-
-**Files involved:**
-- `source/core/loki/command/plugin.c` - Command implementation
-- `source/core/loki/command.c` - Command execution and mode handling
-- `source/core/loki/buffers.c` - Buffer management
-- `source/core/loki/editor.c` - Main loop and screen refresh
-
-**Workaround:** Use `:plugin preset <n>` to select presets by number, or `:plugin preset <name>` for partial name matching. The status bar shows current preset info with `:plugin`.
+**Original description:** The `:plugin presets` command was intended to open a new scratch buffer displaying all plugin presets. The command executed without errors, but the new buffer did not appear - the editor stayed on the original buffer.
 
 ---
 
@@ -109,8 +38,9 @@ The web host is functional with xterm.js terminal emulator. Remaining work:
 
 ### Architecture
 
-- [ ] Extract buffer manager to injectable service
-  - Remove global `buffer_state` in `buffers.c`
+- [x] ~~Extract buffer manager to injectable service~~ **DONE**
+  - Added `buffer_manager_t` struct with `*_in()` API variants
+  - Global `g_buffer_manager` for backwards compatibility
   - Enables multi-editor and better testability
 
 - [ ] Wrap editor core in standalone service process (optional)
@@ -138,6 +68,11 @@ The web host is functional with xterm.js terminal emulator. Remaining work:
   - Most complex - requires rethinking REPL interaction model
 
 ### Editor Features
+
+- [ ] Complete command dispatcher for all keybindings
+  - Currently `eval_line`, `play_file`, and `quit` are hardcoded in `modal.c`
+  - These commands have complex behavior (multi-press confirmation, internal functions)
+  - Refactor to allow TOML configuration of these bindings
 
 - [ ] Playback visualization
   - Highlight currently playing region
@@ -191,20 +126,11 @@ The web host is functional with xterm.js terminal emulator. Remaining work:
   - Already designed for in `editor_ctx_t`
   - Requires screen rendering changes
 
-- [ ] Expand editor highlight vocabulary for full tree-sitter support
-  - Currently maps ~40 tree-sitter token types to only 9 HL_* constants
-  - Missing distinctions:
-    - `function` vs `function.builtin` vs `function.call` (all map to HL_KEYWORD1)
-    - `variable.builtin` (self/this) vs regular variables (both map to HL_NORMAL)
-    - `operator` and `punctuation.*` (map to HL_NORMAL, no color)
-    - `constructor`, `namespace`, `label`, `tag` (all map to HL_NORMAL)
-    - `keyword.control` vs `keyword.function` vs `keyword.return` (all map to HL_KEYWORD1)
-  - Implementation:
-    - Expand HL_* constants (add HL_FUNCTION, HL_OPERATOR, HL_PUNCTUATION, HL_VARIABLE_BUILTIN, etc.)
-    - Expand `ctx->view.colors[]` array to match
-    - Update `capture_to_hl()` in `treesitter.c` for finer mapping
-    - Update `syntax_apply_theme_colors()` to map more TOK_* to new HL_* types
-  - Files: `internal.h`, `treesitter.c`, `syntax.c`
+- [x] ~~Expand editor highlight vocabulary for full tree-sitter support~~ **DONE**
+  - 51 HL_* types now defined in `internal.h`
+  - Full tree-sitter capture mapping in `treesitter.c`
+  - TOML themes support all token types (function, operator, punctuation, variable.builtin, etc.)
+  - See `.psnd/themes/*.toml` for complete color mappings
 
 - [ ] LSP client integration
   - Would provide IDE-like features

@@ -25,8 +25,79 @@
 /* Maximum number of simultaneous buffers */
 #define MAX_BUFFERS 16
 
-/* Buffer state - opaque structure defined in loki_buffers.c */
-struct buffer_state;
+/* Forward declarations */
+struct LuaHost;
+struct SharedContext;
+
+/* Buffer entry - wraps an editor context with metadata */
+typedef struct {
+    editor_ctx_t ctx;       /* Editor context for this buffer */
+    int id;                 /* Unique buffer ID */
+    int active;             /* 1 if this slot is in use, 0 if free */
+    char display_name[64];  /* Cached display name for tabs */
+} buffer_entry_t;
+
+/* Buffer manager - injectable service for managing buffers.
+ * Can be created independently for testing, or use the global
+ * g_buffer_manager for backwards compatibility. */
+typedef struct buffer_manager {
+    buffer_entry_t buffers[MAX_BUFFERS];  /* Array of buffer slots */
+    int current_buffer_id;                /* ID of currently active buffer */
+    int next_id;                          /* Next ID to assign */
+    int initialized;                      /* 1 if initialized */
+    struct LuaHost *shared_lua_host;      /* Shared across all buffers */
+    struct SharedContext *shared_ctx;     /* Audio/MIDI/Link state */
+} buffer_manager_t;
+
+/* Global buffer manager for backwards compatibility */
+extern buffer_manager_t *g_buffer_manager;
+
+/* ======================== Buffer Manager API ======================== */
+
+/* Create a new buffer manager
+ * Returns: Pointer to buffer manager, or NULL on failure */
+buffer_manager_t *buffer_manager_create(void);
+
+/* Destroy a buffer manager and free all buffers
+ * Does not free the manager itself if it's the global instance */
+void buffer_manager_destroy(buffer_manager_t *mgr);
+
+/* Initialize buffer manager with an initial context
+ * mgr: Buffer manager to initialize
+ * initial_ctx: Editor context to use as template for first buffer
+ * Returns: 0 on success, -1 on failure */
+int buffer_manager_init(buffer_manager_t *mgr, editor_ctx_t *initial_ctx);
+
+/* Create a new buffer in a specific manager
+ * mgr: Buffer manager
+ * filename: File to open (NULL for empty buffer)
+ * Returns: Buffer ID on success, -1 on failure */
+int buffer_create_in(buffer_manager_t *mgr, const char *filename);
+
+/* Switch to a buffer in a specific manager
+ * mgr: Buffer manager
+ * buffer_id: ID of buffer to switch to
+ * Returns: 0 on success, -1 if buffer not found */
+int buffer_switch_in(buffer_manager_t *mgr, int buffer_id);
+
+/* Get current buffer context from a specific manager
+ * mgr: Buffer manager
+ * Returns: Pointer to current editor context, or NULL if no buffers */
+editor_ctx_t *buffer_get_current_in(buffer_manager_t *mgr);
+
+/* Get buffer context by ID from a specific manager
+ * mgr: Buffer manager
+ * buffer_id: ID of buffer to get
+ * Returns: Pointer to editor context, or NULL if not found */
+editor_ctx_t *buffer_get_in(buffer_manager_t *mgr, int buffer_id);
+
+/* Get current buffer ID from a specific manager
+ * Returns: Current buffer ID, or -1 if no buffers */
+int buffer_get_current_id_in(buffer_manager_t *mgr);
+
+/* Get number of buffers in a specific manager
+ * Returns: Number of open buffers */
+int buffer_count_in(buffer_manager_t *mgr);
 
 /* ======================== Public API ======================== */
 

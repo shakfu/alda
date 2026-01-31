@@ -29,7 +29,8 @@ typedef enum {
     MODE_NORMAL,
     MODE_INSERT,
     MODE_VISUAL,
-    MODE_COMMAND
+    MODE_COMMAND,
+    MODE_PICKER       /* Full-screen selection UI (themes, presets, files) */
 } EditorMode;
 
 /* ============================================================================

@@ -17,7 +17,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.4]
+
 ### Added
+
+- **Modal Picker**: Full-screen selection UI for choosing items from lists
+  - Integrated with editor modes as `MODE_PICKER`
+  - Vim-style navigation: `j/k` or arrow keys to move, `ENTER` to select, `ESC/q` to cancel
+  - Additional keybindings: `g/G` (top/bottom), `CTRL_D/U` (page down/up)
+  - Callback-based API for selection notification
+  - Scroll support for long lists
+  - Renderer-agnostic implementation (terminal + null renderers)
+  - Used by `:theme` (when no args) and `:plugin presets` commands
+
+- **Buffer Manager Service**: Injectable buffer management for testability
+  - New `buffer_manager_t` struct encapsulates all buffer state
+  - Explicit-manager API variants (`buffer_create_in()`, `buffer_switch_in()`, etc.)
+  - Global `g_buffer_manager` for backwards compatibility
+  - Enables isolated buffer managers for unit testing
 
 - **TOML Configuration System**: Safe, declarative configuration via `.psnd/config.toml`
   - Settings for theme, line numbers, tab width, audio backend, soundfont, and keybindings
@@ -25,6 +42,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - All 17 themes converted to TOML format (nord, dracula, monokai, gruvbox-dark, catppuccin, etc.)
   - Config loading order: project-local `.psnd/config.toml` > home `~/.psnd/config.toml` > defaults
   - Built on [tomlc99](https://github.com/cktan/tomlc99) (MIT license, ~1000 LOC)
+
+- **Configurable Keybindings**: Command dispatcher for TOML-defined keybindings
+  - Define keybindings in `[keybindings]` section of config.toml
+  - Available commands: `save`, `find`, `stop`, `lua_repl`, `new_buffer`, `copy`, `word_wrap`
+  - Custom keybindings override defaults (e.g., `"ctrl-w" = "save"`)
+  - Built-in defaults preserved for unbound keys
+  - Extensible: `keybind_register()` API for adding custom commands
 
 - **Opt-in Lua Scripting**: Lua is now disabled by default for improved security
   - Enable with `editor.lua.enabled = true` in config.toml
@@ -620,6 +644,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Root cause: `command_mode_exit()` was called with stale context after buffer-switching commands
   - Fix: Get fresh buffer context via `buffer_get_current()` after command execution
   - Affects: `:plugin presets`, `:e`, and any command that switches buffers
+
+- **Stale context in `:plugin presets`**: Fixed stale `ctx` pointer after `buffer_switch()` in plugin.c
+  - After `buffer_switch()`, the original `ctx` pointer becomes invalid
+  - Now refreshes `ctx = buffer_get_current()` immediately after buffer switch
 
 ### Removed
 
