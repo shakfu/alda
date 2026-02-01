@@ -124,9 +124,12 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
 
 ### Ableton Link Integration
 
-- [ ] Full transport sync
-  - Wire transport callbacks to start/stop playback
-  - Requires interruptible playback and "armed for playback" state
+- [x] ~~Full transport sync~~ **DONE**
+  - [x] ~~Wire transport callbacks to start/stop playback~~ **DONE**
+    - `:link transport [on|off]` command to enable optional transport sync mode
+    - When enabled, Link transport start plays the buffer, stop halts playback
+    - Works independently of basic Link tempo sync
+  - [ ] "Armed for playback" state (visual indicator when waiting for Link start)
 
 ---
 

@@ -12,6 +12,7 @@
 #include "loki/link.h"
 #include "internal.h"
 #include "async_queue.h"
+#include "lang_bridge.h"
 
 /* Ableton Link C wrapper */
 #include <abl_link.h>
@@ -45,6 +46,9 @@ typedef struct {
     char *peers_callback;
     char *tempo_callback;
     char *start_stop_callback;
+
+    /* Transport sync mode - when enabled, Link transport controls playback */
+    int transport_sync_enabled;
 } LinkState;
 
 static LinkState g_link_state = {0};
@@ -282,6 +286,28 @@ void loki_link_set_playing(editor_ctx_t *ctx, int playing) {
     abl_link_commit_app_session_state(g_link_state.link, g_link_state.session_state);
 }
 
+/* ======================= Transport Sync Mode ======================= */
+
+void loki_link_set_transport_sync(editor_ctx_t *ctx, int enable) {
+    (void)ctx;
+
+    if (!g_link_state.initialized) return;
+
+    /* Enable/disable Link start/stop sync protocol */
+    abl_link_enable_start_stop_sync(g_link_state.link, enable ? true : false);
+
+    /* Set our transport sync mode flag */
+    g_link_state.transport_sync_enabled = enable;
+}
+
+int loki_link_is_transport_sync_enabled(editor_ctx_t *ctx) {
+    (void)ctx;
+
+    if (!g_link_state.initialized) return 0;
+
+    return g_link_state.transport_sync_enabled;
+}
+
 /* ======================= Peers ======================= */
 
 uint64_t loki_link_num_peers(editor_ctx_t *ctx) {
@@ -386,24 +412,42 @@ void loki_link_check_callbacks(editor_ctx_t *ctx, lua_State *L) {
     }
 
     /* Check for start/stop changes */
-    if (g_link_state.playing_changed && g_link_state.start_stop_callback) {
+    if (g_link_state.playing_changed) {
         int playing = g_link_state.pending_playing;
+        int transport_sync = g_link_state.transport_sync_enabled;
         g_link_state.playing_changed = 0;
         g_link_state.last_playing = playing;
 
         char *callback = g_link_state.start_stop_callback;
         psnd_mutex_unlock(&g_link_state.mutex);
 
-        lua_getglobal(L, callback);
-        if (lua_isfunction(L, -1)) {
-            lua_pushboolean(L, playing);
-            if (lua_pcall(L, 1, 0, 0) != LUA_OK) {
-                const char *err = lua_tostring(L, -1);
-                fprintf(stderr, "Link start/stop callback error: %s\n", err ? err : "unknown");
+        /* Handle transport sync mode - control playback */
+        if (transport_sync) {
+            if (playing) {
+                /* Link transport started - play the buffer */
+                if (loki_lang_eval_buffer(ctx) == 0) {
+                    editor_set_status_msg(ctx, "Link transport: playing");
+                }
+            } else {
+                /* Link transport stopped - stop all playback */
+                loki_lang_stop_all(ctx);
+                editor_set_status_msg(ctx, "Link transport: stopped");
+            }
+        }
+
+        /* Also invoke Lua callback if registered */
+        if (callback) {
+            lua_getglobal(L, callback);
+            if (lua_isfunction(L, -1)) {
+                lua_pushboolean(L, playing);
+                if (lua_pcall(L, 1, 0, 0) != LUA_OK) {
+                    const char *err = lua_tostring(L, -1);
+                    fprintf(stderr, "Link start/stop callback error: %s\n", err ? err : "unknown");
+                    lua_pop(L, 1);
+                }
+            } else {
                 lua_pop(L, 1);
             }
-        } else {
-            lua_pop(L, 1);
         }
 
         psnd_mutex_lock(&g_link_state.mutex);

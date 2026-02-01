@@ -159,6 +159,31 @@ int loki_link_is_playing(editor_ctx_t *ctx);
 void loki_link_set_playing(editor_ctx_t *ctx, int playing);
 
 /* ============================================================================
+ * Transport Sync Mode
+ * ============================================================================ */
+
+/**
+ * Enable or disable transport sync mode.
+ * When enabled, Link transport state controls buffer playback:
+ * - Transport start: plays the current buffer
+ * - Transport stop: stops all playback
+ *
+ * This is an opt-in feature separate from basic Link tempo sync.
+ *
+ * @param ctx Editor context
+ * @param enable 1 to enable, 0 to disable
+ */
+void loki_link_set_transport_sync(editor_ctx_t *ctx, int enable);
+
+/**
+ * Check if transport sync mode is enabled.
+ *
+ * @param ctx Editor context
+ * @return 1 if enabled, 0 otherwise
+ */
+int loki_link_is_transport_sync_enabled(editor_ctx_t *ctx);
+
+/* ============================================================================
  * Peer Information
  * ============================================================================ */
 

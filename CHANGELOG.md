@@ -78,6 +78,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - `RenderSegment.is_playing` field added for renderer styling
   - Updated each frame via `shared_async_get_current_source_line(-1)`
 
+- **Link Transport Sync Mode**: Optional mode for synchronized playback with Link peers
+  - `:link transport [on|off]` command to enable/disable transport sync
+  - When enabled, Link transport state controls buffer playback:
+    - Transport start (from Ableton Live, etc.) plays the current buffer
+    - Transport stop halts all playback
+  - Separate from basic Link tempo sync - can enable tempo sync without transport sync
+  - Uses `loki_link_set_transport_sync()` and `loki_link_is_transport_sync_enabled()`
+  - Leverages existing Link start/stop sync protocol via `abl_link_enable_start_stop_sync()`
+
 - **Test Framework Expansion**: Enhanced assertion macros and test infrastructure
   - Comparison macros: `ASSERT_GT`, `ASSERT_LT`, `ASSERT_GTE`, `ASSERT_LTE`
   - Test fixtures: `FIXTURE`, `FIXTURE_SETUP`, `FIXTURE_TEARDOWN`, `TEST_F`, `RUN_TEST_F`
