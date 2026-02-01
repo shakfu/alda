@@ -120,9 +120,17 @@ static void terminal_render_row(Renderer *r, int row_num,
     TerminalRendererData *data = (TerminalRendererData *)r->data;
     struct abuf *ab = &data->ab;
 
+    /* Check if this is a playing line (check first segment) */
+    int is_playing_line = (seg_count > 0 && segments[0].is_playing);
+
     /* Render gutter (line number) */
     if (gutter_width > 0) {
-        terminal_buffer_append(ab, "\x1b[90m", 5);  /* Dark gray */
+        if (is_playing_line) {
+            /* Playing line: bright green gutter with indicator */
+            terminal_buffer_append(ab, "\x1b[92m", 5);  /* Bright green */
+        } else {
+            terminal_buffer_append(ab, "\x1b[90m", 5);  /* Dark gray */
+        }
         if (is_empty) {
             /* Empty row: show tilde */
             for (int i = 0; i < gutter_width - 1; i++)
@@ -130,13 +138,26 @@ static void terminal_render_row(Renderer *r, int row_num,
             terminal_buffer_append(ab, "~", 1);
         } else {
             char line_num_buf[16];
-            int line_num_len = snprintf(line_num_buf, sizeof(line_num_buf),
-                "%*d ", gutter_width - 1, row_num);
-            terminal_buffer_append(ab, line_num_buf, line_num_len);
+            if (is_playing_line) {
+                /* Show play indicator instead of number */
+                int line_num_len = snprintf(line_num_buf, sizeof(line_num_buf),
+                    "%*s>", gutter_width - 2, "");
+                terminal_buffer_append(ab, line_num_buf, line_num_len);
+            } else {
+                int line_num_len = snprintf(line_num_buf, sizeof(line_num_buf),
+                    "%*d ", gutter_width - 1, row_num);
+                terminal_buffer_append(ab, line_num_buf, line_num_len);
+            }
         }
         terminal_buffer_append(ab, "\x1b[39m", 5);  /* Reset foreground */
     } else if (is_empty) {
         terminal_buffer_append(ab, "~", 1);
+    }
+
+    /* For playing line, set a subtle background color */
+    if (is_playing_line) {
+        /* Dark green background: 48;5;22 (256-color palette) */
+        terminal_buffer_append(ab, "\x1b[48;5;22m", 10);
     }
 
     /* Render segments */
@@ -186,6 +207,10 @@ static void terminal_render_row(Renderer *r, int row_num,
             char sym = (seg->text[0] <= 26) ? '@' + seg->text[0] : '?';
             terminal_buffer_append(ab, &sym, 1);
             terminal_buffer_append(ab, "\x1b[0m", 4);  /* Reset */
+            if (is_playing_line) {
+                /* Restore playing line background */
+                terminal_buffer_append(ab, "\x1b[48;5;22m", 10);
+            }
             current_type = HL_TYPE_NORMAL;
         } else {
             terminal_buffer_append(ab, seg->text, seg->len);
@@ -196,6 +221,9 @@ static void terminal_render_row(Renderer *r, int row_num,
     terminal_buffer_append(ab, "\x1b[39m", 5);  /* Reset foreground */
     if (in_selection) {
         terminal_buffer_append(ab, "\x1b[27m", 5);  /* Normal video */
+    }
+    if (is_playing_line) {
+        terminal_buffer_append(ab, "\x1b[49m", 5);  /* Reset background */
     }
     terminal_buffer_append(ab, "\x1b[0K", 4);   /* Clear to end of line */
     terminal_buffer_append(ab, "\r\n", 2);

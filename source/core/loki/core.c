@@ -584,6 +584,10 @@ static int build_render_segments(editor_ctx_t *ctx, t_erow *row, int row_idx,
     unsigned char *hl = row->hl + coloff;
     int seg_count = 0;
 
+    /* Check if this row is the currently playing line (1-based) */
+    int is_playing_row = (ctx->view.playing_line > 0 &&
+                          ctx->view.playing_line == row_idx + 1);
+
     int seg_start = 0;
     int current_hl = hl[0];
     int current_selected = is_selected(ctx, row_idx, coloff);
@@ -598,6 +602,7 @@ static int build_render_segments(editor_ctx_t *ctx, t_erow *row, int row_idx,
             segments[seg_count].len = j - seg_start;
             segments[seg_count].hl_type = hl_const_to_type(current_hl);
             segments[seg_count].selected = current_selected;
+            segments[seg_count].is_playing = is_playing_row;
             seg_count++;
             seg_start = j;
             current_hl = next_hl;

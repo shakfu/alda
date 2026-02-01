@@ -69,6 +69,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Source tracking would require tokenizer line tracking + callback signature changes
   - Deferred as lower priority (scheduler infrastructure incompatible)
 
+- **Playback Line Highlighting**: Visual feedback during music playback
+  - Currently playing source line highlighted in editor during async playback
+  - Line gutter shows `>` indicator in bright green for the playing line
+  - Row background highlighted with dark green (256-color palette: 22)
+  - Works with Alda, Joy, and TR7 languages (any language using shared async)
+  - `EditorView.playing_line` field added for tracking (1-based, 0=none)
+  - `RenderSegment.is_playing` field added for renderer styling
+  - Updated each frame via `shared_async_get_current_source_line(-1)`
+
 - **Test Framework Expansion**: Enhanced assertion macros and test infrastructure
   - Comparison macros: `ASSERT_GT`, `ASSERT_LT`, `ASSERT_GTE`, `ASSERT_LTE`
   - Test fixtures: `FIXTURE`, `FIXTURE_SETUP`, `FIXTURE_TEARDOWN`, `TEST_F`, `RUN_TEST_F`

@@ -99,14 +99,17 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
 
 ### Editor Features
 
-- [ ] Playback visualization
-  - [ ] Highlight currently playing region
+- [x] ~~Playback visualization~~ **DONE**
+  - [x] ~~Highlight currently playing region~~ **DONE**
     - [x] ~~Source line tracking in Alda events~~ **DONE** (`ALDA_SOURCE_TRACKING`)
     - [x] ~~Source line tracking in shared async~~ **DONE** (`SHARED_SOURCE_TRACKING`)
     - [x] ~~Joy parser source line tracking~~ **DONE**
     - [x] ~~TR7 async API source tracking~~ **DONE** (API ready, primitives use 0 - TR7 interpreter doesn't expose source positions)
     - [ ] Bog parser source line tracking (blocked: callback-based architecture doesn't queue events)
-    - [ ] Editor integration to highlight lines during playback
+    - [x] ~~Editor integration to highlight lines during playback~~ **DONE**
+      - Line gutter shows `>` indicator in bright green for playing line
+      - Row background highlighted with dark green during playback
+      - `EditorView.playing_line` updated each frame from `shared_async_get_current_source_line()`
   - [x] ~~Show playback progress in status bar~~ **DONE**
     - Status bar shows bar.beat, tempo, Link peers, play/metronome state
 

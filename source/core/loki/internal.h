@@ -213,6 +213,9 @@ typedef struct EditorView {
         void *user_data;
         EditorMode prev_mode;       /* Mode to restore on close */
     } picker;
+
+    /* Playback visualization state */
+    int playing_line;               /* Currently playing source line (1-based, 0=none) */
 } EditorView;
 
 /* Editor context - one instance per editor viewport/buffer.

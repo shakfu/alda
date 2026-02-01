@@ -42,6 +42,9 @@
 #include "command/command_impl.h"
 #include "shared/context.h"
 #include "shared/osc/osc.h"
+#ifdef SHARED_SOURCE_TRACKING
+#include "async/shared_async.h"
+#endif
 #ifdef BUILD_MINIHOST_BACKEND
 #include "shared/audio/minihost_backend.h"
 #endif
@@ -632,6 +635,12 @@ int loki_editor_main(int argc, char **argv) {
              * Lua callback invocation is handled by async_queue_dispatch_lua. */
             loki_lang_check_callbacks(ctx, ctx_L(ctx));
         }
+
+#ifdef SHARED_SOURCE_TRACKING
+        /* Update playing line for playback visualization.
+         * Query any active playback slot for the current source line. */
+        ctx->view.playing_line = shared_async_get_current_source_line(-1);
+#endif
 
         editor_refresh_screen(ctx);
         editor_process_keypress(ctx, STDIN_FILENO);

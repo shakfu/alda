@@ -51,6 +51,7 @@ typedef struct {
     int len;                /* Length of text */
     HighlightType hl_type;  /* Highlight type for coloring */
     int selected;           /* 1 if text is selected, 0 otherwise */
+    int is_playing;         /* 1 if this is the currently playing line, 0 otherwise */
 } RenderSegment;
 
 /* ======================= Status Bar Info ================================== */
