@@ -157,6 +157,7 @@ typedef struct {
     TokenType type;
     char* text;
     double number;
+    int line;  /* 1-based source line number */
 } Token;
 
 typedef struct {
@@ -226,9 +227,12 @@ static void tokenize_source(const char* src, TokenVec* out,
 {
     size_t len = strlen(src);
     size_t i = 0;
+    int line = 1;  /* Track current line (1-based) */
     while (i < len) {
         char c = src[i];
         if (isspace((unsigned char)c)) {
+            if (c == '\n')
+                line++;
             i++;
             continue;
         }
@@ -242,7 +246,8 @@ static void tokenize_source(const char* src, TokenVec* out,
             while (i < len && is_ident_part(src[i]))
                 i++;
             Token tok = { .type = TOKEN_IDENT,
-                          .text = substr_copy(src, start, i - start) };
+                          .text = substr_copy(src, start, i - start),
+                          .line = line };
             token_vec_push(out, tok);
             continue;
         }
@@ -265,7 +270,8 @@ static void tokenize_source(const char* src, TokenVec* out,
             }
             memcpy(buf, src + start, seg);
             buf[seg] = '\0';
-            Token tok = { .type = TOKEN_NUMBER, .number = strtod(buf, NULL) };
+            Token tok = { .type = TOKEN_NUMBER, .number = strtod(buf, NULL),
+                          .line = line };
             token_vec_push(out, tok);
             continue;
         }
@@ -274,7 +280,8 @@ static void tokenize_source(const char* src, TokenVec* out,
         for (const char** m = multi; *m; ++m) {
             if (match_seq(src, i, len, *m)) {
                 Token tok = { .type = TOKEN_SYM,
-                              .text = substr_copy(src, i, strlen(*m)) };
+                              .text = substr_copy(src, i, strlen(*m)),
+                              .line = line };
                 token_vec_push(out, tok);
                 i += strlen(*m);
                 matched = true;
@@ -289,7 +296,8 @@ static void tokenize_source(const char* src, TokenVec* out,
                 i++;
                 continue;
             }
-            Token tok = { .type = TOKEN_SYM, .text = substr_copy(src, i, 1) };
+            Token tok = { .type = TOKEN_SYM, .text = substr_copy(src, i, 1),
+                          .line = line };
             token_vec_push(out, tok);
             i++;
             continue;
@@ -297,7 +305,7 @@ static void tokenize_source(const char* src, TokenVec* out,
         *error_message = strdup("Invalid character in source");
         return;
     }
-    Token eof = { .type = TOKEN_EOF, .text = NULL };
+    Token eof = { .type = TOKEN_EOF, .text = NULL, .line = line };
     token_vec_push(out, eof);
 }
 
@@ -817,6 +825,9 @@ static BogClause parse_clause(Parser* parser)
 {
     BogClause clause;
     memset(&clause, 0, sizeof(clause));
+    /* Record source line from first token of clause */
+    Token* first_tok = parser_peek(parser);
+    clause.source_line = first_tok ? first_tok->line : 0;
     clause.head = parse_expression(parser);
     GoalNode* body_ast = NULL;
     Token* tok = parser_peek(parser);
@@ -1242,6 +1253,7 @@ void bog_rename_clause(const BogClause* src, BogClause* dst,
     rename_map_init(&map);
     dst->head = rename_term(src->head, &map, counter, arena);
     dst->body = rename_goal_list(&src->body, &map, counter, arena);
+    dst->source_line = src->source_line;  /* Preserve source line */
     rename_map_free(&map);
 }
 
@@ -1355,7 +1367,8 @@ static void resolve_internal(const BogGoalList* goals, size_t index,
                              BogEnv* env, const BogProgram* program,
                              const BogContext* ctx,
                              const BogBuiltins* builtins,
-                             BogSolutions* solutions, BogArena* arena);
+                             BogSolutions* solutions, BogArena* arena,
+                             int source_line);
 
 static bool goal_succeeds(const BogGoalList* goals, BogEnv* env,
                           const BogProgram* program,
@@ -1363,20 +1376,26 @@ static bool goal_succeeds(const BogGoalList* goals, BogEnv* env,
                           const BogBuiltins* builtins, BogArena* arena)
 {
     BogSolutions temp = { 0 };
-    resolve_internal(goals, 0, env, program, ctx, builtins, &temp, arena);
+    resolve_internal(goals, 0, env, program, ctx, builtins, &temp, arena, 0);
     for (size_t i = 0; i < temp.count; ++i) {
         bog_env_free(&temp.envs[i]);
     }
     free(temp.envs);
+    free(temp.source_lines);
     return temp.count > 0;
 }
 
-static void push_solution(BogSolutions* solutions, const BogEnv* env)
+static void push_solution(BogSolutions* solutions, const BogEnv* env,
+                          int source_line)
 {
     BogEnv copy = bog_env_clone(env);
     solutions->envs = (BogEnv*)realloc(
         solutions->envs, sizeof(BogEnv) * (solutions->count + 1));
-    solutions->envs[solutions->count++] = copy;
+    solutions->source_lines = (int*)realloc(
+        solutions->source_lines, sizeof(int) * (solutions->count + 1));
+    solutions->envs[solutions->count] = copy;
+    solutions->source_lines[solutions->count] = source_line;
+    solutions->count++;
 }
 
 static void resolve_builtin(const BogGoal* goal, size_t next_index,
@@ -1384,7 +1403,8 @@ static void resolve_builtin(const BogGoal* goal, size_t next_index,
                             const BogProgram* program,
                             const BogContext* ctx,
                             const BogBuiltins* builtins,
-                            BogSolutions* solutions, BogArena* arena)
+                            BogSolutions* solutions, BogArena* arena,
+                            int source_line)
 {
     BogTerm* term = goal->data.term;
     const BogBuiltin* builtin = bog_find_builtin(
@@ -1396,7 +1416,7 @@ static void resolve_builtin(const BogGoal* goal, size_t next_index,
                 ctx, &result, arena);
     for (size_t i = 0; i < result.count; ++i) {
         resolve_internal(goals, next_index, &result.envs[i], program, ctx,
-                         builtins, solutions, arena);
+                         builtins, solutions, arena, source_line);
         bog_env_free(&result.envs[i]);
     }
     free(result.envs);
@@ -1406,10 +1426,11 @@ static void resolve_internal(const BogGoalList* goals, size_t index,
                              BogEnv* env, const BogProgram* program,
                              const BogContext* ctx,
                              const BogBuiltins* builtins,
-                             BogSolutions* solutions, BogArena* arena)
+                             BogSolutions* solutions, BogArena* arena,
+                             int source_line)
 {
     if (index >= goals->count) {
-        push_solution(solutions, env);
+        push_solution(solutions, env, source_line);
         return;
     }
     BogGoal goal = goals->items[index];
@@ -1427,7 +1448,7 @@ static void resolve_internal(const BogGoalList* goals, size_t index,
         }
         if (!succeeded) {
             resolve_internal(goals, index + 1, env, program, ctx, builtins,
-                             solutions, arena);
+                             solutions, arena, source_line);
         }
         return;
     }
@@ -1436,7 +1457,7 @@ static void resolve_internal(const BogGoalList* goals, size_t index,
             builtins, goal.data.term->value.compound.functor);
         if (builtin) {
             resolve_builtin(&goal, index + 1, env, goals, program, ctx,
-                            builtins, solutions, arena);
+                            builtins, solutions, arena, source_line);
             return;
         }
     }
@@ -1462,8 +1483,10 @@ static void resolve_internal(const BogGoalList* goals, size_t index,
                    goals->items + index + 1,
                    sizeof(BogGoal) * (goals->count - index - 1));
         }
+        /* Use the matched clause's source line if this is the first goal */
+        int new_source_line = (source_line == 0) ? renamed.source_line : source_line;
         resolve_internal(&combined, 0, &tmp, program, ctx, builtins, solutions,
-                         arena);
+                         arena, new_source_line);
         bog_env_free(&tmp);
     }
 }
@@ -1474,6 +1497,7 @@ void bog_resolve(const BogGoalList* goals, BogEnv* env,
                      BogSolutions* solutions, BogArena* arena)
 {
     solutions->envs = NULL;
+    solutions->source_lines = NULL;
     solutions->count = 0;
-    resolve_internal(goals, 0, env, program, ctx, builtins, solutions, arena);
+    resolve_internal(goals, 0, env, program, ctx, builtins, solutions, arena, 0);
 }

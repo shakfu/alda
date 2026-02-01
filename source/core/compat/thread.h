@@ -22,6 +22,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <process.h>
+#include <stdlib.h>  /* For malloc/free in thread wrapper */
 
 /* Mutex */
 typedef CRITICAL_SECTION psnd_mutex_t;
@@ -49,12 +50,36 @@ static inline int psnd_mutex_trylock(psnd_mutex_t *m) {
 
 /* Thread */
 typedef HANDLE psnd_thread_t;
-typedef unsigned int (__stdcall *psnd_thread_func_t)(void *);
+
+/* Wrapper to bridge POSIX thread signature to Windows calling convention.
+ * POSIX: void* (*)(void*)  - cdecl, returns pointer
+ * Windows: unsigned int (__stdcall *)(void*) - stdcall, returns uint
+ * Direct casting between these causes stack corruption on x86. */
+typedef struct {
+    void *(*func)(void *);
+    void *arg;
+} psnd_thread_wrapper_t;
+
+static unsigned int __stdcall psnd_thread_wrapper_func(void *wrapper_arg) {
+    psnd_thread_wrapper_t *wrapper = (psnd_thread_wrapper_t *)wrapper_arg;
+    void *(*func)(void *) = wrapper->func;
+    void *arg = wrapper->arg;
+    free(wrapper);  /* Free before calling so we don't leak on thread exit */
+    func(arg);
+    return 0;
+}
 
 static inline int psnd_thread_create(psnd_thread_t *thread, void *(*func)(void *), void *arg) {
-    /* Windows _beginthreadex expects different signature, so we wrap */
-    *thread = (HANDLE)_beginthreadex(NULL, 0, (psnd_thread_func_t)func, arg, 0, NULL);
-    return (*thread == NULL) ? -1 : 0;
+    psnd_thread_wrapper_t *wrapper = (psnd_thread_wrapper_t *)malloc(sizeof(*wrapper));
+    if (!wrapper) return -1;
+    wrapper->func = func;
+    wrapper->arg = arg;
+    *thread = (HANDLE)_beginthreadex(NULL, 0, psnd_thread_wrapper_func, wrapper, 0, NULL);
+    if (*thread == NULL) {
+        free(wrapper);
+        return -1;
+    }
+    return 0;
 }
 
 static inline int psnd_thread_join(psnd_thread_t thread, void **retval) {

@@ -213,6 +213,18 @@ int loki_lang_is_playing(editor_ctx_t *ctx) {
     return 0;
 }
 
+int loki_lang_get_source_line(editor_ctx_t *ctx) {
+    if (!ctx) return 0;
+
+    const LokiLangOps *ops = loki_lang_for_file(ctx->model.filename);
+    if (!ops) return 0;
+
+    if (ops->get_source_line) {
+        return ops->get_source_line(ctx);
+    }
+    return 0;
+}
+
 int loki_lang_has_events(editor_ctx_t *ctx) {
     if (!ctx) return 0;
 

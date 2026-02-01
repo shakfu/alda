@@ -62,6 +62,7 @@ void bog_scheduler_tick(BogScheduler* scheduler);
 void bog_scheduler_tick_at(BogScheduler* scheduler,
                                double now_seconds);
 double bog_scheduler_now(const BogScheduler* scheduler);
+int bog_scheduler_get_current_source_line(const BogScheduler* scheduler);
 int bog_scheduler_add_beat_callback(BogScheduler* scheduler,
                                         BogBeatCallback cb,
                                         void* userdata);

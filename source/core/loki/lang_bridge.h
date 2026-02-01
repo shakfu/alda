@@ -52,6 +52,7 @@ typedef struct LokiLangOps {
     int (*eval)(editor_ctx_t *ctx, const char *code);   /* Evaluate/play code */
     void (*stop)(editor_ctx_t *ctx);                    /* Stop playback */
     int (*is_playing)(editor_ctx_t *ctx);               /* Check if playing (optional) */
+    int (*get_source_line)(editor_ctx_t *ctx);          /* Get currently playing source line (optional) */
 
     /* Export support (optional) */
     int (*has_events)(editor_ctx_t *ctx);               /* Has exportable events */
@@ -162,6 +163,14 @@ void loki_lang_stop_all(editor_ctx_t *ctx);
  * @return 1 if playing, 0 otherwise
  */
 int loki_lang_is_playing(editor_ctx_t *ctx);
+
+/**
+ * Get currently playing source line from language for current file.
+ *
+ * @param ctx Editor context
+ * @return Source line (1-based), or 0 if not playing or not available
+ */
+int loki_lang_get_source_line(editor_ctx_t *ctx);
 
 /**
  * Check if any language has exportable events.

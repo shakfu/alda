@@ -160,7 +160,7 @@ static inline int psnd_path_is_absolute(const char *path) {
     if (!path || !path[0]) return 0;
 #ifdef _WIN32
     /* Windows: C:\... or \\server\... */
-    if ((path[0] >= 'A' && path[0] <= 'Z' || path[0] >= 'a' && path[0] <= 'z') && path[1] == ':') {
+    if (((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) && path[1] == ':') {
         return 1;
     }
     if (path[0] == '\\' && path[1] == '\\') {

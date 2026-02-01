@@ -638,8 +638,14 @@ int loki_editor_main(int argc, char **argv) {
 
 #ifdef SHARED_SOURCE_TRACKING
         /* Update playing line for playback visualization.
-         * Query any active playback slot for the current source line. */
-        ctx->view.playing_line = shared_async_get_current_source_line(-1);
+         * First try language-specific source line (e.g., Bog scheduler),
+         * then fall back to shared async infrastructure (Alda, Joy). */
+        int lang_source_line = loki_lang_get_source_line(ctx);
+        if (lang_source_line > 0) {
+            ctx->view.playing_line = lang_source_line;
+        } else {
+            ctx->view.playing_line = shared_async_get_current_source_line(-1);
+        }
 #endif
 
         editor_refresh_screen(ctx);

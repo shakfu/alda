@@ -59,6 +59,12 @@ void bog_async_stop(void);
  */
 int bog_async_is_running(void);
 
+/**
+ * @brief Get the source line of the currently playing event.
+ * @return Source line (1-based), or 0 if not playing.
+ */
+int bog_async_get_current_source_line(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -435,6 +435,12 @@ static int bog_lang_is_playing(editor_ctx_t *ctx) {
     return state ? state->running : 0;
 }
 
+static int bog_lang_get_source_line(editor_ctx_t *ctx) {
+    struct LokiBogState *state = get_bog_state(ctx);
+    if (!state || !state->scheduler || !state->running) return 0;
+    return bog_scheduler_get_current_source_line(state->scheduler);
+}
+
 static const char *bog_lang_get_error(editor_ctx_t *ctx) {
     struct LokiBogState *state = get_bog_state(ctx);
     if (!state) return NULL;
@@ -595,6 +601,7 @@ static const LokiLangOps bog_lang_ops = {
     .eval = bog_lang_eval,
     .stop = bog_lang_stop,
     .is_playing = bog_lang_is_playing,
+    .get_source_line = bog_lang_get_source_line,
 
     /* Export (not supported yet) */
     .has_events = NULL,

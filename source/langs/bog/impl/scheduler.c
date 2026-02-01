@@ -45,6 +45,7 @@ struct BogScheduler {
     bool running;
     int current_beat;
     double last_scheduled_time;  /* Track last scheduled time to avoid duplicates */
+    int current_source_line;     /* Source line of currently triggering event */
     BeatCallbackEntry* callbacks;
     size_t callback_count;
     size_t callback_capacity;
@@ -393,6 +394,7 @@ void bog_scheduler_start(BogScheduler* scheduler)
     if (scheduler->audio.init)
         scheduler->audio.init(scheduler->audio.userdata);
     scheduler->last_scheduled_time = -1.0;  /* Reset for fresh start */
+    scheduler->current_source_line = 0;
     scheduler->running = true;
 }
 
@@ -402,6 +404,7 @@ void bog_scheduler_stop(BogScheduler* scheduler)
         return;
     scheduler->running = false;
     scheduler->current_beat = 0;
+    scheduler->current_source_line = 0;
     notify_beat_callbacks(scheduler, scheduler->current_beat);
 }
 
@@ -410,6 +413,13 @@ double bog_scheduler_now(const BogScheduler* scheduler)
     if (!scheduler || !scheduler->audio.time)
         return 0.0;
     return scheduler->audio.time(scheduler->audio.userdata);
+}
+
+int bog_scheduler_get_current_source_line(const BogScheduler* scheduler)
+{
+    if (!scheduler)
+        return 0;
+    return scheduler->current_source_line;
 }
 
 int bog_scheduler_add_beat_callback(BogScheduler* scheduler,
@@ -520,6 +530,10 @@ static void scheduler_query_and_schedule(BogScheduler* scheduler, double t)
         double scheduled_time = swing_adjust(t, scheduler->bpm,
                                              scheduler->swing);
         if (voiceStr) {
+            /* Track source line of the matched event clause */
+            if (solutions.source_lines) {
+                scheduler->current_source_line = solutions.source_lines[i];
+            }
             trigger_voice(scheduler, voiceStr, scheduled_time, midi, vel);
         }
         free(voiceStr);
@@ -527,6 +541,7 @@ static void scheduler_query_and_schedule(BogScheduler* scheduler, double t)
         bog_arena_destroy(subst_arena);
     }
     free(solutions.envs);
+    free(solutions.source_lines);
     bog_arena_destroy(arena);
 }
 

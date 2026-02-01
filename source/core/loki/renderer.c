@@ -266,6 +266,8 @@ static void terminal_render_status(Renderer *r, const StatusInfo *info, int widt
         playing_tag = "[PLAYING] ";
     } else if (info->metronome_active) {
         playing_tag = "[METRONOME] ";
+    } else if (info->transport_armed) {
+        playing_tag = "[ARMED] ";
     }
 
     /* Link peers indicator */

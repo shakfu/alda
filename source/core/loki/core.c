@@ -721,6 +721,11 @@ static void editor_refresh_screen_via_renderer(editor_ctx_t *ctx) {
         link_peers = (int)loki_link_num_peers(ctx);
     }
 
+    /* Check if transport sync is armed (enabled but not playing) */
+    int transport_armed = link_active &&
+                          loki_link_is_transport_sync_enabled(ctx) &&
+                          !loki_lang_is_playing(ctx);
+
     StatusInfo status_info = {
         .mode = mode_str,
         .filename = ctx->model.filename,
@@ -731,6 +736,7 @@ static void editor_refresh_screen_via_renderer(editor_ctx_t *ctx) {
         .playing = loki_lang_is_playing(ctx),
         .link_active = link_active,
         .metronome_active = metronome_is_enabled(),
+        .transport_armed = transport_armed,
         .tempo = tempo,
         .beat = beat,
         .bar = bar,

@@ -78,6 +78,7 @@ struct BogGoalList {
 typedef struct {
     BogTerm* head;
     BogGoalList body;
+    int source_line;  /* 1-based line number where clause was defined */
 } BogClause;
 
 typedef struct {
@@ -158,6 +159,7 @@ bool bog_unify(BogTerm* a, BogTerm* b, BogEnv* env,
 /* Resolution */
 typedef struct {
     BogEnv* envs;
+    int* source_lines;  /* Source line of matched clause for each solution */
     size_t count;
 } BogSolutions;
 

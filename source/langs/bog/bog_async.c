@@ -123,3 +123,10 @@ void bog_async_stop(void) {
 int bog_async_is_running(void) {
     return atomic_load(&g_running);
 }
+
+int bog_async_get_current_source_line(void) {
+    if (!g_scheduler || !atomic_load(&g_running)) {
+        return 0;
+    }
+    return bog_scheduler_get_current_source_line(g_scheduler);
+}

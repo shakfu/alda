@@ -464,8 +464,9 @@ void terminal_handle_resize(editor_ctx_t *ctx) {
     if (terminal_host_resize_pending(g_terminal_host)) {
         terminal_host_clear_resize(g_terminal_host);
         terminal_update_window_size(ctx);
-        if (ctx->view.cy > ctx->view.screenrows) ctx->view.cy = ctx->view.screenrows - 1;
-        if (ctx->view.cx > ctx->view.screencols) ctx->view.cx = ctx->view.screencols - 1;
+        /* cy/cx are 0-indexed, so valid range is [0, screenrows-1] */
+        if (ctx->view.cy >= ctx->view.screenrows) ctx->view.cy = ctx->view.screenrows - 1;
+        if (ctx->view.cx >= ctx->view.screencols) ctx->view.cx = ctx->view.screencols - 1;
     }
 }
 

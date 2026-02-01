@@ -105,7 +105,12 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
     - [x] ~~Source line tracking in shared async~~ **DONE** (`SHARED_SOURCE_TRACKING`)
     - [x] ~~Joy parser source line tracking~~ **DONE**
     - [x] ~~TR7 async API source tracking~~ **DONE** (API ready, primitives use 0 - TR7 interpreter doesn't expose source positions)
-    - [ ] Bog parser source line tracking (blocked: callback-based architecture doesn't queue events)
+    - [x] ~~Bog parser source line tracking~~ **DONE**
+      - Tokenizer tracks line numbers per token
+      - `BogClause.source_line` stores clause definition line
+      - `BogSolutions.source_lines` tracks matched clause per solution
+      - `bog_scheduler_get_current_source_line()` API for querying
+      - `LokiLangOps.get_source_line` callback for language-agnostic query
     - [x] ~~Editor integration to highlight lines during playback~~ **DONE**
       - Line gutter shows `>` indicator in bright green for playing line
       - Row background highlighted with dark green during playback
@@ -129,7 +134,9 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
     - `:link transport [on|off]` command to enable optional transport sync mode
     - When enabled, Link transport start plays the buffer, stop halts playback
     - Works independently of basic Link tempo sync
-  - [ ] "Armed for playback" state (visual indicator when waiting for Link start)
+  - [x] ~~"Armed for playback" state~~ **DONE**
+    - Status bar shows `[ARMED]` when transport sync enabled but waiting for Link start
+    - `StatusInfo.transport_armed` field for renderer
 
 ---
 

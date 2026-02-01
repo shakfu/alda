@@ -63,20 +63,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Source tracking available via `_ex` variants when `SHARED_SOURCE_TRACKING` enabled
   - Note: TR7 interpreter doesn't currently expose source positions to primitives
 
-- **Bog Source Tracking Assessment**: Documented architectural limitation
-  - Bog uses callback-based immediate audio triggering during Prolog resolution
-  - `BogAudioCallbacks` fire directly via `trigger_voice()` - no event queue
-  - Source tracking would require tokenizer line tracking + callback signature changes
-  - Deferred as lower priority (scheduler infrastructure incompatible)
+- **Bog Source Line Tracking**: Complete source tracking for Bog playback visualization
+  - Tokenizer tracks line numbers (1-based) per token during lexical analysis
+  - `BogClause.source_line` stores the line where each clause is defined
+  - `BogSolutions.source_lines` array tracks which clause produced each solution
+  - Resolution propagates source line through clause matching
+  - `BogScheduler.current_source_line` updated when triggering voices
+  - `bog_scheduler_get_current_source_line()` API for external queries
+  - `bog_async_get_current_source_line()` for async layer access
+  - `LokiLangOps.get_source_line` callback added to language bridge interface
+  - `loki_lang_get_source_line()` convenience function for editor queries
+  - New test: `resolution_tracks_source_lines` verifies clause and solution tracking
+  - Completes source tracking for all music languages (Alda, Joy, TR7, Bog)
 
 - **Playback Line Highlighting**: Visual feedback during music playback
   - Currently playing source line highlighted in editor during async playback
   - Line gutter shows `>` indicator in bright green for the playing line
   - Row background highlighted with dark green (256-color palette: 22)
-  - Works with Alda, Joy, and TR7 languages (any language using shared async)
+  - Works with all music languages: Alda, Joy, TR7, and Bog
   - `EditorView.playing_line` field added for tracking (1-based, 0=none)
   - `RenderSegment.is_playing` field added for renderer styling
-  - Updated each frame via `shared_async_get_current_source_line(-1)`
+  - Editor queries `loki_lang_get_source_line()` first, then `shared_async_get_current_source_line()`
 
 - **Link Transport Sync Mode**: Optional mode for synchronized playback with Link peers
   - `:link transport [on|off]` command to enable/disable transport sync
@@ -86,6 +93,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Separate from basic Link tempo sync - can enable tempo sync without transport sync
   - Uses `loki_link_set_transport_sync()` and `loki_link_is_transport_sync_enabled()`
   - Leverages existing Link start/stop sync protocol via `abl_link_enable_start_stop_sync()`
+  - **Armed indicator**: Status bar shows `[ARMED]` when transport sync is enabled but waiting for Link start
+    - `StatusInfo.transport_armed` field added for renderer integration
+    - Helps users see when editor is ready to respond to Link transport
 
 - **Test Framework Expansion**: Enhanced assertion macros and test infrastructure
   - Comparison macros: `ASSERT_GT`, `ASSERT_LT`, `ASSERT_GTE`, `ASSERT_LTE`

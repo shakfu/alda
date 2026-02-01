@@ -66,6 +66,7 @@ TEST(resolution_resolves_builtin_choose)
     for (size_t i = 0; i < solutions.count; i++)
         bog_env_free(&solutions.envs[i]);
     free(solutions.envs);
+    free(solutions.source_lines);
     bog_env_free(&env);
     free(error);
     bog_arena_destroy(arena);
@@ -115,6 +116,7 @@ TEST(resolution_supports_euclidean_rhythm_gating)
     for (size_t i = 0; i < solutions.count; i++)
         bog_env_free(&solutions.envs[i]);
     free(solutions.envs);
+    free(solutions.source_lines);
     bog_env_free(&env);
     free(error);
     bog_arena_destroy(arena);
@@ -163,6 +165,7 @@ TEST(resolution_handles_multiple_clauses)
     for (size_t i = 0; i < solutions.count; i++)
         bog_env_free(&solutions.envs[i]);
     free(solutions.envs);
+    free(solutions.source_lines);
     bog_env_free(&env);
     free(error);
     bog_arena_destroy(arena);
@@ -214,6 +217,67 @@ TEST(resolution_handles_conjunctive_goals)
     for (size_t i = 0; i < solutions.count; i++)
         bog_env_free(&solutions.envs[i]);
     free(solutions.envs);
+    free(solutions.source_lines);
+    bog_env_free(&env);
+    free(error);
+    bog_arena_destroy(arena);
+    TEST_PASS();
+}
+
+TEST(resolution_tracks_source_lines)
+{
+    BogArena* arena = bog_arena_create();
+    BogBuiltins* builtins = bog_create_builtins(arena);
+    char* error = NULL;
+
+    /* Multi-line program - clauses on different lines */
+    BogProgram* program = bog_parse_program(
+        "foo(1).\n"
+        "foo(2).\n"
+        "foo(3).", arena, &error);
+
+    ASSERT_NOT_NULL(program);
+    ASSERT_EQ(program->count, 3);
+
+    /* Verify source lines are tracked in clauses */
+    ASSERT_EQ(program->clauses[0].source_line, 1);
+    ASSERT_EQ(program->clauses[1].source_line, 2);
+    ASSERT_EQ(program->clauses[2].source_line, 3);
+
+    /* Query: foo(X) */
+    BogTerm* query_args[1];
+    query_args[0] = bog_make_var(arena, "X");
+    BogTerm* query = bog_make_compound(arena, "foo", query_args, 1);
+
+    BogGoal goal;
+    goal.kind = CPROLOG_GOAL_TERM;
+    goal.data.term = query;
+
+    BogGoalList goals;
+    goals.items = &goal;
+    goals.count = 1;
+
+    BogContext ctx;
+    ctx.bpm = 120.0;
+    ctx.state_manager = NULL;
+
+    BogEnv env;
+    bog_env_init(&env);
+    BogSolutions solutions = { 0 };
+
+    bog_resolve(&goals, &env, program, &ctx, builtins, &solutions, arena);
+
+    /* Should get 3 solutions with correct source lines */
+    ASSERT_EQ(solutions.count, 3);
+    ASSERT_NOT_NULL(solutions.source_lines);
+    ASSERT_EQ(solutions.source_lines[0], 1);
+    ASSERT_EQ(solutions.source_lines[1], 2);
+    ASSERT_EQ(solutions.source_lines[2], 3);
+
+    for (size_t i = 0; i < solutions.count; i++)
+        bog_env_free(&solutions.envs[i]);
+    free(solutions.envs);
+    free(solutions.source_lines);
     bog_env_free(&env);
     free(error);
     bog_arena_destroy(arena);
@@ -264,6 +328,7 @@ TEST(resolution_handles_is_builtin)
     for (size_t i = 0; i < solutions.count; i++)
         bog_env_free(&solutions.envs[i]);
     free(solutions.envs);
+    free(solutions.source_lines);
     bog_env_free(&env);
     free(error);
     bog_arena_destroy(arena);
@@ -279,6 +344,7 @@ int main(void)
     RUN_TEST(resolution_supports_euclidean_rhythm_gating);
     RUN_TEST(resolution_handles_multiple_clauses);
     RUN_TEST(resolution_handles_conjunctive_goals);
+    RUN_TEST(resolution_tracks_source_lines);
     RUN_TEST(resolution_handles_is_builtin);
 
     TEST_SUMMARY();

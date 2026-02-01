@@ -69,6 +69,7 @@ typedef struct {
     int playing;                /* Playback active flag */
     int link_active;            /* Ableton Link active flag */
     int metronome_active;       /* Metronome is running */
+    int transport_armed;        /* Transport sync enabled, waiting for Link start */
     double tempo;               /* Current tempo in BPM (0 if unknown) */
     double beat;                /* Current beat position (fractional) */
     int bar;                    /* Current bar number (1-based) */
