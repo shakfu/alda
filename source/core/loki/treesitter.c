@@ -3,7 +3,7 @@
  * @brief Tree-sitter syntax highlighting for editor buffers.
  *
  * This module provides tree-sitter based syntax highlighting for the editor.
- * Supported languages: Lua, Alda, Csound, Joy, Haskell, Scheme.
+ * Supported languages: Lua, Alda, Csound, Joy, Haskell, Scheme, Prolog (Bog).
  */
 
 #include "treesitter.h"
@@ -22,6 +22,7 @@ extern const TSLanguage *tree_sitter_csound(void);
 extern const TSLanguage *tree_sitter_joy(void);
 extern const TSLanguage *tree_sitter_haskell(void);
 extern const TSLanguage *tree_sitter_scheme(void);
+extern const TSLanguage *tree_sitter_prolog(void);
 
 /* Highlight query for Lua */
 static const char *LUA_HIGHLIGHT_QUERY =
@@ -149,6 +150,22 @@ static const char *SCHEME_HIGHLIGHT_QUERY =
     "(string) @string\n"
     "(list . (symbol) @function)\n"
     "[(comment) (block_comment) (directive)] @comment\n"
+;
+
+/* Highlight query for Prolog (used for Bog language) */
+static const char *PROLOG_HIGHLIGHT_QUERY =
+    "(comment) @comment\n"
+    "(atom) @constant\n"
+    "(functional_notation function: (atom) @function.call)\n"
+    "(integer) @number\n"
+    "(float_number) @number\n"
+    "(directive_head) @operator\n"
+    "(operator_notation operator: _ @operator)\n"
+    "[(open) (open_ct) (close) (open_list) \"|\" (close_list)\n"
+    " (open_curly) (close_curly)] @punctuation.bracket\n"
+    "[(arg_list_separator) (comma) (end) (list_notation_separator)] @punctuation.delimiter\n"
+    "(double_quoted_list_notation) @string\n"
+    "(variable_term) @variable\n"
 ;
 
 /**
@@ -405,6 +422,9 @@ const TSLanguage *treesitter_get_language(const char *lang_name) {
     if (strcmp(lang_name, "scheme") == 0) {
         return tree_sitter_scheme();
     }
+    if (strcmp(lang_name, "prolog") == 0 || strcmp(lang_name, "bog") == 0) {
+        return tree_sitter_prolog();
+    }
 
     return NULL;
 }
@@ -430,6 +450,9 @@ static const char *get_highlight_query(const char *lang_name) {
     if (strcmp(lang_name, "scheme") == 0) {
         return SCHEME_HIGHLIGHT_QUERY;
     }
+    if (strcmp(lang_name, "prolog") == 0 || strcmp(lang_name, "bog") == 0) {
+        return PROLOG_HIGHLIGHT_QUERY;
+    }
 
     return NULL;
 }
@@ -452,6 +475,8 @@ const char *treesitter_lang_from_filename(const char *filename) {
     if (strcmp(ext, "scm") == 0) return "scheme";
     if (strcmp(ext, "ss") == 0) return "scheme";
     if (strcmp(ext, "rkt") == 0) return "scheme";
+    if (strcmp(ext, "bog") == 0) return "prolog";
+    if (strcmp(ext, "pl") == 0) return "prolog";
 
     return NULL;
 }

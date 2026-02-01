@@ -1,0 +1,12 @@
+* text eol=lf
+
+*.pl linguist-language=Prolog
+
+grammars/*/src/**/* linguist-generated -linguist-detectable
+
+bindings/** linguist-generated -linguist-detectable
+binding.gyp linguist-generated -linguist-detectable
+setup.py linguist-generated -linguist-detectable
+CMakeLists.txt linguist-generated -linguist-detectable
+Makefile linguist-generated -linguist-detectable
+Package.swift linguist-generated -linguist-detectable

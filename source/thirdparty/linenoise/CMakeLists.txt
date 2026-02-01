@@ -127,6 +127,15 @@ target_include_directories(tree-sitter-csound PRIVATE
     ${TREESITTER_DIR}/lib/include
 )
 
+# Prolog grammar (used for Bog language)
+add_library(tree-sitter-prolog STATIC
+    ${TREESITTER_GRAMMARS_DIR}/tree-sitter-prolog/grammars/prolog/src/parser.c
+)
+target_include_directories(tree-sitter-prolog PRIVATE
+    ${TREESITTER_GRAMMARS_DIR}/tree-sitter-prolog/grammars/prolog/src
+    ${TREESITTER_DIR}/lib/include
+)
+
 # Silence warnings for all grammars
 if(MSVC)
     target_compile_options(tree-sitter-lua PRIVATE /w)
@@ -135,6 +144,7 @@ if(MSVC)
     target_compile_options(tree-sitter-scheme PRIVATE /w)
     target_compile_options(tree-sitter-alda PRIVATE /w)
     target_compile_options(tree-sitter-csound PRIVATE /w)
+    target_compile_options(tree-sitter-prolog PRIVATE /w)
 else()
     target_compile_options(tree-sitter-lua PRIVATE -w)
     target_compile_options(tree-sitter-haskell PRIVATE -w)
@@ -142,6 +152,7 @@ else()
     target_compile_options(tree-sitter-scheme PRIVATE -w)
     target_compile_options(tree-sitter-alda PRIVATE -w)
     target_compile_options(tree-sitter-csound PRIVATE -w)
+    target_compile_options(tree-sitter-prolog PRIVATE -w)
 endif()
 
 # ==============================================================================
@@ -257,4 +268,4 @@ target_link_libraries(linenoise-highlight-scheme
     PRIVATE linenoise-theme tree-sitter tree-sitter-scheme
 )
 
-message(STATUS "linenoise: tree-sitter syntax highlighting enabled (Lua, Alda, Csound, Joy, Haskell, Scheme)")
+message(STATUS "linenoise: tree-sitter syntax highlighting enabled (Lua, Alda, Csound, Joy, Haskell, Scheme, Prolog)")

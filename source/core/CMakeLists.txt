@@ -303,6 +303,7 @@ function(psnd_build_loki)
             tree-sitter-joy
             tree-sitter-haskell
             tree-sitter-scheme
+            tree-sitter-prolog
         )
     endif()
 

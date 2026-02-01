@@ -19,6 +19,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 
+- **Tree-sitter Prolog Grammar for Bog**: Integrated tree-sitter-prolog for syntax highlighting
+  - Bog files (`.bog`, `.pl`) now use tree-sitter-based highlighting instead of keyword-based
+  - Highlights: comments, atoms, variables, function calls, numbers, operators, strings, punctuation
+  - Grammar located at `source/thirdparty/tree-sitter-grammars/tree-sitter-prolog/`
+
 - **Test Framework Expansion**: Enhanced assertion macros and test infrastructure
   - Comparison macros: `ASSERT_GT`, `ASSERT_LT`, `ASSERT_GTE`, `ASSERT_LTE`
   - Test fixtures: `FIXTURE`, `FIXTURE_SETUP`, `FIXTURE_TEARDOWN`, `TEST_F`, `RUN_TEST_F`
