@@ -54,6 +54,10 @@ int joy_async_play(MidiSchedule* sched, MusicContext* mctx) {
             /* Scale timings by Link tempo ratio */
             int time_ms = (int)(ev->time_ms * tempo_scale + 0.5);
             int duration_ms = (int)(ev->duration_ms * tempo_scale + 0.5);
+#ifdef SHARED_SOURCE_TRACKING
+            /* Pass source line through to shared async */
+            SHARED_SET_SOURCE_LINE(async_sched, ev->source_line);
+#endif
             shared_async_schedule_note(async_sched, time_ms, ev->channel,
                                         ev->pitch, ev->velocity, duration_ms);
         }

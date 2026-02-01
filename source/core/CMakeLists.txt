@@ -36,6 +36,13 @@ set(LIBSHARED_SOURCES
 add_library(shared STATIC ${LIBSHARED_SOURCES})
 add_library(shared::shared ALIAS shared)
 
+# Source tracking for playback visualization (stores source line in events)
+option(SHARED_SOURCE_TRACKING "Enable source line tracking in shared async events" ON)
+if(SHARED_SOURCE_TRACKING)
+    target_compile_definitions(shared PUBLIC SHARED_SOURCE_TRACKING)
+    message(STATUS "Shared: Source tracking enabled (for playback visualization)")
+endif()
+
 target_include_directories(shared
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/shared

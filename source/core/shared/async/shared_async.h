@@ -32,6 +32,23 @@ extern "C" {
 #define SHARED_ASYNC_DEFAULT_TEMPO 120     /* Default BPM */
 
 /* ============================================================================
+ * Source Line Tracking (for playback visualization)
+ * ============================================================================ */
+
+#ifdef SHARED_SOURCE_TRACKING
+/**
+ * @brief Set the source line for subsequent scheduled events.
+ * Call this before scheduling events to record which source line produced them.
+ * @param sched SharedAsyncSchedule pointer.
+ * @param line Source line number (1-based, or 0 for unknown).
+ */
+#define SHARED_SET_SOURCE_LINE(sched, line) \
+    do { if (sched) (sched)->source_tracking_line = (line); } while(0)
+#else
+#define SHARED_SET_SOURCE_LINE(sched, line) ((void)0)
+#endif
+
+/* ============================================================================
  * Completion Callback
  * ============================================================================ */
 
@@ -71,6 +88,9 @@ typedef struct SharedAsyncEvent {
     int data2;              /* Velocity for notes, CC value */
     int duration_ticks;     /* Duration in ticks (for tick mode) */
     int duration_ms;        /* Duration in ms (for ms mode) */
+#ifdef SHARED_SOURCE_TRACKING
+    int source_line;        /* Source line number (1-based, 0=unknown) */
+#endif
 } SharedAsyncEvent;
 
 /**
@@ -93,6 +113,9 @@ typedef struct SharedAsyncSchedule {
     int use_ticks;          /* Non-zero to use tick-based timing */
     int initial_tempo;      /* Starting tempo in BPM (for tick mode) */
     int launch_quantize;    /* Beat quantization (0=immediate, 1=beat, 4=bar, etc.) */
+#ifdef SHARED_SOURCE_TRACKING
+    int source_tracking_line; /* Current source line for new events (set via SHARED_SET_SOURCE_LINE) */
+#endif
 } SharedAsyncSchedule;
 
 /* ============================================================================
@@ -183,6 +206,33 @@ void shared_async_schedule_program_tick(SharedAsyncSchedule* sched, int tick,
  * @param tempo New tempo in BPM.
  */
 void shared_async_schedule_tempo(SharedAsyncSchedule* sched, int tick, int tempo);
+
+/* ============================================================================
+ * Source-Tracking Schedule Helpers (explicit source line parameter)
+ * ============================================================================ */
+
+#ifdef SHARED_SOURCE_TRACKING
+/**
+ * Add a note event with explicit source line.
+ */
+void shared_async_schedule_note_ex(SharedAsyncSchedule* sched, int time_ms,
+                                    int channel, int pitch, int velocity,
+                                    int duration_ms, int source_line);
+
+/**
+ * Add a note-on event at tick position with explicit source line.
+ */
+void shared_async_schedule_note_on_tick_ex(SharedAsyncSchedule* sched, int tick,
+                                            int channel, int pitch, int velocity,
+                                            int source_line);
+
+/**
+ * Add a note-off event at tick position with explicit source line.
+ */
+void shared_async_schedule_note_off_tick_ex(SharedAsyncSchedule* sched, int tick,
+                                             int channel, int pitch,
+                                             int source_line);
+#endif
 
 /**
  * Convert ticks to milliseconds.
@@ -280,6 +330,19 @@ int shared_async_wait_all(int timeout_ms);
  * @return 0 if completed, -1 if timed out.
  */
 int shared_async_wait(int slot_id, int timeout_ms);
+
+/* ============================================================================
+ * Playback State Query (for visualization)
+ * ============================================================================ */
+
+#ifdef SHARED_SOURCE_TRACKING
+/**
+ * Get the source line of the most recently played event in a slot.
+ * @param slot_id Slot to query (-1 for any active slot).
+ * @return Source line number (1-based), or 0 if unknown/not playing.
+ */
+int shared_async_get_current_source_line(int slot_id);
+#endif
 
 #ifdef __cplusplus
 }

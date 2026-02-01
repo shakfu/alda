@@ -114,6 +114,9 @@ typedef struct {
     int data1;           /* Pitch or CC number or program */
     int data2;           /* Velocity or CC value */
     int part_index;      /* Source part index (for debugging) */
+#ifdef ALDA_SOURCE_TRACKING
+    int source_line;     /* Source line number (1-based, 0=unknown) */
+#endif
 } AldaScheduledEvent;
 
 /* ============================================================================
@@ -195,6 +198,13 @@ typedef struct AldaContext {
     /* Current file context for error reporting */
     const char* current_file;
     int current_line;
+
+#ifdef ALDA_SOURCE_TRACKING
+    /* Source tracking for playback visualization.
+     * Set this before scheduling events to record which source line
+     * produced each event. The scheduler reads this value. */
+    int source_tracking_line;
+#endif
 } AldaContext;
 
 /* ============================================================================

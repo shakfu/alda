@@ -71,6 +71,9 @@ typedef struct ScheduledEvent {
     int pitch;          /* MIDI pitch (0-127) */
     int velocity;       /* Velocity (0-127) */
     int duration_ms;    /* Note duration in ms */
+#ifdef SHARED_SOURCE_TRACKING
+    int source_line;    /* Source line number (1-based, 0=unknown) */
+#endif
 } ScheduledEvent;
 
 /* A MIDI schedule (collection of events) */
@@ -79,6 +82,9 @@ typedef struct MidiSchedule {
     size_t count;
     size_t capacity;
     int total_duration_ms;  /* Length of the schedule */
+#ifdef SHARED_SOURCE_TRACKING
+    int source_tracking_line;  /* Current source line for new events */
+#endif
 } MidiSchedule;
 
 /* Schedule management */

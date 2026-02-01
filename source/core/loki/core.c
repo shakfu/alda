@@ -47,6 +47,7 @@ see LICENSE.
 #include "lang_bridge.h"
 #include "loki/link.h"
 #include "picker.h"
+#include "command/command_impl.h"
 
 void editor_set_status_msg(editor_ctx_t *ctx, const char *fmt, ...) {
     if (!ctx) return;
@@ -699,6 +700,22 @@ static void editor_refresh_screen_via_renderer(editor_ctx_t *ctx) {
         lang_buf[0] = '\0';
     }
 
+    /* Get playback timing info from Link */
+    double tempo = 0.0;
+    double beat = 0.0;
+    int bar = 0;
+    int beat_in_bar = 0;
+    int link_peers = 0;
+
+    if (link_active) {
+        tempo = loki_link_get_tempo(ctx);
+        beat = loki_link_get_beat(ctx, 4.0);  /* 4/4 time */
+        double phase = loki_link_get_phase(ctx, 4.0);
+        bar = (int)(beat / 4.0) + 1;
+        beat_in_bar = (int)phase + 1;
+        link_peers = (int)loki_link_num_peers(ctx);
+    }
+
     StatusInfo status_info = {
         .mode = mode_str,
         .filename = ctx->model.filename,
@@ -708,6 +725,12 @@ static void editor_refresh_screen_via_renderer(editor_ctx_t *ctx) {
         .dirty = ctx->model.dirty,
         .playing = loki_lang_is_playing(ctx),
         .link_active = link_active,
+        .metronome_active = metronome_is_enabled(),
+        .tempo = tempo,
+        .beat = beat,
+        .bar = bar,
+        .beat_in_bar = beat_in_bar,
+        .link_peers = link_peers,
     };
     r->render_status(r, &status_info, ctx->view.screencols);
 

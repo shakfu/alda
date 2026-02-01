@@ -101,6 +101,67 @@ int tr7_async_is_playing(void);
  */
 int tr7_async_wait(int timeout_ms);
 
+#ifdef SHARED_SOURCE_TRACKING
+/**
+ * @brief Play a single note asynchronously with source tracking.
+ *
+ * @param shared SharedContext for MIDI output.
+ * @param channel MIDI channel (0-15).
+ * @param pitch MIDI pitch (0-127).
+ * @param velocity Note velocity (0-127).
+ * @param duration_ms Duration in milliseconds (at local_tempo).
+ * @param local_tempo Local tempo in BPM used to calculate duration_ms.
+ * @param source_line Source line number (1-based, 0=unknown).
+ * @return 0 on success, -1 on error.
+ */
+int tr7_async_play_note_ex(SharedContext* shared, int channel, int pitch,
+                           int velocity, int duration_ms, int local_tempo,
+                           int source_line);
+
+/**
+ * @brief Play a chord asynchronously with source tracking.
+ *
+ * @param shared SharedContext for MIDI output.
+ * @param channel MIDI channel (0-15).
+ * @param pitches Array of MIDI pitches.
+ * @param count Number of notes in the chord.
+ * @param velocity Note velocity (0-127).
+ * @param duration_ms Duration in milliseconds (at local_tempo).
+ * @param local_tempo Local tempo in BPM used to calculate duration_ms.
+ * @param source_line Source line number (1-based, 0=unknown).
+ * @return 0 on success, -1 on error.
+ */
+int tr7_async_play_chord_ex(SharedContext* shared, int channel,
+                            const int* pitches, int count,
+                            int velocity, int duration_ms, int local_tempo,
+                            int source_line);
+
+/**
+ * @brief Play a sequence of notes asynchronously with source tracking.
+ *
+ * @param shared SharedContext for MIDI output.
+ * @param channel MIDI channel (0-15).
+ * @param pitches Array of MIDI pitches.
+ * @param count Number of notes in the sequence.
+ * @param velocity Note velocity (0-127).
+ * @param duration_ms Duration of each note in milliseconds (at local_tempo).
+ * @param local_tempo Local tempo in BPM used to calculate duration_ms.
+ * @param source_line Source line number (1-based, 0=unknown).
+ * @return 0 on success, -1 on error.
+ */
+int tr7_async_play_sequence_ex(SharedContext* shared, int channel,
+                               const int* pitches, int count,
+                               int velocity, int duration_ms, int local_tempo,
+                               int source_line);
+
+/**
+ * @brief Get the current source line being played.
+ * @param slot_id Playback slot ID (from shared async).
+ * @return Source line (1-based), or 0 if unknown/not playing.
+ */
+int tr7_async_get_current_source_line(int slot_id);
+#endif /* SHARED_SOURCE_TRACKING */
+
 #ifdef __cplusplus
 }
 #endif

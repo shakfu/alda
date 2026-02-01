@@ -30,6 +30,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Beat-synced via Ableton Link, plays drum sounds (kick for downbeat, hi-hat for subdivisions)
   - Stopped automatically by `:stop` command
 
+- **Enhanced Playback Status Bar**: Real-time playback information display
+  - Shows bar.beat position and tempo (e.g., `3.2 120BPM`) when playing or metronome active
+  - Displays Link peer count (e.g., `[2P]`) when connected to other Link apps
+  - Status indicators: `[PLAYING]`, `[METRONOME]`, or `[PLAY+MET]` for combined
+
+- **Alda Source Line Tracking**: Infrastructure for playback visualization
+  - Events store source line numbers for future highlight-during-playback feature
+  - `ALDA_SOURCE_TRACKING` compile option (ON by default)
+  - `ALDA_SET_SOURCE_LINE(ctx, line)` macro for setting source context
+  - Instrumented in interpreter: notes, chords, cram blocks, lisp expressions
+  - Zero overhead when disabled (compiles to no-op)
+
+- **Shared Async Source Tracking**: Language-agnostic playback visualization infrastructure
+  - `SharedAsyncEvent` now stores `source_line` field for all languages
+  - `SHARED_SOURCE_TRACKING` compile option (ON by default)
+  - `SHARED_SET_SOURCE_LINE(sched, line)` macro for setting context before scheduling
+  - `shared_async_get_current_source_line(slot_id)` to query currently playing line
+  - Extended scheduling functions (`_ex` variants) for explicit source line
+  - Enables Joy, Bog, TR7 to add source tracking when their parsers support it
+
+- **Joy Source Line Tracking**: Parser and scheduler now track source lines
+  - Lexer tracks line/column during tokenization
+  - `Token` stores `source_line` (1-based)
+  - `JoyContext` has `current_source_line` for execution context
+  - `ScheduledEvent` and `MidiSchedule` store source line
+  - Source lines propagate through `joy_async_play()` to shared async
+
+- **TR7 Async Source Tracking API**: Extended async API with source line support
+  - Added `tr7_async_play_note_ex()`, `tr7_async_play_chord_ex()`, `tr7_async_play_sequence_ex()`
+  - Added `tr7_async_get_current_source_line()` for playback visualization
+  - Source tracking available via `_ex` variants when `SHARED_SOURCE_TRACKING` enabled
+  - Note: TR7 interpreter doesn't currently expose source positions to primitives
+
+- **Bog Source Tracking Assessment**: Documented architectural limitation
+  - Bog uses callback-based immediate audio triggering during Prolog resolution
+  - `BogAudioCallbacks` fire directly via `trigger_voice()` - no event queue
+  - Source tracking would require tokenizer line tracking + callback signature changes
+  - Deferred as lower priority (scheduler infrastructure incompatible)
+
 - **Test Framework Expansion**: Enhanced assertion macros and test infrastructure
   - Comparison macros: `ASSERT_GT`, `ASSERT_LT`, `ASSERT_GTE`, `ASSERT_LTE`
   - Test fixtures: `FIXTURE`, `FIXTURE_SETUP`, `FIXTURE_TEARDOWN`, `TEST_F`, `RUN_TEST_F`

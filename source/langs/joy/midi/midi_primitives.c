@@ -856,6 +856,9 @@ MidiSchedule* schedule_new(void) {
     sched->count = 0;
     sched->capacity = 0;
     sched->total_duration_ms = 0;
+#ifdef SHARED_SOURCE_TRACKING
+    sched->source_tracking_line = 0;
+#endif
     return sched;
 }
 
@@ -886,6 +889,9 @@ void schedule_add_event(MidiSchedule* sched, int time_ms, int channel,
     ev->pitch = pitch;
     ev->velocity = velocity;
     ev->duration_ms = duration_ms;
+#ifdef SHARED_SOURCE_TRACKING
+    ev->source_line = sched->source_tracking_line;
+#endif
 
     /* Update total duration */
     int end_time = time_ms + duration_ms;

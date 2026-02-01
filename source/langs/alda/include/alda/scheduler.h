@@ -13,6 +13,22 @@ extern "C" {
 #endif
 
 /* ============================================================================
+ * Source Line Tracking (for playback visualization)
+ * ============================================================================ */
+
+#ifdef ALDA_SOURCE_TRACKING
+/**
+ * @brief Set the source line for subsequent scheduled events.
+ * Call this before scheduling events from an AST node.
+ * @param ctx Alda context.
+ * @param line Source line number (1-based, or 0 for unknown).
+ */
+#define ALDA_SET_SOURCE_LINE(ctx, line) ((ctx)->source_tracking_line = (line))
+#else
+#define ALDA_SET_SOURCE_LINE(ctx, line) ((void)0)
+#endif
+
+/* ============================================================================
  * Event Queue Management
  * ============================================================================ */
 

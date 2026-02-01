@@ -63,6 +63,13 @@ if(BUILD_FLUID_BACKEND)
     )
 endif()
 
+# Source tracking for playback visualization (stores source line in events)
+option(ALDA_SOURCE_TRACKING "Enable source line tracking in Alda events" ON)
+if(ALDA_SOURCE_TRACKING)
+    target_compile_definitions(alda PUBLIC ALDA_SOURCE_TRACKING)
+    message(STATUS "Alda: Source tracking enabled (for playback visualization)")
+endif()
+
 # Platform-specific dependencies (uses psnd_platform.cmake)
 psnd_platform_link_audio_midi(alda PUBLIC)
 psnd_platform_add_warnings(alda)

@@ -210,6 +210,9 @@ struct JoyContext {
     void* user_data;                /* user data (e.g., MusicContext*) */
     jmp_buf* error_jmp;             /* error recovery point (NULL = exit on error) */
     JoyPostEvalHook post_eval_hook; /* hook called after each line evaluation */
+#ifdef SHARED_SOURCE_TRACKING
+    int current_source_line;        /* Current source line for playback visualization */
+#endif
 };
 
 /* ---------- Dictionary Operations ---------- */

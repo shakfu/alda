@@ -60,6 +60,11 @@ typedef struct {
     void *callback_userdata;
     int slot_id;            /* Store slot ID for callback */
 
+#ifdef SHARED_SOURCE_TRACKING
+    /* Last played source line (for visualization) */
+    int last_source_line;
+#endif
+
     /* libuv handles */
     uv_timer_t timer;
     uv_async_t stop_async;
@@ -159,6 +164,13 @@ static int find_earliest_note_off(AsyncSlot* slot) {
 
 static void send_event(AsyncSlot* slot, SharedAsyncEvent* evt) {
     if (!slot->ctx) return;
+
+#ifdef SHARED_SOURCE_TRACKING
+    /* Track last played source line for visualization */
+    if (evt->source_line > 0) {
+        slot->last_source_line = evt->source_line;
+    }
+#endif
 
     switch (evt->type) {
         case SHARED_ASYNC_NOTE:
@@ -421,6 +433,9 @@ SharedAsyncSchedule* shared_async_schedule_new(void) {
     sched->use_ticks = 0;
     sched->initial_tempo = SHARED_ASYNC_DEFAULT_TEMPO;
     sched->launch_quantize = LAUNCH_QUANT_IMMEDIATE;
+#ifdef SHARED_SOURCE_TRACKING
+    sched->source_tracking_line = 0;
+#endif
     return sched;
 }
 
@@ -460,6 +475,9 @@ void shared_async_schedule_note(SharedAsyncSchedule* sched, int time_ms,
     evt->data2 = velocity;
     evt->duration_ms = duration_ms;
     evt->duration_ticks = 0;
+#ifdef SHARED_SOURCE_TRACKING
+    evt->source_line = sched->source_tracking_line;
+#endif
 
     schedule_update_duration(sched, time_ms + duration_ms);
 }
@@ -478,6 +496,9 @@ void shared_async_schedule_note_on(SharedAsyncSchedule* sched, int time_ms,
     evt->data2 = velocity;
     evt->duration_ms = 0;
     evt->duration_ticks = 0;
+#ifdef SHARED_SOURCE_TRACKING
+    evt->source_line = sched->source_tracking_line;
+#endif
 
     schedule_update_duration(sched, time_ms);
 }
@@ -496,6 +517,9 @@ void shared_async_schedule_note_off(SharedAsyncSchedule* sched, int time_ms,
     evt->data2 = 0;
     evt->duration_ms = 0;
     evt->duration_ticks = 0;
+#ifdef SHARED_SOURCE_TRACKING
+    evt->source_line = sched->source_tracking_line;
+#endif
 
     schedule_update_duration(sched, time_ms);
 }
@@ -514,6 +538,9 @@ void shared_async_schedule_cc(SharedAsyncSchedule* sched, int time_ms,
     evt->data2 = value;
     evt->duration_ms = 0;
     evt->duration_ticks = 0;
+#ifdef SHARED_SOURCE_TRACKING
+    evt->source_line = sched->source_tracking_line;
+#endif
 
     schedule_update_duration(sched, time_ms);
 }
@@ -532,6 +559,9 @@ void shared_async_schedule_program(SharedAsyncSchedule* sched, int time_ms,
     evt->data2 = 0;
     evt->duration_ms = 0;
     evt->duration_ticks = 0;
+#ifdef SHARED_SOURCE_TRACKING
+    evt->source_line = sched->source_tracking_line;
+#endif
 
     schedule_update_duration(sched, time_ms);
 }
@@ -571,6 +601,9 @@ void shared_async_schedule_note_on_tick(SharedAsyncSchedule* sched, int tick,
     evt->data2 = velocity;
     evt->duration_ticks = 0;
     evt->duration_ms = 0;
+#ifdef SHARED_SOURCE_TRACKING
+    evt->source_line = sched->source_tracking_line;
+#endif
 }
 
 void shared_async_schedule_note_off_tick(SharedAsyncSchedule* sched, int tick,
@@ -587,6 +620,9 @@ void shared_async_schedule_note_off_tick(SharedAsyncSchedule* sched, int tick,
     evt->data2 = 0;
     evt->duration_ticks = 0;
     evt->duration_ms = 0;
+#ifdef SHARED_SOURCE_TRACKING
+    evt->source_line = sched->source_tracking_line;
+#endif
 }
 
 void shared_async_schedule_cc_tick(SharedAsyncSchedule* sched, int tick,
@@ -603,6 +639,9 @@ void shared_async_schedule_cc_tick(SharedAsyncSchedule* sched, int tick,
     evt->data2 = value;
     evt->duration_ticks = 0;
     evt->duration_ms = 0;
+#ifdef SHARED_SOURCE_TRACKING
+    evt->source_line = sched->source_tracking_line;
+#endif
 }
 
 void shared_async_schedule_program_tick(SharedAsyncSchedule* sched, int tick,
@@ -619,6 +658,9 @@ void shared_async_schedule_program_tick(SharedAsyncSchedule* sched, int tick,
     evt->data2 = 0;
     evt->duration_ticks = 0;
     evt->duration_ms = 0;
+#ifdef SHARED_SOURCE_TRACKING
+    evt->source_line = sched->source_tracking_line;
+#endif
 }
 
 void shared_async_schedule_tempo(SharedAsyncSchedule* sched, int tick, int tempo) {
@@ -634,6 +676,9 @@ void shared_async_schedule_tempo(SharedAsyncSchedule* sched, int tick, int tempo
     evt->data2 = 0;
     evt->duration_ticks = 0;
     evt->duration_ms = 0;
+#ifdef SHARED_SOURCE_TRACKING
+    evt->source_line = sched->source_tracking_line;
+#endif
 }
 
 /* ============================================================================
@@ -788,6 +833,9 @@ int shared_async_play_ex(SharedAsyncSchedule* sched, SharedContext* ctx,
     slot->callback = callback;
     slot->callback_userdata = userdata;
     slot->slot_id = slot_id;
+#ifdef SHARED_SOURCE_TRACKING
+    slot->last_source_line = 0;
+#endif
     slot->active = 1;
     g_async.active_count++;
 
@@ -909,3 +957,92 @@ int shared_async_wait(int slot_id, int timeout_ms) {
 
     return 0;
 }
+
+/* ============================================================================
+ * Source Tracking Functions
+ * ============================================================================ */
+
+#ifdef SHARED_SOURCE_TRACKING
+
+void shared_async_schedule_note_ex(SharedAsyncSchedule* sched, int time_ms,
+                                    int channel, int pitch, int velocity,
+                                    int duration_ms, int source_line) {
+    if (!sched) return;
+    schedule_grow(sched);
+
+    SharedAsyncEvent* evt = &sched->events[sched->count++];
+    evt->time_ms = time_ms;
+    evt->tick = 0;
+    evt->type = SHARED_ASYNC_NOTE;
+    evt->channel = channel;
+    evt->data1 = pitch;
+    evt->data2 = velocity;
+    evt->duration_ms = duration_ms;
+    evt->duration_ticks = 0;
+    evt->source_line = source_line;
+
+    schedule_update_duration(sched, time_ms + duration_ms);
+}
+
+void shared_async_schedule_note_on_tick_ex(SharedAsyncSchedule* sched, int tick,
+                                            int channel, int pitch, int velocity,
+                                            int source_line) {
+    if (!sched) return;
+    schedule_grow(sched);
+
+    SharedAsyncEvent* evt = &sched->events[sched->count++];
+    evt->tick = tick;
+    evt->time_ms = 0;
+    evt->type = SHARED_ASYNC_NOTE_ON;
+    evt->channel = channel;
+    evt->data1 = pitch;
+    evt->data2 = velocity;
+    evt->duration_ticks = 0;
+    evt->duration_ms = 0;
+    evt->source_line = source_line;
+}
+
+void shared_async_schedule_note_off_tick_ex(SharedAsyncSchedule* sched, int tick,
+                                             int channel, int pitch,
+                                             int source_line) {
+    if (!sched) return;
+    schedule_grow(sched);
+
+    SharedAsyncEvent* evt = &sched->events[sched->count++];
+    evt->tick = tick;
+    evt->time_ms = 0;
+    evt->type = SHARED_ASYNC_NOTE_OFF;
+    evt->channel = channel;
+    evt->data1 = pitch;
+    evt->data2 = 0;
+    evt->duration_ticks = 0;
+    evt->duration_ms = 0;
+    evt->source_line = source_line;
+}
+
+int shared_async_get_current_source_line(int slot_id) {
+    if (!g_async.loop) return 0;
+
+    uv_mutex_lock(&g_async.mutex);
+
+    int line = 0;
+    if (slot_id >= 0 && slot_id < SHARED_ASYNC_MAX_SLOTS) {
+        /* Query specific slot */
+        if (g_async.slots[slot_id].active) {
+            line = g_async.slots[slot_id].last_source_line;
+        }
+    } else {
+        /* Query any active slot (returns first non-zero) */
+        for (int i = 0; i < SHARED_ASYNC_MAX_SLOTS; i++) {
+            if (g_async.slots[i].active && g_async.slots[i].last_source_line > 0) {
+                line = g_async.slots[i].last_source_line;
+                break;
+            }
+        }
+    }
+
+    uv_mutex_unlock(&g_async.mutex);
+    return line;
+}
+
+#endif /* SHARED_SOURCE_TRACKING */

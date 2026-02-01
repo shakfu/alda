@@ -50,6 +50,9 @@ typedef struct {
         char* string;
         char character;
     } value;
+#ifdef SHARED_SOURCE_TRACKING
+    int source_line;    /* Line number where token starts (1-based) */
+#endif
 } Token;
 
 typedef struct {
@@ -57,6 +60,10 @@ typedef struct {
     size_t pos;
     size_t length;
     Token current;
+#ifdef SHARED_SOURCE_TRACKING
+    int line;           /* Current line number (1-based) */
+    int column;         /* Current column (1-based) */
+#endif
 } Lexer;
 
 static void lexer_init(Lexer* lex, const char* source) {
@@ -65,6 +72,11 @@ static void lexer_init(Lexer* lex, const char* source) {
     lex->length = strlen(source);
     lex->current.type = TOK_EOF;
     lex->current.value.string = NULL;
+#ifdef SHARED_SOURCE_TRACKING
+    lex->line = 1;
+    lex->column = 1;
+    lex->current.source_line = 1;
+#endif
 }
 
 static char lexer_peek(Lexer* lex) {
@@ -74,7 +86,16 @@ static char lexer_peek(Lexer* lex) {
 
 static char lexer_advance(Lexer* lex) {
     if (lex->pos >= lex->length) return '\0';
-    return lex->source[lex->pos++];
+    char c = lex->source[lex->pos++];
+#ifdef SHARED_SOURCE_TRACKING
+    if (c == '\n') {
+        lex->line++;
+        lex->column = 1;
+    } else {
+        lex->column++;
+    }
+#endif
+    return c;
 }
 
 static void skip_whitespace_and_comments(Lexer* lex) {
@@ -194,6 +215,11 @@ static void lexer_next(Lexer* lex) {
         lex->current.type = TOK_EOF;
         return;
     }
+
+#ifdef SHARED_SOURCE_TRACKING
+    /* Record line number at start of token */
+    lex->current.source_line = lex->line;
+#endif
 
     char c = lexer_peek(lex);
 

@@ -63,6 +63,9 @@ int alda_schedule_event(AldaContext* ctx, int tick, AldaEventType type,
     evt->data1 = data1;
     evt->data2 = data2;
     evt->part_index = part_index;
+#ifdef ALDA_SOURCE_TRACKING
+    evt->source_line = ctx->source_tracking_line;
+#endif
 
     ctx->event_count++;
     return 0;

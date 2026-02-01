@@ -67,6 +67,12 @@ typedef struct {
     int dirty;                  /* File modified flag */
     int playing;                /* Playback active flag */
     int link_active;            /* Ableton Link active flag */
+    int metronome_active;       /* Metronome is running */
+    double tempo;               /* Current tempo in BPM (0 if unknown) */
+    double beat;                /* Current beat position (fractional) */
+    int bar;                    /* Current bar number (1-based) */
+    int beat_in_bar;            /* Beat within bar (1-based, 1-4 for 4/4) */
+    int link_peers;             /* Number of Link peers (excluding self) */
 } StatusInfo;
 
 /* ======================= REPL Info ======================================== */

@@ -337,6 +337,9 @@ static int visit_note(AldaContext* ctx, AldaNode* node) {
     /* Check if this note is slurred (should skip quantization) */
     int slurred = node->data.note.slurred;
 
+    /* Set source line for event tracking */
+    ALDA_SET_SOURCE_LINE(ctx, node->pos.line);
+
     /* Schedule note for all active parts */
     for (int i = 0; i < ctx->current_part_count; i++) {
         int idx = ctx->current_part_indices[i];
@@ -452,6 +455,9 @@ static int visit_chord(AldaContext* ctx, AldaNode* node) {
     /* Get velocity */
     int velocity = alda_effective_velocity(ctx, part);
 
+    /* Set source line for event tracking */
+    ALDA_SET_SOURCE_LINE(ctx, node->pos.line);
+
     /* Schedule all chord notes for all active parts */
     for (int i = 0; i < ctx->current_part_count; i++) {
         int idx = ctx->current_part_indices[i];
@@ -517,6 +523,9 @@ static int visit_octave_down(AldaContext* ctx, AldaNode* node) {
 int alda_eval_attribute(AldaContext* ctx, AldaPartState* part, AldaNode* lisp_list);
 
 static int visit_lisp_list(AldaContext* ctx, AldaNode* node) {
+    /* Set source line for event tracking (tempo, pan, program changes) */
+    ALDA_SET_SOURCE_LINE(ctx, node->pos.line);
+
     /* Evaluate attribute for all active parts */
     for (int i = 0; i < ctx->current_part_count; i++) {
         int idx = ctx->current_part_indices[i];
@@ -973,6 +982,9 @@ static int process_cram_with_duration(AldaContext* ctx, AldaNode* node, int cram
             if (pitch >= 0) {
                 int velocity = alda_effective_velocity(ctx, part);
 
+                /* Set source line for event tracking */
+                ALDA_SET_SOURCE_LINE(ctx, child->pos.line);
+
                 /* Schedule note for all active parts */
                 for (int i = 0; i < ctx->current_part_count; i++) {
                     int idx = ctx->current_part_indices[i];
@@ -1043,6 +1055,9 @@ static int process_cram_with_duration(AldaContext* ctx, AldaNode* node, int cram
                 }
                 note = note->next;
             }
+
+            /* Set source line for event tracking */
+            ALDA_SET_SOURCE_LINE(ctx, child->pos.line);
 
             /* Schedule chord for all active parts */
             for (int i = 0; i < ctx->current_part_count; i++) {

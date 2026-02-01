@@ -100,8 +100,15 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
 ### Editor Features
 
 - [ ] Playback visualization
-  - Highlight currently playing region
-  - Show playback progress in status bar
+  - [ ] Highlight currently playing region
+    - [x] ~~Source line tracking in Alda events~~ **DONE** (`ALDA_SOURCE_TRACKING`)
+    - [x] ~~Source line tracking in shared async~~ **DONE** (`SHARED_SOURCE_TRACKING`)
+    - [x] ~~Joy parser source line tracking~~ **DONE**
+    - [x] ~~TR7 async API source tracking~~ **DONE** (API ready, primitives use 0 - TR7 interpreter doesn't expose source positions)
+    - [ ] Bog parser source line tracking (blocked: callback-based architecture doesn't queue events)
+    - [ ] Editor integration to highlight lines during playback
+  - [x] ~~Show playback progress in status bar~~ **DONE**
+    - Status bar shows bar.beat, tempo, Link peers, play/metronome state
 
 - [x] ~~Tempo tap / Metronome toggle~~ **DONE**
   - `:tap` command for tap tempo (averages intervals, sets BPM via Link or context)

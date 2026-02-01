@@ -208,7 +208,7 @@ static void terminal_render_status(Renderer *r, const StatusInfo *info, int widt
     terminal_buffer_append(ab, "\x1b[0K", 4);   /* Clear line */
     terminal_buffer_append(ab, "\x1b[7m", 4);   /* Reverse video */
 
-    char status[80], rstatus[80];
+    char status[128], rstatus[128];
 
     /* Build left status */
     int len = snprintf(status, sizeof(status), " %s%s  %.20s - %d lines %s",
@@ -218,10 +218,37 @@ static void terminal_render_status(Renderer *r, const StatusInfo *info, int widt
         info->numrows,
         info->dirty ? "(modified)" : "");
 
-    /* Build right status */
-    const char *playing = info->playing ? "[PLAYING] " : "";
-    int rlen = snprintf(rstatus, sizeof(rstatus), "%s%d/%d",
-        playing, info->current_row, info->numrows);
+    /* Build right status with playback info */
+    char playback_info[64] = "";
+    if (info->playing || info->metronome_active) {
+        if (info->tempo > 0 && info->bar > 0) {
+            /* Show bar.beat and tempo */
+            snprintf(playback_info, sizeof(playback_info), "%d.%d %.0fBPM ",
+                info->bar, info->beat_in_bar, info->tempo);
+        } else if (info->tempo > 0) {
+            /* Just tempo */
+            snprintf(playback_info, sizeof(playback_info), "%.0fBPM ", info->tempo);
+        }
+    }
+
+    const char *playing_tag = "";
+    if (info->playing && info->metronome_active) {
+        playing_tag = "[PLAY+MET] ";
+    } else if (info->playing) {
+        playing_tag = "[PLAYING] ";
+    } else if (info->metronome_active) {
+        playing_tag = "[METRONOME] ";
+    }
+
+    /* Link peers indicator */
+    char peers_info[16] = "";
+    if (info->link_active && info->link_peers > 0) {
+        snprintf(peers_info, sizeof(peers_info), "[%dP] ", info->link_peers);
+    }
+
+    int rlen = snprintf(rstatus, sizeof(rstatus), "%s%s%s%d/%d",
+        peers_info, playback_info, playing_tag,
+        info->current_row, info->numrows);
 
     if (len > width) len = width;
     terminal_buffer_append(ab, status, len);

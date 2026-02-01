@@ -124,3 +124,97 @@ int tr7_async_is_playing(void) {
 int tr7_async_wait(int timeout_ms) {
     return shared_async_wait_all(timeout_ms);
 }
+
+#ifdef SHARED_SOURCE_TRACKING
+int tr7_async_play_note_ex(SharedContext* shared, int channel, int pitch,
+                           int velocity, int duration_ms, int local_tempo,
+                           int source_line) {
+    if (!shared) return -1;
+    if (pitch < 0 || pitch > 127) return -1;
+    if (velocity < 0) velocity = 0;
+    if (velocity > 127) velocity = 127;
+
+    /* Scale duration based on Link tempo if enabled */
+    int scaled_duration = scale_duration_for_link(duration_ms, local_tempo);
+
+    SharedAsyncSchedule* sched = shared_async_schedule_new();
+    if (!sched) return -1;
+
+    /* Set source line and schedule note */
+    SHARED_SET_SOURCE_LINE(sched, source_line);
+    shared_async_schedule_note(sched, 0, channel, pitch, velocity, scaled_duration);
+
+    int result = shared_async_play(sched, shared);
+    shared_async_schedule_free(sched);
+
+    return (result >= 0) ? 0 : -1;
+}
+
+int tr7_async_play_chord_ex(SharedContext* shared, int channel,
+                            const int* pitches, int count,
+                            int velocity, int duration_ms, int local_tempo,
+                            int source_line) {
+    if (!shared || !pitches || count <= 0) return -1;
+    if (velocity < 0) velocity = 0;
+    if (velocity > 127) velocity = 127;
+
+    /* Scale duration based on Link tempo if enabled */
+    int scaled_duration = scale_duration_for_link(duration_ms, local_tempo);
+
+    SharedAsyncSchedule* sched = shared_async_schedule_new();
+    if (!sched) return -1;
+
+    /* Set source line for all notes in chord */
+    SHARED_SET_SOURCE_LINE(sched, source_line);
+
+    /* Schedule all notes at time 0 with scaled duration */
+    for (int i = 0; i < count; i++) {
+        int p = pitches[i];
+        if (p >= 0 && p <= 127) {
+            shared_async_schedule_note(sched, 0, channel, p, velocity, scaled_duration);
+        }
+    }
+
+    int result = shared_async_play(sched, shared);
+    shared_async_schedule_free(sched);
+
+    return (result >= 0) ? 0 : -1;
+}
+
+int tr7_async_play_sequence_ex(SharedContext* shared, int channel,
+                               const int* pitches, int count,
+                               int velocity, int duration_ms, int local_tempo,
+                               int source_line) {
+    if (!shared || !pitches || count <= 0) return -1;
+    if (velocity < 0) velocity = 0;
+    if (velocity > 127) velocity = 127;
+
+    /* Scale duration based on Link tempo if enabled */
+    int scaled_duration = scale_duration_for_link(duration_ms, local_tempo);
+
+    SharedAsyncSchedule* sched = shared_async_schedule_new();
+    if (!sched) return -1;
+
+    /* Set source line for all notes in sequence */
+    SHARED_SET_SOURCE_LINE(sched, source_line);
+
+    /* Schedule notes sequentially, each starting after the previous ends */
+    int time_ms = 0;
+    for (int i = 0; i < count; i++) {
+        int p = pitches[i];
+        if (p >= 0 && p <= 127) {
+            shared_async_schedule_note(sched, time_ms, channel, p, velocity, scaled_duration);
+        }
+        time_ms += scaled_duration;
+    }
+
+    int result = shared_async_play(sched, shared);
+    shared_async_schedule_free(sched);
+
+    return (result >= 0) ? 0 : -1;
+}
+
+int tr7_async_get_current_source_line(int slot_id) {
+    return shared_async_get_current_source_line(slot_id);
+}
+#endif /* SHARED_SOURCE_TRACKING */
