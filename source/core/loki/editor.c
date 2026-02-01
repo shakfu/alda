@@ -39,6 +39,7 @@
 #include "loki/link.h"
 #include "live_loop.h"
 #include "async_queue.h"
+#include "command/command_impl.h"
 #include "shared/context.h"
 #include "shared/osc/osc.h"
 #ifdef BUILD_MINIHOST_BACKEND
@@ -612,6 +613,11 @@ int loki_editor_main(int argc, char **argv) {
 
         /* Check live loops for beat boundary triggers (pushes events to queue) */
         live_loop_tick();
+
+        /* Tick metronome if enabled (plays clicks on beat boundaries) */
+        if (metronome_is_enabled()) {
+            metronome_tick(ctx);
+        }
 
         /* Dispatch all pending async events.
          * This handles:

@@ -140,6 +140,7 @@ function(psnd_build_loki)
         ${PSND_CORE_DIR}/loki/command/loop.c
         ${PSND_CORE_DIR}/loki/command/plugin.c
         ${PSND_CORE_DIR}/loki/command/theme.c
+        ${PSND_CORE_DIR}/loki/command/metronome.c
         ${PSND_CORE_DIR}/loki/terminal_posix.c
         ${PSND_CORE_DIR}/loki/terminal_win.c
         ${PSND_CORE_DIR}/loki/undo.c

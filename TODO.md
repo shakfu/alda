@@ -103,7 +103,10 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
   - Highlight currently playing region
   - Show playback progress in status bar
 
-- [ ] Tempo tap / Metronome toggle
+- [x] ~~Tempo tap / Metronome toggle~~ **DONE**
+  - `:tap` command for tap tempo (averages intervals, sets BPM via Link or context)
+  - `:metronome` command with subdivisions (1=quarter, 2=eighth, 4=sixteenth)
+  - Beat-synced via Link, uses drum sounds (kick/hi-hat)
 
 - [ ] Split windows
   - Already designed for in `editor_ctx_t`

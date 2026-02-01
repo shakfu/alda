@@ -80,6 +80,10 @@ static command_def_t builtin_commands[] = {
     /* Theme switching (theme.c) */
     {"theme",  cmd_theme,       "List or switch themes",          0, 1},
 
+    /* Metronome and tempo (metronome.c) */
+    {"tap",       cmd_tap,       "Tap to set tempo",              0, 1},
+    {"metronome", cmd_metronome, "Toggle metronome",              0, 1},
+
     {NULL, NULL, NULL, 0, 0}  /* Sentinel */
 };
 

@@ -24,6 +24,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Highlights: comments, atoms, variables, function calls, numbers, operators, strings, punctuation
   - Grammar located at `source/thirdparty/tree-sitter-grammars/tree-sitter-prolog/`
 
+- **Tempo Tap and Metronome**: New commands for tempo control and beat reference
+  - `:tap` - Tap multiple times to set tempo from interval (averages up to 8 taps, 2s timeout)
+  - `:metronome [on|off|1-8]` - Toggle metronome with optional subdivisions (quarter/eighth/sixteenth)
+  - Beat-synced via Ableton Link, plays drum sounds (kick for downbeat, hi-hat for subdivisions)
+  - Stopped automatically by `:stop` command
+
 - **Test Framework Expansion**: Enhanced assertion macros and test infrastructure
   - Comparison macros: `ASSERT_GT`, `ASSERT_LT`, `ASSERT_GTE`, `ASSERT_LTE`
   - Test fixtures: `FIXTURE`, `FIXTURE_SETUP`, `FIXTURE_TEARDOWN`, `TEST_F`, `RUN_TEST_F`

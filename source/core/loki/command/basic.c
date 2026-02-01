@@ -97,6 +97,9 @@ int cmd_set(editor_ctx_t *ctx, const char *args) {
 int cmd_stop(editor_ctx_t *ctx, const char *args) {
     (void)args;
 
+    /* Stop metronome */
+    metronome_stop();
+
     /* Stop all live loops */
     live_loop_shutdown();
 

@@ -113,6 +113,19 @@ int cmd_plugin(editor_ctx_t *ctx, const char *args);
 /* :theme [name] - List or switch syntax highlighting themes */
 int cmd_theme(editor_ctx_t *ctx, const char *args);
 
+/* ======================== Metronome Commands (metronome.c) ======================== */
+
+/* :tap - Tap tempo (tap multiple times to set BPM) */
+int cmd_tap(editor_ctx_t *ctx, const char *args);
+
+/* :metronome - Toggle metronome on/off */
+int cmd_metronome(editor_ctx_t *ctx, const char *args);
+
+/* Main loop integration - call from editor loop */
+int metronome_is_enabled(void);
+void metronome_tick(editor_ctx_t *ctx);
+void metronome_stop(void);
+
 /* ======================== Helper for find_command (used by cmd_help) ======================== */
 
 /* Find a command by name (defined in command.c) */
