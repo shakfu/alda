@@ -6,7 +6,7 @@ macro(add_joy_test TEST_NAME)
         test_${TEST_NAME}.c
         ${PSND_ROOT_DIR}/source/testing/test_framework.c
     )
-    target_link_libraries(test_joy_${TEST_NAME} PRIVATE joy m)
+    target_link_libraries(test_joy_${TEST_NAME} PRIVATE joy $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
     target_include_directories(test_joy_${TEST_NAME} PRIVATE
         ${PSND_ROOT_DIR}/source/testing
     )

@@ -13,7 +13,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#ifdef _WIN32
+#define strncasecmp _strnicmp
+#else
 #include <strings.h>  /* for strncasecmp */
+#endif
 
 /* ======================= Language Definitions ============================= */
 /* Language-specific keywords and extensions are defined in separate headers

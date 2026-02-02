@@ -20,7 +20,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 /* ============================================================================
  * Built-in Synth Abstraction (FluidSynth or TSF)

@@ -10,8 +10,25 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#define dup _dup
+#define dup2 _dup2
+#define close _close
+#define open _open
+#define O_WRONLY _O_WRONLY
+#define O_CREAT _O_CREAT
+#define O_TRUNC _O_TRUNC
+#ifndef STDERR_FILENO
+#define STDERR_FILENO 2
+#endif
+#define DEV_NULL "NUL"
+#else
 #include <unistd.h>
 #include <fcntl.h>
+#define DEV_NULL "/dev/null"
+#endif
 
 #ifdef BUILD_MINIHOST_BACKEND
 
@@ -38,7 +55,7 @@ static void redirect_stderr_to_null(void) {
     if (g_log_path[0] != '\0') {
         g_redirect_fd = open(g_log_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     } else {
-        g_redirect_fd = open("/dev/null", O_WRONLY);
+        g_redirect_fd = open(DEV_NULL, O_WRONLY);
     }
 
     if (g_redirect_fd != -1) {

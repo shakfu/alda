@@ -13,7 +13,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef _WIN32
+#include <io.h>
+#define STDOUT_FILENO 1
+#else
 #include <unistd.h>
+#endif
 
 /* ======================= Helper Functions ================================= */
 

@@ -471,7 +471,11 @@
 #endif
 #ifdef _MSC_VER
 #include <basetsd.h>
+#include <malloc.h>
 typedef SSIZE_T ssize_t;
+#define TR7_ALLOCA(sz) _alloca(sz)
+#else
+#define TR7_ALLOCA(sz) __builtin_alloca(sz)
 #endif
 /*
 **************************************************************************
@@ -14412,7 +14416,7 @@ tr7_t tr7_command_line(tr7_engine_t tsc) { return TR7_NIL; }
 *
 */
 #if USE_SCHEME_TIME
-#if _POSIX_C_SOURCE >= 199309L
+#if _POSIX_C_SOURCE >= 199309L && !defined(_WIN32)
 #ifndef CLOCK_TAI
 #define CLOCK_TAI CLOCK_REALTIME
 #endif
@@ -17249,15 +17253,15 @@ static int cpl_finalize_code(cpl_t cpl, int nargs, int dotted)
    uint16_t *code = cpl->code;
    unsigned lencode = cpl->poscode;
    unsigned upperlencode = lencode + (unsigned)nargs * 3;
-   int16_t  sdepth[lencode];
-   uint16_t recode[upperlencode];
-   uint16_t renum[upperlencode];
+   int16_t  *sdepth = (int16_t *)TR7_ALLOCA(lencode * sizeof(int16_t));
+   uint16_t *recode = (uint16_t *)TR7_ALLOCA(upperlencode * sizeof(uint16_t));
+   uint16_t *renum = (uint16_t *)TR7_ALLOCA(upperlencode * sizeof(uint16_t));
    unsigned rpos, wpos;
    int      curdep, maxdep;
 #if USE_TR7_DEBUG && DEBUG_LINES
    unsigned lenlines = cpl->poslines;
    uint8_t  *lines = cpl->lines;
-   uint8_t  relines[lencode];
+   uint8_t  *relines = (uint8_t *)TR7_ALLOCA(lencode * sizeof(uint8_t));
 #endif
 
    /* init of stack depths */

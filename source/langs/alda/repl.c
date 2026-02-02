@@ -29,10 +29,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/stat.h>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <io.h>
+#include <windows.h>
+#define usleep(us) Sleep((us) / 1000)
+#define isatty _isatty
+#define STDIN_FILENO 0
+#else
+#include <unistd.h>
 #include <getopt.h>
 #endif
 

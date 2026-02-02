@@ -12,10 +12,17 @@
 #include "loki/core.h"
 #include "loki/internal.h"
 #include <stdio.h>
-#include <unistd.h>
 #include <sys/stat.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <direct.h>
+#define mkdir(path, mode) _mkdir(path)
+#define TEST_FILE_DIR "C:\\Temp\\loki_test"
+#else
+#include <unistd.h>
 #define TEST_FILE_DIR "/tmp/loki_test"
+#endif
 
 /* Setup: Create test directory */
 static void setup_test_dir(void) {

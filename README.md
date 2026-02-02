@@ -10,7 +10,7 @@ Five languages are currently supported:
 - **[Bog](https://github.com/shakfu/bog)** - C implementation of [dogalog](https://github.com/danja/dogalog), a prolog-based beats-oriented language for music
 - **[MHS](https://github.com/augustss/MicroHs)** - Micro Haskell with MIDI support for functional music programming
 
-All are practical for daily live-coding, REPL sketches, and headless playback. The Alda and Joy MIDI cores are from the [midi-langs](https://github.com/shakfu/midi-langs) project. Languages register themselves via a modular dispatch system, allowing additional DSLs to be integrated without modifying core dispatch logic. Audio output is handled by the built-in [TinySoundFont](https://github.com/schellingb/TinySoundFont) synthesizer or, optionally, a [Csound](https://csound.com/) backend for advanced synthesis. macOS and Linux are currently supported.
+All are practical for daily live-coding, REPL sketches, and headless playback. The Alda and Joy MIDI cores are from the [midi-langs](https://github.com/shakfu/midi-langs) project. Languages register themselves via a modular dispatch system, allowing additional DSLs to be integrated without modifying core dispatch logic. Audio output is handled by the built-in [TinySoundFont](https://github.com/schellingb/TinySoundFont) synthesizer or, optionally, a [Csound](https://csound.com/) backend for advanced synthesis. macOS, Linux, and Windows are supported.
 
 ## Features
 
@@ -61,6 +61,21 @@ sudo dnf install cmake flex bison
 
 ```bash
 sudo pacman -S cmake flex bison
+```
+
+**Windows:**
+
+```powershell
+# Using Visual Studio 2022 with C++ workload
+# Install CMake from https://cmake.org/download/
+# Install winflexbison from https://github.com/lexxmark/winflexbison/releases
+# Add winflexbison to PATH
+```
+
+Or with vcpkg:
+
+```powershell
+vcpkg install winflexbison
 ```
 
 `flex` and `bison` are required for building the MHS (Micro Haskell) language component.
@@ -1480,6 +1495,10 @@ The `.psnd/scales/` directory includes example scales:
 
 **Recent additions:**
 
+- Windows/MSVC native support with full cross-platform compatibility
+- Playback visualization with source line highlighting during playback
+- Link transport sync mode for synchronized playback with Link peers
+- Tempo tap and metronome commands for beat reference
 - Web-based editor using xterm.js terminal emulation
 - Mouse click-to-position support in web mode
 - Language switching commands in web REPL
@@ -1490,7 +1509,6 @@ The `.psnd/scales/` directory includes example scales:
 - Session persistence across server restarts
 - Beat-aligned playback with Ableton Link
 - Integrate additional MIDI DSLs from [midi-langs](https://github.com/shakfu/midi-langs)
-- Playback visualization (highlight currently playing region)
 
 Feedback and experiments are welcome - polyglot support will be guided by real-world usage.
 

@@ -16,6 +16,19 @@
 
 /* TR7 library headers */
 #include "tr7.h"
+
+/* MSVC workaround: TR7ARG macros don't expand correctly with MSVC preprocessor */
+#ifdef _MSC_VER
+#undef TR7ARG_ANY
+#undef TR7ARG_STRING
+#undef TR7ARG_INTEGER
+#undef TR7ARG_PROPER_LIST
+#define TR7ARG_ANY         "\003"
+#define TR7ARG_STRING      "\004"
+#define TR7ARG_INTEGER     "\017"
+#define TR7ARG_PROPER_LIST "\027"
+#endif
+
 #include "context.h"
 #include "midi/midi.h"
 #include "audio/audio.h"
@@ -24,8 +37,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/stat.h>
+
+#ifdef _WIN32
+#include <io.h>
+#include <windows.h>
+#define isatty _isatty
+#define STDIN_FILENO 0
+#define usleep(us) Sleep((us) / 1000)
+#else
+#include <unistd.h>
+#endif
 
 /* ============================================================================
  * TR7 Usage and Help

@@ -15,15 +15,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <ctype.h>
+
+#ifdef _WIN32
+#include <io.h>
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 #ifdef LOKI_USE_LINENOISE
 #include <linenoise.h>
 #include "repl_linenoise.h"
 #endif
 
-#ifndef LOKI_USE_LINENOISE
+#if !defined(LOKI_USE_LINENOISE) && !defined(_WIN32)
 #include <termios.h>
 #endif
 

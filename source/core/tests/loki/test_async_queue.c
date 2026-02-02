@@ -6,7 +6,21 @@
 #include "test_framework.h"
 #include "loki/async_queue.h"
 #include <string.h>
+
+#ifdef _WIN32
+#include <windows.h>
+typedef HANDLE pthread_t;
+typedef CRITICAL_SECTION pthread_mutex_t;
+#define pthread_create(t, attr, func, arg) \
+    ((*(t) = (HANDLE)_beginthreadex(NULL, 0, (unsigned (__stdcall *)(void *))func, arg, 0, NULL)) == 0 ? -1 : 0)
+#define pthread_join(t, retval) (WaitForSingleObject(t, INFINITE), CloseHandle(t), 0)
+#define pthread_mutex_init(m, attr) (InitializeCriticalSection(m), 0)
+#define pthread_mutex_destroy(m) DeleteCriticalSection(m)
+#define pthread_mutex_lock(m) EnterCriticalSection(m)
+#define pthread_mutex_unlock(m) LeaveCriticalSection(m)
+#else
 #include <pthread.h>
+#endif
 
 /* Test: Queue initialization */
 TEST(queue_init) {

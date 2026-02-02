@@ -12,10 +12,58 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <dirent.h>
 #include <sys/stat.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#define access _access
+#define F_OK 0
+
+/* Minimal dirent compatibility for Windows */
+struct dirent { char d_name[MAX_PATH]; };
+typedef struct { HANDLE hFind; WIN32_FIND_DATAA ffd; struct dirent ent; int first; } DIR;
+static DIR *opendir(const char *path) {
+    DIR *d = (DIR*)malloc(sizeof(DIR));
+    if (!d) return NULL;
+    char search[MAX_PATH];
+    snprintf(search, MAX_PATH, "%s\\*", path);
+    d->hFind = FindFirstFileA(search, &d->ffd);
+    if (d->hFind == INVALID_HANDLE_VALUE) { free(d); return NULL; }
+    d->first = 1;
+    return d;
+}
+static struct dirent *readdir(DIR *d) {
+    if (!d) return NULL;
+    if (d->first) { d->first = 0; }
+    else if (!FindNextFileA(d->hFind, &d->ffd)) return NULL;
+    strncpy(d->ent.d_name, d->ffd.cFileName, MAX_PATH - 1);
+    d->ent.d_name[MAX_PATH - 1] = '\0';
+    return &d->ent;
+}
+static void closedir(DIR *d) { if (d) { FindClose(d->hFind); free(d); } }
+
+/* Get home directory on Windows */
+static const char *get_home_dir(void) {
+    const char *home = getenv("USERPROFILE");
+    if (!home) home = getenv("HOME");
+    return home;
+}
+#define GET_HOME_DIR() get_home_dir()
+#else
+#include <dirent.h>
 #include <unistd.h>
 #include <pwd.h>
+#define GET_HOME_DIR() get_home_dir_posix()
+static const char *get_home_dir_posix(void) {
+    const char *home = getenv("HOME");
+    if (!home) {
+        struct passwd *pw = getpwuid(getuid());
+        if (pw) home = pw->pw_dir;
+    }
+    return home;
+}
+#endif
 
 /* Maximum keywords per language */
 #define MAX_KEYWORDS 512
@@ -254,11 +302,7 @@ int lang_toml_load_all(void) {
     }
 
     /* Then, try home directory ~/.psnd/languages/ */
-    const char *home = getenv("HOME");
-    if (!home) {
-        struct passwd *pw = getpwuid(getuid());
-        if (pw) home = pw->pw_dir;
-    }
+    const char *home = GET_HOME_DIR();
 
     if (home) {
         snprintf(path, sizeof(path), "%s/.psnd/languages", home);

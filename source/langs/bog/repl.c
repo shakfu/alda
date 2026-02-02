@@ -33,10 +33,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/stat.h>
-#include <signal.h>
 #include <time.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#define usleep(us) Sleep((us) / 1000)
+#define isatty _isatty
+#define STDIN_FILENO 0
+#else
+#include <unistd.h>
+#include <signal.h>
+#endif
 
 /* ============================================================================
  * Bog Usage and Help
@@ -298,9 +307,19 @@ static int vel_to_midi(double velocity) {
 static double g_bog_start_time = 0.0;
 
 static double get_wall_time(void) {
+#ifdef _WIN32
+    static LARGE_INTEGER freq = {0};
+    LARGE_INTEGER counter;
+    if (freq.QuadPart == 0) {
+        QueryPerformanceFrequency(&freq);
+    }
+    QueryPerformanceCounter(&counter);
+    return (double)counter.QuadPart / (double)freq.QuadPart;
+#else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec + (double)ts.tv_nsec / 1000000000.0;
+#endif
 }
 
 static void repl_audio_init(void *userdata) {
@@ -1088,13 +1107,24 @@ static int bog_load_file(const char *path) {
 }
 
 /* Execute a Bog file - for headless 'play' mode with signal handler */
-static volatile sig_atomic_t g_bog_interrupted = 0;
+static volatile int g_bog_interrupted = 0;
 
+#ifdef _WIN32
+static BOOL WINAPI bog_console_handler(DWORD ctrl_type) {
+    if (ctrl_type == CTRL_C_EVENT || ctrl_type == CTRL_BREAK_EVENT) {
+        g_bog_interrupted = 1;
+        g_bog_repl_running = 0;
+        return TRUE;
+    }
+    return FALSE;
+}
+#else
 static void bog_sigint_handler(int sig) {
     (void)sig;
     g_bog_interrupted = 1;
     g_bog_repl_running = 0;
 }
+#endif
 
 static int bog_cb_exec_file(void *lang_ctx, const char *path, int verbose) {
     (void)lang_ctx;
@@ -1105,11 +1135,15 @@ static int bog_cb_exec_file(void *lang_ctx, const char *path, int verbose) {
     }
 
     /* Install signal handler for Ctrl-C */
+#ifdef _WIN32
+    SetConsoleCtrlHandler(bog_console_handler, TRUE);
+#else
     struct sigaction sa, old_sa;
     sa.sa_handler = bog_sigint_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
     sigaction(SIGINT, &sa, &old_sa);
+#endif
 
     /* Reset interrupt flag */
     g_bog_interrupted = 0;
@@ -1134,7 +1168,11 @@ static int bog_cb_exec_file(void *lang_ctx, const char *path, int verbose) {
     }
 
     /* Restore original signal handler */
+#ifdef _WIN32
+    SetConsoleCtrlHandler(bog_console_handler, FALSE);
+#else
     sigaction(SIGINT, &old_sa, NULL);
+#endif
 
     if (g_bog_interrupted) {
         printf("\nStopped.\n");

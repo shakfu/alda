@@ -14,7 +14,17 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <ctype.h>
+#ifdef _WIN32
+#include <io.h>
+#define isatty _isatty
+#define fileno _fileno
+#define STDIN_FILENO 0
+#ifndef S_ISDIR
+#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+#endif
+#else
 #include <unistd.h>
+#endif
 
 /* Maximum input line length for piped input */
 #ifndef MAX_INPUT_LENGTH

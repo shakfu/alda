@@ -23,7 +23,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#define usleep(us) Sleep((us) / 1000)
+#else
 #include <unistd.h>
+#endif
 
 #include "psnd.h"
 #include "loki/internal.h"
@@ -33,6 +38,19 @@
 
 /* TR7 library header */
 #include "tr7.h"
+
+/* MSVC workaround: TR7ARG macros use preprocessor tricks that don't work on MSVC.
+ * Provide explicit string definitions instead. Values from tr7.h _TR7ARGNUM_* */
+#ifdef _MSC_VER
+#undef TR7ARG_ANY
+#undef TR7ARG_STRING
+#undef TR7ARG_INTEGER
+#undef TR7ARG_PROPER_LIST
+#define TR7ARG_ANY         "\003"
+#define TR7ARG_STRING      "\004"
+#define TR7ARG_INTEGER     "\017"
+#define TR7ARG_PROPER_LIST "\027"
+#endif
 
 /* Shared backend for MIDI/audio */
 #include "context.h"

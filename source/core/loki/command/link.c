@@ -6,6 +6,12 @@
 #include "command_impl.h"
 #include "loki/link.h"
 #include <ctype.h>
+#include <string.h>
+
+#ifdef _MSC_VER
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
+#endif
 
 /* Helper to skip leading whitespace */
 static const char *skip_ws(const char *s) {

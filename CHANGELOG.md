@@ -102,6 +102,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Test fixtures: `FIXTURE`, `FIXTURE_SETUP`, `FIXTURE_TEARDOWN`, `TEST_F`, `RUN_TEST_F`
   - Suite-level fixtures: `SUITE_SETUP`, `SUITE_TEARDOWN`, `BEGIN_TEST_SUITE_WITH_FIXTURE`
 
+- **Windows/MSVC Native Support**: Full cross-platform compatibility for Windows builds
+  - MSVC C-mode atomic handling via volatile semantics (`ASYNC_ATOMIC_SIZE_T`, `PARAM_ATOMIC_FLOAT`)
+  - POSIX function implementations: `gettimeofday()`, `getline()`, `strndup()`, `usleep()`
+  - Windows directory traversal via minimal `dirent.h` compatibility layer (`opendir`/`readdir`/`closedir`)
+  - Windows console raw mode for terminal UI (`ENABLE_VIRTUAL_TERMINAL_INPUT/PROCESSING`)
+  - pthread-to-Windows threading: `CRITICAL_SECTION` for mutexes, `_beginthreadex` for threads
+  - Signal handling via `SetConsoleCtrlHandler()` for Ctrl-C interrupts
+  - Home directory detection via `USERPROFILE` environment variable
+  - Conditional math library linking (`-lm` only on non-Windows)
+  - Windows macro conflict resolution (MOD_SHIFT, MOD_CONTROL, MOD_ALT from winuser.h)
+
+- **Tracker Terminal View Windows Console**: Native Windows terminal support for tracker mode
+  - Windows console input handling via `ReadConsoleInputA` and virtual key codes
+  - Console screen buffer info for terminal size detection
+  - VT100/ANSI escape sequence processing enabled via console mode flags
+
 - **Memory Leak Detection**: Allocation tracking for test suites (`test_memcheck.h`)
   - Tracked allocation macros: `MEMCHECK_MALLOC`, `MEMCHECK_FREE`, `MEMCHECK_REALLOC`, `MEMCHECK_CALLOC`, `MEMCHECK_STRDUP`
   - Session management: `memcheck_init()`, `memcheck_begin()`, `memcheck_end()`, `memcheck_report()`
@@ -128,6 +144,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - All commands configurable via TOML `[keybindings]` section
 
 ### Changed
+
+- **Language REPLs Cross-Platform**: All music languages now support Windows builds
+  - Alda, Bog, Joy, and TR7 REPLs use platform-abstracted threading and timing
+  - Async playback uses Windows `_beginthreadex`/`CRITICAL_SECTION` on Windows
+  - High-resolution timing via `QueryPerformanceCounter` on Windows
+  - Ctrl-C interrupt handling via `SetConsoleCtrlHandler` on Windows
 
 - **CLI Tests Refactored**: Replaced `system()` shell spawning with direct `fork`/`execve`
   - Eliminates shell injection risks in test code
@@ -160,6 +182,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **CLI Test Build Fix**: Fixed `nftw()` availability for POSIX compliance
   - Added `_XOPEN_SOURCE 500` to `test_play_command.c` before system includes
   - Enables `nftw()`, `FTW_DEPTH`, and `FTW_PHYS` constants used by `test_process.h`
+
+- **Linux Build Compatibility**: Resolved header and library issues for Linux builds
+  - Added missing `#include <string.h>` in command modules (csd.c, link.c)
+  - Fixed `strcasecmp`/`strncasecmp` availability via `<strings.h>` on POSIX systems
+  - Conditional math library linking in CMake (`-lm` only when needed)
+
+- **Cross-Platform Test Infrastructure**: Test utilities now work on both POSIX and Windows
+  - Test directory paths use platform-appropriate locations (`/tmp` vs `C:\Temp`)
+  - File access macros (`F_OK`, `R_OK`) defined for Windows
+  - pthread compatibility layer for Windows in async queue tests
 
 ## [0.1.4]
 

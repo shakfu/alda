@@ -13,10 +13,19 @@
 #include "midi/events.h"
 #include "loki/midi_export.h"
 #include <stdio.h>
-#include <unistd.h>
 
+#ifdef _WIN32
+#include <io.h>
+#define access _access
+#define F_OK 0
+#define unlink _unlink
+/* Test output directory */
+static const char *TEST_DIR = "C:\\Temp";
+#else
+#include <unistd.h>
 /* Test output directory */
 static const char *TEST_DIR = "/tmp";
+#endif
 
 /* Helper to build test file path */
 static void build_test_path(char *buf, size_t size, const char *name) {

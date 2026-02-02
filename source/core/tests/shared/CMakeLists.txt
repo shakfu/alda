@@ -9,7 +9,7 @@ target_include_directories(test_link PRIVATE
     ${PSND_ROOT_DIR}/source/core/shared
     ${PSND_ROOT_DIR}/source/testing
 )
-target_link_libraries(test_link PRIVATE shared test_framework m)
+target_link_libraries(test_link PRIVATE shared test_framework $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
 # Excluded from ctest - run manually if needed
 
 # Test for shared MIDI event buffer
@@ -19,7 +19,7 @@ target_include_directories(test_midi_events PRIVATE
     ${PSND_ROOT_DIR}/source/core/shared
     ${PSND_ROOT_DIR}/source/testing
 )
-target_link_libraries(test_midi_events PRIVATE shared test_framework m)
+target_link_libraries(test_midi_events PRIVATE shared test_framework $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
 add_test(
     NAME shared_midi_events_tests
     COMMAND $<TARGET_FILE:test_midi_events>
@@ -36,7 +36,7 @@ target_include_directories(test_midi_export PRIVATE
     ${PSND_ROOT_DIR}/source/testing
     ${CMAKE_BINARY_DIR}/generated
 )
-target_link_libraries(test_midi_export PRIVATE libloki test_framework m)
+target_link_libraries(test_midi_export PRIVATE libloki test_framework $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
 # Apply LANG_* definitions so struct sizes match library
 psnd_apply_lang_definitions(test_midi_export)
 add_test(
@@ -53,7 +53,7 @@ target_include_directories(test_tsf_backend PRIVATE
     ${PSND_ROOT_DIR}/source/core/shared
     ${PSND_ROOT_DIR}/source/testing
 )
-target_link_libraries(test_tsf_backend PRIVATE shared test_framework m)
+target_link_libraries(test_tsf_backend PRIVATE shared test_framework $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
 add_test(
     NAME shared_tsf_backend_tests
     COMMAND $<TARGET_FILE:test_tsf_backend>
@@ -68,7 +68,7 @@ target_include_directories(test_csound_backend PRIVATE
     ${PSND_ROOT_DIR}/source/core/shared
     ${PSND_ROOT_DIR}/source/testing
 )
-target_link_libraries(test_csound_backend PRIVATE shared test_framework m)
+target_link_libraries(test_csound_backend PRIVATE shared test_framework $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
 if(BUILD_CSOUND_BACKEND)
     target_compile_definitions(test_csound_backend PRIVATE BUILD_CSOUND_BACKEND)
 endif()
@@ -86,7 +86,7 @@ target_include_directories(test_fluid_backend PRIVATE
     ${PSND_ROOT_DIR}/source/core/shared
     ${PSND_ROOT_DIR}/source/testing
 )
-target_link_libraries(test_fluid_backend PRIVATE shared test_framework m)
+target_link_libraries(test_fluid_backend PRIVATE shared test_framework $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
 if(BUILD_FLUID_BACKEND)
     target_compile_definitions(test_fluid_backend PRIVATE BUILD_FLUID_BACKEND)
 endif()
@@ -104,7 +104,7 @@ target_include_directories(test_minihost_backend PRIVATE
     ${PSND_ROOT_DIR}/source/core/shared
     ${PSND_ROOT_DIR}/source/testing
 )
-target_link_libraries(test_minihost_backend PRIVATE shared test_framework m)
+target_link_libraries(test_minihost_backend PRIVATE shared test_framework $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
 if(BUILD_MINIHOST_BACKEND)
     target_compile_definitions(test_minihost_backend PRIVATE BUILD_MINIHOST_BACKEND)
 endif()
@@ -122,7 +122,7 @@ target_include_directories(test_repl_commands PRIVATE
     ${PSND_ROOT_DIR}/source/core/shared
     ${PSND_ROOT_DIR}/source/testing
 )
-target_link_libraries(test_repl_commands PRIVATE shared test_framework m)
+target_link_libraries(test_repl_commands PRIVATE shared test_framework $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
 add_test(
     NAME shared_repl_commands_tests
     COMMAND $<TARGET_FILE:test_repl_commands>

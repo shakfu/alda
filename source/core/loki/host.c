@@ -16,7 +16,12 @@
 #include "async_queue.h"
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <io.h>
+#define STDOUT_FILENO 1
+#else
 #include <unistd.h>
+#endif
 
 /* ======================= Common Host Logic ================================= */
 

@@ -11,8 +11,27 @@
 #include "command_impl.h"
 #include "loki/link.h"
 #include "shared/context.h"
-#include <sys/time.h>
 #include <math.h>
+
+#ifdef _WIN32
+#include <windows.h>
+/* Windows gettimeofday implementation */
+static int gettimeofday(struct timeval *tv, void *tz) {
+    (void)tz;
+    FILETIME ft;
+    ULARGE_INTEGER uli;
+    GetSystemTimeAsFileTime(&ft);
+    uli.LowPart = ft.dwLowDateTime;
+    uli.HighPart = ft.dwHighDateTime;
+    /* Convert from 100-nanosec intervals since 1601 to microseconds since 1970 */
+    uli.QuadPart = (uli.QuadPart - 116444736000000000ULL) / 10;
+    tv->tv_sec = (long)(uli.QuadPart / 1000000);
+    tv->tv_usec = (long)(uli.QuadPart % 1000000);
+    return 0;
+}
+#else
+#include <sys/time.h>
+#endif
 
 /* ============================================================================
  * Tempo Tap State

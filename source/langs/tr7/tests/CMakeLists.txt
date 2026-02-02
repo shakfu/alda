@@ -9,7 +9,7 @@ macro(add_tr7_test TEST_NAME)
     target_link_libraries(test_tr7_${TEST_NAME} PRIVATE
         tr7
         shared
-        m
+        $<$<NOT:$<PLATFORM_ID:Windows>>:m>
     )
     target_include_directories(test_tr7_${TEST_NAME} PRIVATE
         ${PSND_ROOT_DIR}/source/testing

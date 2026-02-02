@@ -9,6 +9,11 @@
 
 #include "command_impl.h"
 #include "loki/csound.h"
+#include <string.h>
+
+#ifdef _MSC_VER
+#define strcasecmp _stricmp
+#endif
 
 /* :csd - Toggle Csound synthesis */
 int cmd_csd(editor_ctx_t *ctx, const char *args) {

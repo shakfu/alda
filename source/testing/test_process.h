@@ -18,11 +18,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/stat.h>
+#include <errno.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#include <direct.h>
+#define TEST_PROC_PATH_SEP '\\'
+#else
+#include <unistd.h>
 #include <sys/wait.h>
 #include <ftw.h>
-#include <errno.h>
+#define TEST_PROC_PATH_SEP '/'
+#endif
 
 /* Maximum path length for temp directories */
 #define TEST_PROC_MAX_PATH 512
@@ -44,6 +53,35 @@
  *   int result = test_exec(PSND_BINARY, args);
  */
 static inline int test_exec(const char *binary_path, char *const args[]) {
+#ifdef _WIN32
+    /* Build command line from args */
+    char cmdline[4096] = {0};
+    int pos = 0;
+    for (int i = 0; args[i] != NULL; i++) {
+        if (i > 0) cmdline[pos++] = ' ';
+        pos += snprintf(cmdline + pos, sizeof(cmdline) - pos, "\"%s\"", args[i]);
+    }
+
+    STARTUPINFOA si = {0};
+    PROCESS_INFORMATION pi = {0};
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = NULL;
+    si.hStdOutput = NULL;
+    si.hStdError = NULL;
+
+    if (!CreateProcessA(binary_path, cmdline, NULL, NULL, FALSE,
+                        CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+        return -1;
+    }
+
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    DWORD exit_code;
+    GetExitCodeProcess(pi.hProcess, &exit_code);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    return (int)exit_code;
+#else
     pid_t pid = fork();
 
     if (pid < 0) {
@@ -75,6 +113,7 @@ static inline int test_exec(const char *binary_path, char *const args[]) {
 
     /* Process was killed by signal */
     return -1;
+#endif
 }
 
 /**
@@ -88,6 +127,59 @@ static inline int test_exec(const char *binary_path, char *const args[]) {
  */
 static inline int test_exec_capture(const char *binary_path, char *const args[],
                                      char *output, size_t output_size) {
+#ifdef _WIN32
+    /* Build command line from args */
+    char cmdline[4096] = {0};
+    int pos = 0;
+    for (int i = 0; args[i] != NULL; i++) {
+        if (i > 0) cmdline[pos++] = ' ';
+        pos += snprintf(cmdline + pos, sizeof(cmdline) - pos, "\"%s\"", args[i]);
+    }
+
+    /* Create pipe for stdout */
+    HANDLE hReadPipe, hWritePipe;
+    SECURITY_ATTRIBUTES sa = {0};
+    sa.nLength = sizeof(sa);
+    sa.bInheritHandle = TRUE;
+    if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0)) {
+        return -1;
+    }
+    SetHandleInformation(hReadPipe, HANDLE_FLAG_INHERIT, 0);
+
+    STARTUPINFOA si = {0};
+    PROCESS_INFORMATION pi = {0};
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = NULL;
+    si.hStdOutput = hWritePipe;
+    si.hStdError = NULL;
+
+    if (!CreateProcessA(binary_path, cmdline, NULL, NULL, TRUE,
+                        CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+        CloseHandle(hReadPipe);
+        CloseHandle(hWritePipe);
+        return -1;
+    }
+    CloseHandle(hWritePipe);
+
+    /* Read output */
+    if (output && output_size > 0) {
+        DWORD bytes_read;
+        if (ReadFile(hReadPipe, output, (DWORD)(output_size - 1), &bytes_read, NULL)) {
+            output[bytes_read] = '\0';
+        } else {
+            output[0] = '\0';
+        }
+    }
+    CloseHandle(hReadPipe);
+
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    DWORD exit_code;
+    GetExitCodeProcess(pi.hProcess, &exit_code);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    return (int)exit_code;
+#else
     int pipefd[2];
     if (pipe(pipefd) < 0) {
         return -1;
@@ -137,6 +229,7 @@ static inline int test_exec_capture(const char *binary_path, char *const args[],
     }
 
     return -1;
+#endif
 }
 
 /* =============================================================================
@@ -158,13 +251,26 @@ static inline int test_exec_capture(const char *binary_path, char *const args[],
  *   test_rmdir_recursive(temp_dir);
  */
 static inline int test_mkdtemp(const char *prefix, char *path) {
+#ifdef _WIN32
+    char temp_path[MAX_PATH];
+    if (GetTempPathA(MAX_PATH, temp_path) == 0) {
+        return -1;
+    }
+    snprintf(path, TEST_PROC_MAX_PATH, "%s%s_%u", temp_path, prefix, (unsigned)GetTickCount());
+    if (_mkdir(path) != 0) {
+        return -1;
+    }
+    return 0;
+#else
     snprintf(path, TEST_PROC_MAX_PATH, "/tmp/%s_XXXXXX", prefix);
     if (mkdtemp(path) == NULL) {
         return -1;
     }
     return 0;
+#endif
 }
 
+#ifndef _WIN32
 /* Helper callback for nftw to remove files/directories */
 static inline int test_rmdir_callback(const char *fpath, const struct stat *sb,
                                        int typeflag, struct FTW *ftwbuf) {
@@ -173,6 +279,7 @@ static inline int test_rmdir_callback(const char *fpath, const struct stat *sb,
     (void)ftwbuf;
     return remove(fpath);
 }
+#endif
 
 /**
  * Recursively remove a directory and all its contents.
@@ -187,6 +294,17 @@ static inline int test_rmdir_recursive(const char *path) {
         return -1;
     }
 
+#ifdef _WIN32
+    /* Safety check: don't remove root directories */
+    if (strlen(path) <= 3) {  /* C:\ or similar */
+        return -1;
+    }
+
+    /* Use system command for simplicity on Windows */
+    char cmd[TEST_PROC_MAX_PATH + 32];
+    snprintf(cmd, sizeof(cmd), "rmdir /s /q \"%s\" 2>nul", path);
+    return system(cmd) == 0 ? 0 : -1;
+#else
     /* Safety check: don't remove root or home directories */
     if (strcmp(path, "/") == 0 || strcmp(path, getenv("HOME")) == 0) {
         return -1;
@@ -194,6 +312,7 @@ static inline int test_rmdir_recursive(const char *path) {
 
     /* Use nftw to traverse and remove */
     return nftw(path, test_rmdir_callback, 64, FTW_DEPTH | FTW_PHYS);
+#endif
 }
 
 /**
@@ -207,7 +326,7 @@ static inline int test_rmdir_recursive(const char *path) {
 static inline int test_write_file(const char *dir, const char *filename,
                                    const char *content) {
     char path[TEST_PROC_MAX_PATH];
-    snprintf(path, sizeof(path), "%s/%s", dir, filename);
+    snprintf(path, sizeof(path), "%s%c%s", dir, TEST_PROC_PATH_SEP, filename);
 
     FILE *f = fopen(path, "w");
     if (!f) {
@@ -231,7 +350,7 @@ static inline int test_write_file(const char *dir, const char *filename,
  * @param path     Buffer to store result (must be at least TEST_PROC_MAX_PATH)
  */
 static inline void test_build_path(const char *dir, const char *filename, char *path) {
-    snprintf(path, TEST_PROC_MAX_PATH, "%s/%s", dir, filename);
+    snprintf(path, TEST_PROC_MAX_PATH, "%s%c%s", dir, TEST_PROC_PATH_SEP, filename);
 }
 
 #endif /* TEST_PROCESS_H */

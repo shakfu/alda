@@ -7,8 +7,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 #include <time.h>
+
+#ifdef _WIN32
+#include <windows.h>
+/* Windows mutex compatibility using Critical Sections */
+typedef CRITICAL_SECTION pthread_mutex_t;
+#define pthread_mutex_init(m, attr) (InitializeCriticalSection(m), 0)
+#define pthread_mutex_destroy(m) DeleteCriticalSection(m)
+#define pthread_mutex_lock(m) EnterCriticalSection(m)
+#define pthread_mutex_unlock(m) LeaveCriticalSection(m)
+#else
+#include <pthread.h>
+#endif
 
 #include "psnd.h"
 #include "register.h"

@@ -17,9 +17,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <direct.h>
+#define mkdir(path, mode) _mkdir(path)
+#define TEST_DIR "C:\\Temp\\loki_cmd_test"
+#else
+#include <unistd.h>
 #define TEST_DIR "/tmp/loki_cmd_test"
+#endif
 
 /* Helper: Create test directory */
 static void setup_test_dir(void) {

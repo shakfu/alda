@@ -11,6 +11,15 @@
 #include <time.h>
 #include <stdio.h>
 
+#ifdef _MSC_VER
+static char* strndup(const char* s, size_t n) {
+    size_t len = strnlen(s, n);
+    char* result = (char*)malloc(len + 1);
+    if (result) { memcpy(result, s, len); result[len] = '\0'; }
+    return result;
+}
+#endif
+
 /* Forward declarations of editor functions we need */
 void editor_row_insert_char(editor_ctx_t *ctx, t_erow *row, int at, int c);
 void editor_row_del_char(editor_ctx_t *ctx, t_erow *row, int at);

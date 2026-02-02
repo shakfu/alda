@@ -11,7 +11,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#ifdef _WIN32
+#include <io.h>
+#define STDIN_FILENO 0
+#define STDOUT_FILENO 1
+#else
 #include <unistd.h>
+#endif
 #include <time.h>
 
 /* Lua headers */

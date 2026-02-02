@@ -22,6 +22,10 @@
 #include <ctype.h>
 #include <stdio.h>
 
+#ifdef _MSC_VER
+#define strcasecmp _stricmp
+#endif
+
 #ifdef LOKI_USE_LINENOISE
 #include <syntax/theme.h>
 #include "treesitter.h"

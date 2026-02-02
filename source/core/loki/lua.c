@@ -17,9 +17,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <io.h>
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
+#define access _access
+#define F_OK 0
+#define R_OK 4
+#else
 #include <strings.h>  /* for strcasecmp */
-#include <stdarg.h>
 #include <unistd.h>   /* for access */
+#endif
+#include <stdarg.h>
 #include <ctype.h>    /* for isspace, isprint, tolower */
 
 #include "lua.h"

@@ -16,7 +16,23 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#if defined(_MSC_VER) && !defined(__cplusplus)
+/* MSVC C mode: use volatile for simple atomics.
+ * On x86/x64, aligned 32-bit reads/writes are atomic. */
+#define ASYNC_ATOMIC_SIZE_T volatile size_t
+#define ASYNC_ATOMIC_UINT32_T volatile uint32_t
+#define _Atomic volatile  /* Make _Atomic a no-op */
+#ifndef atomic_store
+#define atomic_store(ptr, val) (*(ptr) = (val))
+#endif
+#ifndef atomic_load
+#define atomic_load(ptr) (*(ptr))
+#endif
+#else
 #include <stdatomic.h>
+#define ASYNC_ATOMIC_SIZE_T _Atomic size_t
+#define ASYNC_ATOMIC_UINT32_T _Atomic uint32_t
+#endif
 
 /* Forward declarations */
 struct lua_State;

@@ -15,23 +15,70 @@ see LICENSE.
 #define _POSIX_C_SOURCE 200809L
 #endif
 
-#include <termios.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <errno.h>
 #include <string.h>
-#include <strings.h>
-
 #include <ctype.h>
 #include <time.h>
+#include <stdarg.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#include <fcntl.h>
+#include <basetsd.h>
+typedef SSIZE_T ssize_t;
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
+#define isatty _isatty
+#define fileno _fileno
+#define write _write
+#define read _read
+#define STDIN_FILENO 0
+#define STDOUT_FILENO 1
+#define STDERR_FILENO 2
+#define ftruncate _chsize
+
+/* Windows getline implementation */
+static ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
+    if (!lineptr || !n || !stream) return -1;
+
+    size_t pos = 0;
+    int c;
+
+    if (*lineptr == NULL || *n == 0) {
+        *n = 128;
+        *lineptr = (char*)malloc(*n);
+        if (!*lineptr) return -1;
+    }
+
+    while ((c = fgetc(stream)) != EOF) {
+        if (pos + 1 >= *n) {
+            *n *= 2;
+            char *new_ptr = (char*)realloc(*lineptr, *n);
+            if (!new_ptr) return -1;
+            *lineptr = new_ptr;
+        }
+        (*lineptr)[pos++] = (char)c;
+        if (c == '\n') break;
+    }
+
+    if (pos == 0 && c == EOF) return -1;
+    (*lineptr)[pos] = '\0';
+    return (ssize_t)pos;
+}
+#else
+#include <termios.h>
+#include <strings.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <stdarg.h>
 #include <fcntl.h>
 #include <signal.h>
+#endif
 
 #include "loki/editor.h"
 #include "internal.h"

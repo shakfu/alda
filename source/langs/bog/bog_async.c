@@ -10,9 +10,24 @@
 #include "scheduler.h"
 #include "livecoding.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#include <process.h>
+/* Windows threading compatibility */
+typedef HANDLE pthread_t;
+#define pthread_create(t, attr, func, arg) \
+    ((*(t) = (HANDLE)_beginthreadex(NULL, 0, (unsigned (__stdcall *)(void *))func, arg, 0, NULL)) == 0 ? -1 : 0)
+#define pthread_join(t, retval) (WaitForSingleObject(t, INFINITE), CloseHandle(t), 0)
+#define usleep(us) Sleep((us) / 1000)
+/* MSVC atomic compatibility */
+#define atomic_int volatile int
+#define atomic_store(ptr, val) (*(ptr) = (val))
+#define atomic_load(ptr) (*(ptr))
+#else
 #include <pthread.h>
 #include <unistd.h>
 #include <stdatomic.h>
+#endif
 
 /* ============================================================================
  * Thread State

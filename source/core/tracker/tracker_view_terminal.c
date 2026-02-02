@@ -8,12 +8,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#include <fcntl.h>
+#include <conio.h>
+#define write _write
+#define read _read
+#define isatty _isatty
+#define STDIN_FILENO 0
+#define STDOUT_FILENO 1
+#else
 #include <unistd.h>
 #include <termios.h>
 #include <sys/ioctl.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+#endif
 
 /*============================================================================
  * Constants
@@ -85,7 +98,13 @@ typedef struct {
     int output_fd;
 
     /* Original terminal state */
+#ifdef _WIN32
+    DWORD orig_console_mode;
+    HANDLE console_in;
+    HANDLE console_out;
+#else
     struct termios orig_termios;
+#endif
     bool raw_mode_enabled;
 
     /* Configuration */
@@ -333,6 +352,25 @@ static void enable_raw_mode(TerminalBackend* tb) {
     if (tb->raw_mode_enabled) return;
     if (!isatty(tb->input_fd)) return;
 
+#ifdef _WIN32
+    tb->console_in = GetStdHandle(STD_INPUT_HANDLE);
+    tb->console_out = GetStdHandle(STD_OUTPUT_HANDLE);
+
+    /* Save original console mode */
+    GetConsoleMode(tb->console_in, &tb->orig_console_mode);
+
+    /* Set raw input mode */
+    DWORD mode = tb->orig_console_mode;
+    mode &= ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT);
+    mode |= ENABLE_VIRTUAL_TERMINAL_INPUT;
+    SetConsoleMode(tb->console_in, mode);
+
+    /* Enable VT processing for output */
+    DWORD out_mode;
+    GetConsoleMode(tb->console_out, &out_mode);
+    out_mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT;
+    SetConsoleMode(tb->console_out, out_mode);
+#else
     tcgetattr(tb->input_fd, &tb->orig_termios);
 
     struct termios raw = tb->orig_termios;
@@ -355,16 +393,32 @@ static void enable_raw_mode(TerminalBackend* tb) {
     raw.c_cc[VTIME] = 0;
 
     tcsetattr(tb->input_fd, TCSAFLUSH, &raw);
+#endif
     tb->raw_mode_enabled = true;
 }
 
 static void disable_raw_mode(TerminalBackend* tb) {
     if (!tb->raw_mode_enabled) return;
+#ifdef _WIN32
+    SetConsoleMode(tb->console_in, tb->orig_console_mode);
+#else
     tcsetattr(tb->input_fd, TCSAFLUSH, &tb->orig_termios);
+#endif
     tb->raw_mode_enabled = false;
 }
 
 static void update_terminal_size(TerminalBackend* tb) {
+#ifdef _WIN32
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (GetConsoleScreenBufferInfo(h, &csbi)) {
+        tb->screen_cols = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+        tb->screen_rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+    } else {
+        tb->screen_cols = 80;
+        tb->screen_rows = 24;
+    }
+#else
     struct winsize ws;
     if (ioctl(tb->output_fd, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
         tb->screen_cols = 80;
@@ -373,6 +427,7 @@ static void update_terminal_size(TerminalBackend* tb) {
         tb->screen_cols = ws.ws_col;
         tb->screen_rows = ws.ws_row;
     }
+#endif
     tb->layout_dirty = true;
 }
 
@@ -1574,6 +1629,49 @@ static int read_key(TerminalBackend* tb, int timeout_ms) {
         return tb->injected_input[tb->injected_input_pos++];
     }
 
+#ifdef _WIN32
+    /* Windows console input */
+    HANDLE h = tb->console_in ? tb->console_in : GetStdHandle(STD_INPUT_HANDLE);
+    DWORD wait_result = WaitForSingleObject(h, timeout_ms < 0 ? INFINITE : (DWORD)timeout_ms);
+    if (wait_result != WAIT_OBJECT_0) return -1;
+
+    INPUT_RECORD ir;
+    DWORD num_read;
+    while (ReadConsoleInputA(h, &ir, 1, &num_read) && num_read > 0) {
+        if (ir.EventType != KEY_EVENT || !ir.Event.KeyEvent.bKeyDown) {
+            continue;
+        }
+
+        WORD vk = ir.Event.KeyEvent.wVirtualKeyCode;
+        char ch = ir.Event.KeyEvent.uChar.AsciiChar;
+        DWORD ctrl = ir.Event.KeyEvent.dwControlKeyState;
+
+        /* Handle special keys */
+        switch (vk) {
+            case VK_UP:     return 1000;
+            case VK_DOWN:   return 1001;
+            case VK_RIGHT:  return 1002;
+            case VK_LEFT:   return 1003;
+            case VK_HOME:   return 1004;
+            case VK_END:    return 1005;
+            case VK_DELETE: return 1006;
+            case VK_PRIOR:  return 1007;  /* Page Up */
+            case VK_NEXT:   return 1008;  /* Page Down */
+            case VK_ESCAPE: return '\x1b';
+        }
+
+        /* Control key combinations */
+        if ((ctrl & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)) && ch >= 1 && ch <= 26) {
+            return ch;
+        }
+
+        /* Regular character */
+        if (ch != 0) {
+            return (unsigned char)ch;
+        }
+    }
+    return -1;
+#else
     /* Set up select for timeout */
     fd_set fds;
     FD_ZERO(&fds);
@@ -1629,6 +1727,7 @@ static int read_key(TerminalBackend* tb, int timeout_ms) {
     }
 
     return c;
+#endif
 }
 
 static TrackerInputType translate_key(int key, uint32_t* modifiers) {

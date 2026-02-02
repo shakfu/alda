@@ -6,7 +6,7 @@ macro(add_alda_test TEST_NAME)
         test_${TEST_NAME}.c
         ${PSND_ROOT_DIR}/source/testing/test_framework.c
     )
-    target_link_libraries(test_alda_${TEST_NAME} PRIVATE alda m)
+    target_link_libraries(test_alda_${TEST_NAME} PRIVATE alda $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
     target_include_directories(test_alda_${TEST_NAME} PRIVATE
         ${PSND_ROOT_DIR}/source/testing
     )
@@ -39,7 +39,7 @@ if(BUILD_CSOUND_BACKEND)
     add_executable(test_alda_csound_microtuning
         test_csound_microtuning.c
     )
-    target_link_libraries(test_alda_csound_microtuning PRIVATE alda m)
+    target_link_libraries(test_alda_csound_microtuning PRIVATE alda $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
     target_include_directories(test_alda_csound_microtuning PRIVATE
         ${PSND_ROOT_DIR}/source/testing
     )

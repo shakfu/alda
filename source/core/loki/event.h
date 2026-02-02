@@ -18,6 +18,14 @@
 #include <stdint.h>
 #include <stddef.h>
 
+/* Undefine any conflicting Windows macros (winuser.h defines MOD_* for hotkeys) */
+#ifdef _WIN32
+#undef MOD_SHIFT
+#undef MOD_CONTROL
+#undef MOD_ALT
+#undef MOD_WIN
+#endif
+
 /* ======================= Event Types ====================================== */
 
 typedef enum {

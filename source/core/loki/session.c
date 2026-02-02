@@ -21,6 +21,19 @@
 #include <stdio.h>
 #include <time.h>
 
+#ifdef _MSC_VER
+/* MSVC doesn't have strndup */
+static char* strndup(const char* s, size_t n) {
+    size_t len = strnlen(s, n);
+    char* result = (char*)malloc(len + 1);
+    if (result) {
+        memcpy(result, s, len);
+        result[len] = '\0';
+    }
+    return result;
+}
+#endif
+
 /* Maximum render segments per row */
 #define MAX_SEGMENTS_PER_ROW 256
 

@@ -22,7 +22,16 @@
 #ifndef SHARED_PARAM_H
 #define SHARED_PARAM_H
 
+#if defined(_MSC_VER) && !defined(__cplusplus)
+/* MSVC C mode: stdatomic.h not well supported, use volatile instead.
+ * On x86/x64, aligned 32-bit reads/writes are atomic. */
+#define PARAM_ATOMIC_FLOAT volatile float
+#define atomic_store(ptr, val) (*(ptr) = (val))
+#define atomic_load(ptr) (*(ptr))
+#else
 #include <stdatomic.h>
+#define PARAM_ATOMIC_FLOAT _Atomic float
+#endif
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -61,7 +70,7 @@ typedef struct {
     float min_val;                           /**< Minimum value */
     float max_val;                           /**< Maximum value */
     float default_val;                       /**< Default value */
-    _Atomic float value;                     /**< Current value (thread-safe) */
+    PARAM_ATOMIC_FLOAT value;                /**< Current value (thread-safe) */
     char osc_path[PARAM_MAX_OSC_PATH_LEN];  /**< Bound OSC path (empty = unbound) */
     int midi_channel;                        /**< MIDI channel (1-16, 0 = unbound) */
     int midi_cc;                             /**< MIDI CC number (0-127, -1 = unbound) */

@@ -10,7 +10,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+#ifdef _WIN32
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
 
 /* Helper: Create a test model with sample data */
 static void setup_test_model(EditorModel *model) {

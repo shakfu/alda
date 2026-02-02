@@ -14,7 +14,12 @@
 #include "loki/internal.h"
 #include "loki/undo.h"
 #include <string.h>
+
+#ifdef _WIN32
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
 
 /* Helper: Create simple test context with undo enabled */
 static void init_ctx_with_undo(editor_ctx_t *ctx, const char *text) {
