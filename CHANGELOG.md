@@ -17,6 +17,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Changed
+
+- **MHS/MicroHs**: Disabled MHS language integration on Windows
+  - The VFS embedding system requires `fmemopen()` which is not available on Windows
+  - MHS integration remains fully functional on Linux and macOS
+  - Stub functions are provided on Windows so psnd builds without errors
+
 ### Added
 
 - **Tree-sitter Prolog Grammar for Bog**: Integrated tree-sitter-prolog for syntax highlighting
