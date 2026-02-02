@@ -9,7 +9,14 @@
 # symbol names to avoid conflicts with Csound (mmalloc->mhs_mmalloc) and
 # Joy (midi_init->mhs_midi_init).
 
-option(ENABLE_MHS_INTEGRATION "Enable MHS psnd integration" ON)
+# MHS integration requires fmemopen() which is not available on Windows
+# Disable on Windows - the embedding system doesn't work without fmemopen
+if(WIN32)
+    set(ENABLE_MHS_INTEGRATION OFF CACHE BOOL "Enable MHS psnd integration" FORCE)
+    message(STATUS "MHS: Disabled on Windows (requires fmemopen)")
+else()
+    option(ENABLE_MHS_INTEGRATION "Enable MHS psnd integration" ON)
+endif()
 
 # If MHS integration is disabled, we still need to provide stub init functions
 # because the language discovery system adds MHS to the generated headers
