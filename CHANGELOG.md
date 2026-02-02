@@ -146,6 +146,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Commands now dispatched via `keybind_try_handle()` before mode-specific handlers
   - Enables user remapping of playback commands via config.toml
 
+- **README Prerequisites Section**: Added system dependency documentation
+  - Documents required packages: `cmake`, `flex`, `bison`
+  - Installation instructions for macOS (Homebrew), Debian/Ubuntu, Fedora/RHEL, Arch Linux
+  - Notes that `flex` and `bison` are required for MHS (Micro Haskell) language component
+
+### Fixed
+
+- **Test Framework Build Fix**: Resolved multiple definition error for `test_stats`
+  - Removed duplicate `test_stats` definition from `test_memcheck_selftest.c`
+  - Variable is already defined in `test_framework.c` and declared as `extern` in header
+
+- **CLI Test Build Fix**: Fixed `nftw()` availability for POSIX compliance
+  - Added `_XOPEN_SOURCE 500` to `test_play_command.c` before system includes
+  - Enables `nftw()`, `FTW_DEPTH`, and `FTW_PHYS` constants used by `test_process.h`
+
 ## [0.1.4]
 
 ### Added

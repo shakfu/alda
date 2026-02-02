@@ -37,6 +37,34 @@ All are practical for daily live-coding, REPL sketches, and headless playback. T
 
 psnd is in active development. Alda, Joy, TR7 Scheme, and Bog are the four fully integrated languages, demonstrating the polyglot architecture. Languages register via a modular dispatch system (`lang_dispatch.h`), allowing new DSLs to be added without modifying core dispatch logic. Additional mini MIDI languages from [midi-langs](https://github.com/shakfu/midi-langs) can reuse the same editor, REPL, and audio stack. Expect iteration and occasional breaking changes as polyglot support expands.
 
+## Prerequisites
+
+**macOS:**
+
+```bash
+brew install cmake flex bison
+```
+
+**Linux (Debian/Ubuntu):**
+
+```bash
+sudo apt install cmake flex bison
+```
+
+**Linux (Fedora/RHEL):**
+
+```bash
+sudo dnf install cmake flex bison
+```
+
+**Linux (Arch):**
+
+```bash
+sudo pacman -S cmake flex bison
+```
+
+`flex` and `bison` are required for building the MHS (Micro Haskell) language component.
+
 ## Building
 
 Build presets select the synthesizer backend and optional features:

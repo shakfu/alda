@@ -13,9 +13,6 @@
 #include "test_framework.h"
 #include "test_memcheck.h"
 
-/* Test statistics instance */
-test_stats_t test_stats;
-
 /* =============================================================================
  * Basic Allocation Tracking Tests
  * =============================================================================

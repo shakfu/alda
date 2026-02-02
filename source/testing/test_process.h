@@ -12,6 +12,9 @@
 #ifndef TEST_PROCESS_H
 #define TEST_PROCESS_H
 
+/* Note: Callers must #define _XOPEN_SOURCE 500 before any includes
+ * to enable nftw() and FTW_DEPTH/FTW_PHYS constants used here. */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
