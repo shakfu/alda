@@ -11,8 +11,14 @@ add_subdirectory(lua-5.5.0)
 add_subdirectory(tomlc99)
 
 # libremidi - Cross-platform MIDI I/O (C++ library)
+# CMP0077: option() honors normal variables - ensures our settings aren't overwritten
+cmake_policy(SET CMP0077 NEW)
 set(LIBREMIDI_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LIBREMIDI_TESTS OFF CACHE BOOL "" FORCE)
+# Disable JACK backend - it requires jack_get_version() which is missing in older
+# JACK headers (pre-1.9.10). ALSA is the primary MIDI backend on Linux anyway.
+set(LIBREMIDI_NO_JACK ON)
+set(LIBREMIDI_NO_JACK ON CACHE BOOL "" FORCE)
 add_subdirectory(libremidi)
 
 # libuv - Async I/O (used by alda for async playback)
