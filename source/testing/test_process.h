@@ -9,11 +9,20 @@
  * - Temporary directory management with nftw cleanup
  */
 
+/* Feature test macros - must be before any system includes.
+ * These enable POSIX functions like mkdtemp() and nftw(). */
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 700
+#endif
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE 1
+#endif
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+#define _DARWIN_C_SOURCE
+#endif
+
 #ifndef TEST_PROCESS_H
 #define TEST_PROCESS_H
-
-/* Note: Callers must #define _XOPEN_SOURCE 500 before any includes
- * to enable nftw() and FTW_DEPTH/FTW_PHYS constants used here. */
 
 #include <stdio.h>
 #include <stdlib.h>

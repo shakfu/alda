@@ -294,7 +294,7 @@ int syntax_format_color(editor_ctx_t *ctx, int hl, char *buf, size_t bufsize) {
 }
 
 /* Select the syntax highlight scheme depending on the filename. */
-void syntax_select_for_filename(editor_ctx_t *ctx, char *filename) {
+void syntax_select_for_filename(editor_ctx_t *ctx, const char *filename) {
 #ifdef LOKI_USE_LINENOISE
     /* Free any existing tree-sitter state */
     if (ctx->model.ts_state != NULL) {

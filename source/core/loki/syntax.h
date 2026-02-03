@@ -25,7 +25,7 @@ int syntax_format_color(editor_ctx_t *ctx, int hl, char *buf, size_t bufsize);
 
 /* Select syntax highlighting scheme based on filename extension.
  * Searches both built-in HLDB and dynamic language registry. */
-void syntax_select_for_filename(editor_ctx_t *ctx, char *filename);
+void syntax_select_for_filename(editor_ctx_t *ctx, const char *filename);
 
 /* Map human-readable style name to HL_* constant.
  * Used by Lua API for color customization. Returns -1 if name unknown. */

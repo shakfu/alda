@@ -495,4 +495,9 @@ void terminal_buffer_free(struct abuf *ab) {
     free(ab->b);
 }
 
+#else /* !_WIN32 */
+
+/* Provide an empty declaration to avoid "empty translation unit" warning */
+typedef int terminal_win_not_available_placeholder;
+
 #endif /* _WIN32 */

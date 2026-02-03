@@ -4,9 +4,22 @@
  * Provides assertion macros and test runner infrastructure.
  */
 
+/* Feature test macros - must be before any system includes.
+ * These enable POSIX functions like mkdtemp() and nftw() in test utilities. */
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 700
+#endif
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE 1
+#endif
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+#define _DARWIN_C_SOURCE
+#endif
+
 #ifndef TEST_FRAMEWORK_H
 #define TEST_FRAMEWORK_H
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -149,6 +162,32 @@ extern test_stats_t test_stats;
         return; \
     } \
 } while(0)
+
+#define ASSERT_NEAR(actual, expected, epsilon) do { \
+    if (fabs((actual) - (expected)) > (epsilon)) { \
+        printf(COLOR_RED "  ✗ " COLOR_RESET "%s:%d: Expected %g, got %g (epsilon=%g)\n", \
+               __FILE__, __LINE__, (double)(expected), (double)(actual), (double)(epsilon)); \
+        test_stats.current_test_failed = 1; \
+        test_stats.failed_tests++; \
+        return; \
+    } \
+} while(0)
+
+/* Compatibility aliases */
+#define ASSERT(cond) ASSERT_TRUE(cond)
+#define ASSERT_STREQ(a, b) ASSERT_STR_EQ(a, b)
+
+/* Legacy test result macros (for backward compatibility) */
+#define TEST_PASS() do { \
+    /* No-op: pass is recorded automatically by RUN_TEST */ \
+} while(0)
+
+#define TEST_SUMMARY() do { \
+    printf("\n%d tests, %d passed, %d failed\n", \
+           test_stats.total_tests, test_stats.passed_tests, test_stats.failed_tests); \
+} while(0)
+
+#define TEST_EXIT_CODE() (test_stats.failed_tests > 0 ? 1 : 0)
 
 /* Test suite infrastructure */
 #define BEGIN_TEST_SUITE(name) \

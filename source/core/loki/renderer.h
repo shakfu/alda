@@ -19,7 +19,7 @@
 #include <stdint.h>
 
 /* Forward declarations */
-typedef struct editor_ctx editor_ctx_t;
+struct editor_ctx;
 typedef struct Renderer Renderer;
 
 /* ======================= Highlight Types ================================== */

@@ -69,6 +69,8 @@ static char advance(AldaScanner* s) {
     return c;
 }
 
+/* match() - currently unused but kept for future use (e.g., multi-char tokens) */
+static int match(AldaScanner* s, char expected) __attribute__((unused));
 static int match(AldaScanner* s, char expected) {
     if (is_at_end(s)) return 0;
     if (s->source[s->current] != expected) return 0;

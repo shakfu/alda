@@ -3,9 +3,8 @@
 # Helper macro for bog tests
 macro(add_bog_test TEST_NAME)
     add_executable(test_bog_${TEST_NAME} test_${TEST_NAME}.c)
-    target_link_libraries(test_bog_${TEST_NAME} PRIVATE bog)
+    target_link_libraries(test_bog_${TEST_NAME} PRIVATE bog test_framework)
     target_include_directories(test_bog_${TEST_NAME} PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
         ${PSND_ROOT_DIR}/source/langs/bog/impl
         ${PSND_ROOT_DIR}/source/testing
     )

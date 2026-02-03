@@ -14,7 +14,7 @@
 /* Required for nftw() and FTW_DEPTH/FTW_PHYS - must be before any includes */
 #define _XOPEN_SOURCE 500
 
-#include "../test_framework.h"
+#include "test_framework.h"
 #include "test_process.h"
 #include <stdio.h>
 #include <stdlib.h>

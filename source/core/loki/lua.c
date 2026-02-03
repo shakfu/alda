@@ -304,6 +304,7 @@ static int lua_loki_get_mode(lua_State *L) {
         case MODE_INSERT: mode_str = "insert"; break;
         case MODE_VISUAL: mode_str = "visual"; break;
         case MODE_COMMAND: mode_str = "command"; break;
+        case MODE_PICKER: mode_str = "picker"; break;
     }
     lua_pushstring(L, mode_str);
     return 1;
@@ -508,6 +509,7 @@ static int lua_loki_repl_register(lua_State *L) {
  * ============================================================================ */
 
 int loki_lua_begin_api(lua_State *L, const char *name) {
+    (void)name;  /* Used by caller context, not within this function */
     lua_getglobal(L, "loki");
     if (!lua_istable(L, -1)) {
         lua_pop(L, 1);
@@ -1758,8 +1760,10 @@ static int lua_osc_send_to(lua_State *L) {
 #endif
 }
 
+#ifdef PSND_OSC
 /* Registry key for storing OSC Lua callbacks */
 static const char osc_callbacks_registry_key = 0;
+#endif
 
 /* Lua API: loki.osc.on(path, callback_name) - Register callback for OSC path
  * callback_name is the name of a global Lua function to call when message arrives

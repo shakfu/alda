@@ -522,7 +522,7 @@ void editor_del_char(editor_ctx_t *ctx) {
 
 /* Load the specified program in the editor memory and returns 0 on success
  * or -1 on error. */
-int editor_open(editor_ctx_t *ctx, char *filename) {
+int editor_open(editor_ctx_t *ctx, const char *filename) {
     FILE *fp;
 
     ctx->model.dirty = 0;
@@ -737,6 +737,7 @@ static void editor_refresh_screen_via_renderer(editor_ctx_t *ctx) {
         case MODE_INSERT: mode_str = "INSERT"; break;
         case MODE_VISUAL: mode_str = "VISUAL"; break;
         case MODE_COMMAND: mode_str = "COMMAND"; break;
+        case MODE_PICKER: mode_str = "PICKER"; break;
     }
 
     const LokiLangOps *lang = loki_lang_for_file(ctx->model.filename);
@@ -1030,6 +1031,7 @@ void editor_refresh_screen(editor_ctx_t *ctx) {
         case MODE_INSERT: mode_str = "INSERT"; break;
         case MODE_VISUAL: mode_str = "VISUAL"; break;
         case MODE_COMMAND: mode_str = "COMMAND"; break;
+        case MODE_PICKER: mode_str = "PICKER"; break;
     }
 
     /* Show language indicator if a language is active for this file */

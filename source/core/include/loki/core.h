@@ -90,7 +90,7 @@ void editor_insert_newline(editor_ctx_t *ctx);
 int editor_save(editor_ctx_t *ctx);
 
 /* Open a file (returns 0 on success, -1 on error) */
-int editor_open(editor_ctx_t *ctx, char *filename);
+int editor_open(editor_ctx_t *ctx, const char *filename);
 
 /* ============================================================================
  * Display and Rendering

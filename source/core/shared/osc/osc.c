@@ -1075,4 +1075,9 @@ int shared_osc_get_note_rate_limit(void) {
     return osc_note_rate_limit;
 }
 
+#else /* !PSND_OSC */
+
+/* Provide an empty declaration to avoid "empty translation unit" warning */
+typedef int osc_not_available_placeholder;
+
 #endif /* PSND_OSC */

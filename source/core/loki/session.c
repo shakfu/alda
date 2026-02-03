@@ -106,6 +106,7 @@ static int build_row_segments(editor_ctx_t *ctx, t_erow *row, int row_idx,
 /* Deep copy row view with owned segment data */
 static int copy_row_view(EditorRowView *dest, editor_ctx_t *ctx, int y,
                          int gutter_width, int text_cols) {
+    (void)gutter_width;  /* Reserved for future gutter rendering */
     int filerow = ctx->view.rowoff + y;
     dest->is_empty = (filerow >= ctx->model.numrows);
     dest->row_num = dest->is_empty ? 0 : filerow + 1;
@@ -195,8 +196,8 @@ EditorSession *editor_session_new(const EditorConfig *config) {
 
         /* Open initial file if specified */
         if (config->filename) {
-            syntax_select_for_filename(&session->ctx, (char *)config->filename);
-            editor_open(&session->ctx, (char *)config->filename);
+            syntax_select_for_filename(&session->ctx, config->filename);
+            editor_open(&session->ctx, config->filename);
         }
 
         /* Create SharedContext for audio/MIDI/Link state (shared by all languages) */
@@ -395,6 +396,7 @@ EditorViewModel *editor_session_snapshot(EditorSession *session) {
         case MODE_INSERT: mode_str = "INSERT"; break;
         case MODE_VISUAL: mode_str = "VISUAL"; break;
         case MODE_COMMAND: mode_str = "COMMAND"; break;
+        case MODE_PICKER: mode_str = "PICKER"; break;
     }
 
     /* Get language indicator */

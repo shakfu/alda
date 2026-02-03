@@ -426,7 +426,7 @@ int loki_editor_main(int argc, char **argv) {
     /* Initialize editor core */
     init_editor(&E);
     syntax_select_for_filename(&E, filename);
-    editor_open(&E, (char*)filename);
+    editor_open(&E, filename);
 
     /* Load TOML configuration first (before Lua) */
     loki_config_t *config = config_global();

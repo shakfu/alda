@@ -7,7 +7,7 @@ list(APPEND CMAKE_MODULE_PATH "${PSND_ROOT_DIR}/scripts/cmake")
 # Include centralized platform detection
 include(psnd_platform)
 
-set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 

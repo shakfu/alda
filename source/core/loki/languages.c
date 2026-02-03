@@ -1,7 +1,7 @@
 /* loki_languages.c - Language syntax infrastructure
  *
  * This file contains syntax highlighting infrastructure and the HLDB.
- * Language definitions (keywords, extensions) are in languages/*.h headers.
+ * Language definitions (keywords, extensions) are in languages/ *.h headers.
  *
  * Minimal keyword arrays are kept for markdown code block highlighting.
  * For actual file editing, Lua-defined languages can extend these.
