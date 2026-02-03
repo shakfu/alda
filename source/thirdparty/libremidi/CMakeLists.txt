@@ -31,7 +31,7 @@ cmake_dependent_option(LIBREMIDI_DOWNLOAD_CPPWINRT "Download cppwinrt and MIDI2 
 # https://github.com/microsoft/MIDI/releases/download/dev-preview-9-namm-4/Microsoft.Windows.Devices.Midi2.1.0.2-preview-9.250121-1820.nupkg renamed to .zip
 cmake_dependent_option(LIBREMIDI_WINMIDI_HEADERS_ZIP "Path to the WinMIDI headers archive" "" "WIN32" "")
 
-option(LIBREMIDI_NO_JACK "Disable JACK back-end" OFF)
+option(LIBREMIDI_NO_JACK "Disable JACK back-end" ON)
 option(LIBREMIDI_NO_PIPEWIRE "Disable PipeWire back-end" OFF)
 option(LIBREMIDI_NO_NETWORK "Disable Network back-end" OFF)
 option(LIBREMIDI_NO_KEYBOARD "Disable Computer keyboard back-end" OFF)
