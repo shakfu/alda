@@ -22,13 +22,14 @@ struct backend
   static inline bool available() noexcept
   {
 #if LIBREMIDI_WEAKJACK
-    if (WeakJack::instance().available() != 0)
-      return false;
-#endif
-
+    // WeakJack doesn't expose jack_get_version, and JACK UMP requires JACK 3.1.4+
+    // which is too new to be commonly available via weak loading anyway
+    return false;
+#else
     int major, minor, micro, patch;
     jack_get_version(&major, &minor, &micro, &patch);
     return (major >= 3 && minor >= 1 && micro >= 4);
+#endif
   }
 };
 }
