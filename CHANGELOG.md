@@ -35,6 +35,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - New files: `source/core/loki/window.h`, `source/core/loki/window.c`
   - 29 unit tests for window tree operations
 
+- **Tracker Terminal View API**: New function for creating terminal views with custom file descriptors
+  - `tracker_view_terminal_new_with_config_and_fds()` sets fds before initialization
+  - Prevents escape sequences from being written to stdout during view creation
+  - Useful for testing and embedding the tracker in non-terminal contexts
+
+### Fixed
+
+- **Tracker Terminal Tests**: Fixed escape sequences corrupting CTest output
+  - Terminal view tests now redirect output to `/dev/null` during initialization
+  - Prevents VT100 escape sequences (alternate screen, cursor hide) from garbling test output
+
 ### Changed
 
 - **MHS/MicroHs**: Disabled MHS language integration on Windows
