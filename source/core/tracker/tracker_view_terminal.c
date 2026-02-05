@@ -1529,24 +1529,28 @@ static void terminal_render(TrackerView* view) {
     /* Check for help mode */
     if (view->state.view_mode == TRACKER_VIEW_MODE_HELP) {
         render_help(view);
+        output_flush(tb);
         return;
     }
 
     /* Check for arrange mode */
     if (view->state.view_mode == TRACKER_VIEW_MODE_ARRANGE) {
         render_arrange(view);
+        output_flush(tb);
         return;
     }
 
     /* Check for FX mode */
     if (view->state.view_mode == TRACKER_VIEW_MODE_FX) {
         render_fx(view);
+        output_flush(tb);
         return;
     }
 
     /* Check for mixer mode */
     if (view->state.view_mode == TRACKER_VIEW_MODE_MIXER) {
         render_mixer(view);
+        output_flush(tb);
         return;
     }
 

@@ -159,3 +159,36 @@ add_test(
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 set_tests_properties(shared_midi_tests PROPERTIES LABELS "unit")
+
+# Test for shared async playback system
+add_executable(test_shared_async test_shared_async.c)
+target_include_directories(test_shared_async PRIVATE
+    ${PSND_ROOT_DIR}/source/core/include
+    ${PSND_ROOT_DIR}/source/core/shared
+    ${PSND_ROOT_DIR}/source/testing
+)
+target_link_libraries(test_shared_async PRIVATE shared test_framework $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
+add_test(
+    NAME shared_async_tests
+    COMMAND $<TARGET_FILE:test_shared_async>
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+set_tests_properties(shared_async_tests PROPERTIES LABELS "unit")
+
+# Test for OSC (Open Sound Control) module
+add_executable(test_osc test_osc.c)
+target_include_directories(test_osc PRIVATE
+    ${PSND_ROOT_DIR}/source/core/include
+    ${PSND_ROOT_DIR}/source/core/shared
+    ${PSND_ROOT_DIR}/source/testing
+)
+target_link_libraries(test_osc PRIVATE shared test_framework $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
+if(BUILD_OSC)
+    target_compile_definitions(test_osc PRIVATE PSND_OSC)
+endif()
+add_test(
+    NAME shared_osc_tests
+    COMMAND $<TARGET_FILE:test_osc>
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+set_tests_properties(shared_osc_tests PROPERTIES LABELS "unit")

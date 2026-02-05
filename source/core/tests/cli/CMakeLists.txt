@@ -27,3 +27,59 @@ add_test(
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 set_tests_properties(cli_play_command_tests PROPERTIES LABELS "integration")
+
+# ============================================================================
+# Language dispatch unit tests
+# ============================================================================
+
+add_executable(test_lang_dispatch
+    test_lang_dispatch.c
+    ${PSND_ROOT_DIR}/source/core/lang_dispatch.c
+    ${PSND_ROOT_DIR}/source/testing/test_framework.c
+)
+
+target_include_directories(test_lang_dispatch PRIVATE
+    ${PSND_ROOT_DIR}/source/testing
+    ${PSND_ROOT_DIR}/source/core
+    ${CMAKE_BINARY_DIR}/generated
+)
+
+# Only link test framework - lang_dispatch is compiled directly
+target_link_libraries(test_lang_dispatch PRIVATE test_framework)
+
+add_test(
+    NAME cli_lang_dispatch_tests
+    COMMAND $<TARGET_FILE:test_lang_dispatch>
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+set_tests_properties(cli_lang_dispatch_tests PROPERTIES LABELS "unit")
+
+# ============================================================================
+# Main dispatch integration tests
+# ============================================================================
+
+add_executable(test_main_dispatch
+    test_main_dispatch.c
+    ${PSND_ROOT_DIR}/source/testing/test_framework.c
+)
+
+target_include_directories(test_main_dispatch PRIVATE
+    ${PSND_ROOT_DIR}/source/testing
+)
+
+# Pass the path to the psnd binary
+target_compile_definitions(test_main_dispatch PRIVATE
+    PSND_BINARY="$<TARGET_FILE:psnd_bin>"
+)
+
+target_link_libraries(test_main_dispatch PRIVATE test_framework)
+
+# This test depends on psnd being built
+add_dependencies(test_main_dispatch psnd_bin)
+
+add_test(
+    NAME cli_main_dispatch_tests
+    COMMAND $<TARGET_FILE:test_main_dispatch>
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+set_tests_properties(cli_main_dispatch_tests PROPERTIES LABELS "integration")

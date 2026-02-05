@@ -78,28 +78,51 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
 
 ### Code Coverage
 
-Current state: **54 test files**, **~1,400 test functions**, **~3,700 assertions**. Direct file mapping coverage ~44%.
+Current state: **72 test files**, **~2,390 test functions**, **~5,800 assertions**. Direct file mapping coverage ~70%.
 
 **Critical gaps (no unit tests):**
 
-- [ ] `main.c` / `lang_dispatch.c` - Entry point and mode selection
+- [x] ~~`main.c` / `lang_dispatch.c` - Entry point and mode selection~~ **DONE** (70 tests: 44 unit + 26 integration)
 - [x] ~~`midi.c` / `midi_input.c` - Core MIDI subsystem~~ **DONE** (68 tests)
 - [x] ~~`music_theory.c` - Chord construction, scale handling~~ **DONE** (73 tests)
-- [ ] Tracker module (11 files) - Only minimal integration tests
-  - tracker_engine.c, tracker_model.c, tracker_plugin.c
-  - tracker_view.c, tracker_view_clipboard.c, tracker_view_json.c
-  - tracker_view_terminal.c, tracker_view_theme.c, tracker_view_undo.c
+- [x] ~~Tracker module (11 files)~~ **DONE** (654 tests)
+  - [x] ~~tracker_model.c~~ **DONE** (70 tests)
+  - [x] ~~tracker_engine.c~~ **DONE** (104 tests)
+  - [x] ~~tracker_plugin.c~~ **DONE** (65 tests)
+  - [x] ~~tracker_plugin_notes.c~~ **DONE** (included in plugin tests)
+  - [x] ~~tracker_audio.c~~ **DONE** (included in engine tests)
+  - [x] ~~tracker_view_json.c~~ **DONE** (77 tests)
+  - [x] ~~tracker_view_undo.c~~ **DONE** (47 tests)
+  - [x] ~~tracker_view_theme.c~~ **DONE** (49 tests)
+  - [x] ~~tracker_view_clipboard.c~~ **DONE** (77 tests)
+  - [x] ~~tracker_view.c~~ **DONE** (121 tests)
+  - [x] ~~tracker_view_terminal.c~~ **DONE** (44 tests)
 - [x] ~~Command system (11 files in `loki/command/`)~~ **DONE** (51 tests)
   - All handlers tested: goto, substitute, basic, file, export, metronome, link, loop, csd, theme, plugin
 
 **Secondary gaps:**
 
-- [ ] `lua.c` - Lua integration only partially tested
-- [ ] `config.c`, `keybind.c`, `theme_toml.c` - Configuration loading
-- [ ] `renderer.c` - Terminal rendering
-- [ ] `async.c` / `shared_async.c` - Async scheduling
-- [ ] `jsonrpc.c`, `osc.c` - Protocol handlers
-- [ ] MHS (Scheme) - Entire 19-file module has no tests
+- [x] ~~`config.c`, `keybind.c`, `theme_toml.c` - Configuration loading~~ **DONE** (41 tests)
+- [x] ~~`renderer.c` - Terminal rendering~~ **DONE** (50 tests)
+- [x] ~~`async.c` / `shared_async.c` - Async scheduling~~ **DONE** (62 tests)
+- [x] ~~`jsonrpc.c`, `osc.c` - Protocol handlers~~ **DONE** (67 tests: 42 jsonrpc + 25 osc)
+
+**Remaining test coverage work:**
+
+- [ ] `lua.c` - Lua integration (extend existing `test_lua_api.c`)
+  - [ ] Lua state lifecycle (init, cleanup, error recovery)
+  - [ ] API bindings coverage (loki.*, alda.*, joy.*, link.*)
+  - [ ] Script loading and execution
+  - [ ] Error handling and sandboxing
+  - [ ] Callback registration
+
+- [ ] MHS (MicroHaskell) - 19 files, initial tests added (47 tests)
+  - [x] MIDI FFI (32 tests) - cents-to-bend, random, recording, channel validation
+  - [x] Context state (15 tests) - null safety, port API, lifecycle
+  - [ ] Lexer/tokenizer (MicroHs runtime - low priority)
+  - [ ] Parser (MicroHs runtime - low priority)
+  - [ ] Type checker (MicroHs runtime - low priority)
+  - [ ] Interpreter/evaluator (MicroHs runtime - low priority)
 
 **Well-tested areas (for reference):**
 
@@ -114,6 +137,13 @@ Current state: **54 test files**, **~1,400 test functions**, **~3,700 assertions
 | Music theory | 73 | Pitch, chords, scales, microtonal |
 | Command handlers | 51 | All 11 command files covered |
 | MIDI I/O | 68 | Context, ports, callbacks, timing |
+| Async playback | 62 | Schedule, events, tick/ms modes, lifecycle |
+| Config system | 41 | TOML parsing, keybindings, themes |
+| Tracker model | 70 | Events, phrases, cells, tracks, patterns, songs |
+| Tracker engine | 104 | Lifecycle, timing, transport, event queue, sync |
+| Tracker plugin | 65 | Registry, compilation, evaluation, context, RNG |
+| Tracker view | 415 | JSON, undo, theme, clipboard, core, terminal |
+| MHS (MicroHaskell) | 47 | MIDI FFI, context state, port API |
 
 ### Code Quality (Completed)
 

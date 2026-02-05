@@ -53,9 +53,18 @@ macro(add_tracker_test TEST_NAME)
 endmacro()
 
 # Add tracker tests
+add_tracker_test(model)
+add_tracker_test(engine)
+add_tracker_test(plugin)
 add_tracker_test(plugin_notes)
 add_tracker_test(audio)
 add_tracker_test(midi_import)
+add_tracker_test(view)
+add_tracker_test(view_json)
+add_tracker_test(view_undo)
+add_tracker_test(view_theme)
+add_tracker_test(view_clipboard)
+add_tracker_test(view_terminal)
 
 # Tracker demo (interactive, not a test)
 add_executable(tracker_demo tracker_demo.c)
