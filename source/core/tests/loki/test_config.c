@@ -22,6 +22,7 @@
 
 #ifdef _WIN32
 #include <io.h>
+#include <process.h>
 #define access _access
 #define F_OK 0
 #else

@@ -9,6 +9,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <process.h>
 typedef HANDLE pthread_t;
 typedef CRITICAL_SECTION pthread_mutex_t;
 #define pthread_create(t, attr, func, arg) \
@@ -264,7 +265,7 @@ TEST(handler_registration) {
 
     /* Register custom handler for timer events */
     async_queue_set_handler(queue, ASYNC_EVENT_TIMER, test_handler);
-    ASSERT_EQ((void *)async_queue_get_handler(queue, ASYNC_EVENT_TIMER), (void *)test_handler);
+    ASSERT_PTR_EQ((void *)async_queue_get_handler(queue, ASYNC_EVENT_TIMER), (void *)test_handler);
 
     /* Push and dispatch */
     g_handler_called = 0;

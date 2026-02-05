@@ -145,7 +145,7 @@ TEST(picker_select) {
     /* Verify callback was called with correct index */
     ASSERT_TRUE(callback_state.called);
     ASSERT_EQ(callback_state.selected_index, 2);
-    ASSERT_EQ(callback_state.user_data, (void*)0xABCD);
+    ASSERT_PTR_EQ(callback_state.user_data, (void*)0xABCD);
 
     /* Verify picker closed */
     ASSERT_EQ(ctx.view.mode, MODE_NORMAL);
