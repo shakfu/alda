@@ -12,8 +12,8 @@
 typedef HANDLE pthread_t;
 typedef CRITICAL_SECTION pthread_mutex_t;
 #define pthread_create(t, attr, func, arg) \
-    ((*(t) = (HANDLE)_beginthreadex(NULL, 0, (unsigned (__stdcall *)(void *))func, arg, 0, NULL)) == 0 ? -1 : 0)
-#define pthread_join(t, retval) (WaitForSingleObject(t, INFINITE), CloseHandle(t), 0)
+    ((*(t) = (HANDLE)_beginthreadex(NULL, 0, func, arg, 0, NULL)) == 0 ? -1 : 0)
+#define pthread_join(t, retval) (WaitForSingleObject(t, INFINITE), CloseHandle(t))
 #define pthread_mutex_init(m, attr) (InitializeCriticalSection(m), 0)
 #define pthread_mutex_destroy(m) DeleteCriticalSection(m)
 #define pthread_mutex_lock(m) EnterCriticalSection(m)
@@ -322,7 +322,11 @@ TEST(event_timestamp) {
 }
 
 /* Thread function for concurrent push test */
+#ifdef _WIN32
+static unsigned __stdcall thread_push_func(void *arg) {
+#else
 static void *thread_push_func(void *arg) {
+#endif
     int thread_id = *(int *)arg;
     AsyncEventQueue *queue = async_queue_global();
 
@@ -330,7 +334,11 @@ static void *thread_push_func(void *arg) {
         async_queue_push_timer(queue, thread_id * 100 + i, NULL);
     }
 
+#ifdef _WIN32
+    return 0;
+#else
     return NULL;
+#endif
 }
 
 /* Test: Concurrent pushes from multiple threads */

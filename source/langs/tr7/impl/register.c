@@ -25,6 +25,8 @@
 #include <string.h>
 #ifdef _WIN32
 #include <windows.h>
+#include <direct.h>
+#define getcwd _getcwd
 #define usleep(us) Sleep((us) / 1000)
 #else
 #include <unistd.h>

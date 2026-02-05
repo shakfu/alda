@@ -16,8 +16,8 @@
 /* Windows threading compatibility */
 typedef HANDLE pthread_t;
 #define pthread_create(t, attr, func, arg) \
-    ((*(t) = (HANDLE)_beginthreadex(NULL, 0, (unsigned (__stdcall *)(void *))func, arg, 0, NULL)) == 0 ? -1 : 0)
-#define pthread_join(t, retval) (WaitForSingleObject(t, INFINITE), CloseHandle(t), 0)
+    ((*(t) = (HANDLE)_beginthreadex(NULL, 0, func, arg, 0, NULL)) == 0 ? -1 : 0)
+#define pthread_join(t, retval) (WaitForSingleObject(t, INFINITE), CloseHandle(t))
 #define usleep(us) Sleep((us) / 1000)
 /* MSVC atomic compatibility */
 #define atomic_int volatile int
@@ -47,7 +47,11 @@ static BogTransitionManager *g_transition = NULL;
  * Tick Thread
  * ============================================================================ */
 
+#ifdef _WIN32
+static unsigned __stdcall tick_thread_func(void *arg) {
+#else
 static void *tick_thread_func(void *arg) {
+#endif
     (void)arg;
 
     while (atomic_load(&g_running)) {
@@ -68,7 +72,11 @@ static void *tick_thread_func(void *arg) {
         }
     }
 
+#ifdef _WIN32
+    return 0;
+#else
     return NULL;
+#endif
 }
 
 /* ============================================================================

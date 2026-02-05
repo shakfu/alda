@@ -41,8 +41,10 @@
 
 #ifdef _WIN32
 #include <io.h>
+#include <direct.h>
 #include <windows.h>
 #define isatty _isatty
+#define getcwd _getcwd
 #define STDIN_FILENO 0
 #define usleep(us) Sleep((us) / 1000)
 #else
