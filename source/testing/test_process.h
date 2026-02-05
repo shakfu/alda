@@ -101,8 +101,8 @@ static inline int test_exec(const char *binary_path, char *const args[]) {
     if (pid == 0) {
         /* Child process */
         /* Redirect stdout and stderr to /dev/null for quiet tests */
-        freopen("/dev/null", "w", stdout);
-        freopen("/dev/null", "w", stderr);
+        if (freopen("/dev/null", "w", stdout) == NULL) _exit(127);
+        if (freopen("/dev/null", "w", stderr) == NULL) _exit(127);
 
         execv(binary_path, args);
 
@@ -209,7 +209,7 @@ static inline int test_exec_capture(const char *binary_path, char *const args[],
         close(pipefd[1]);
 
         /* Redirect stderr to /dev/null */
-        freopen("/dev/null", "w", stderr);
+        if (freopen("/dev/null", "w", stderr) == NULL) _exit(127);
 
         execv(binary_path, args);
         _exit(127);
@@ -335,7 +335,10 @@ static inline int test_rmdir_recursive(const char *path) {
 static inline int test_write_file(const char *dir, const char *filename,
                                    const char *content) {
     char path[TEST_PROC_MAX_PATH];
-    snprintf(path, sizeof(path), "%s%c%s", dir, TEST_PROC_PATH_SEP, filename);
+    int n = snprintf(path, sizeof(path), "%s%c%s", dir, TEST_PROC_PATH_SEP, filename);
+    if (n < 0 || (size_t)n >= sizeof(path)) {
+        return -1;
+    }
 
     FILE *f = fopen(path, "w");
     if (!f) {
@@ -359,7 +362,10 @@ static inline int test_write_file(const char *dir, const char *filename,
  * @param path     Buffer to store result (must be at least TEST_PROC_MAX_PATH)
  */
 static inline void test_build_path(const char *dir, const char *filename, char *path) {
-    snprintf(path, TEST_PROC_MAX_PATH, "%s%c%s", dir, TEST_PROC_PATH_SEP, filename);
+    int n = snprintf(path, TEST_PROC_MAX_PATH, "%s%c%s", dir, TEST_PROC_PATH_SEP, filename);
+    if (n < 0 || (size_t)n >= TEST_PROC_MAX_PATH) {
+        path[0] = '\0';
+    }
 }
 
 #endif /* TEST_PROCESS_H */

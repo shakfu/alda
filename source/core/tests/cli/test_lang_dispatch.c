@@ -14,8 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 
-/* Global test stats required by test framework */
-test_stats_t test_stats;
+/* test_stats is defined in test_framework.c (linked via CMake) */
 
 /*============================================================================
  * Test Helpers
