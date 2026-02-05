@@ -19,6 +19,10 @@ set(LIBREMIDI_TESTS OFF CACHE BOOL "" FORCE)
 # JACK headers (pre-1.9.10). ALSA is the primary MIDI backend on Linux anyway.
 set(LIBREMIDI_NO_JACK ON)
 set(LIBREMIDI_NO_JACK ON CACHE BOOL "" FORCE)
+# Disable WinUWP and WinMIDI backends - they require cppwinrt headers.
+# WinMM is sufficient for MIDI I/O on Windows.
+set(LIBREMIDI_NO_WINUWP ON CACHE BOOL "" FORCE)
+set(LIBREMIDI_NO_WINMIDI ON CACHE BOOL "" FORCE)
 add_subdirectory(libremidi)
 
 # libuv - Async I/O (used by alda for async playback)
