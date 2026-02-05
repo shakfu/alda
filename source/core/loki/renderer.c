@@ -234,6 +234,153 @@ static void terminal_render_row(Renderer *r, int row_num,
     terminal_buffer_append(ab, "\r\n", 2);
 }
 
+/* Render a row at a specific position (for split panes) */
+static void terminal_render_row_at(Renderer *r, int screen_row, int screen_col,
+                                   int max_width, int row_num,
+                                   const RenderSegment *segments, int seg_count,
+                                   int gutter_width, int is_empty,
+                                   int is_active) {
+    TerminalRendererData *data = (TerminalRendererData *)r->data;
+    struct abuf *ab = &data->ab;
+
+    /* Position cursor */
+    char pos_buf[32];
+    int pos_len = snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;%dH", screen_row, screen_col);
+    terminal_buffer_append(ab, pos_buf, pos_len);
+
+    int col = 0;  /* Track columns rendered */
+
+    /* Check if this is a playing line */
+    int is_playing_line = (seg_count > 0 && segments[0].is_playing);
+
+    /* Render gutter (line number) with focus indicator */
+    if (gutter_width > 0 && col < max_width) {
+        /* Choose gutter color based on active state and playing state */
+        if (is_playing_line) {
+            terminal_buffer_append(ab, "\x1b[92m", 5);  /* Bright green for playing */
+        } else if (is_active) {
+            terminal_buffer_append(ab, "\x1b[33m", 5);  /* Yellow for active pane */
+        } else {
+            terminal_buffer_append(ab, "\x1b[90m", 5);  /* Dark gray for inactive */
+        }
+
+        if (is_empty) {
+            /* Empty row: show tilde */
+            int tilde_spaces = gutter_width - 1;
+            if (tilde_spaces > max_width - 1) tilde_spaces = max_width - 1;
+            for (int i = 0; i < tilde_spaces && col < max_width; i++) {
+                terminal_buffer_append(ab, " ", 1);
+                col++;
+            }
+            if (col < max_width) {
+                terminal_buffer_append(ab, "~", 1);
+                col++;
+            }
+        } else {
+            char line_num_buf[16];
+            int line_num_len;
+            if (is_playing_line) {
+                line_num_len = snprintf(line_num_buf, sizeof(line_num_buf),
+                    "%*s>", gutter_width - 2, "");
+            } else {
+                line_num_len = snprintf(line_num_buf, sizeof(line_num_buf),
+                    "%*d ", gutter_width - 1, row_num);
+            }
+            int take = line_num_len;
+            if (take > max_width - col) take = max_width - col;
+            if (take > 0) {
+                terminal_buffer_append(ab, line_num_buf, take);
+                col += take;
+            }
+        }
+        terminal_buffer_append(ab, "\x1b[39m", 5);  /* Reset foreground */
+    } else if (is_empty && col < max_width) {
+        terminal_buffer_append(ab, "~", 1);
+        col++;
+    }
+
+    /* For playing line, set background */
+    if (is_playing_line) {
+        terminal_buffer_append(ab, "\x1b[48;5;22m", 10);
+    }
+
+    /* Render segments */
+    HighlightType current_type = HL_TYPE_NORMAL;
+    int in_selection = 0;
+
+    for (int i = 0; i < seg_count && col < max_width; i++) {
+        const RenderSegment *seg = &segments[i];
+
+        /* Handle selection */
+        if (seg->selected && !in_selection) {
+            terminal_buffer_append(ab, "\x1b[7m", 4);
+            in_selection = 1;
+        } else if (!seg->selected && in_selection) {
+            terminal_buffer_append(ab, "\x1b[27m", 5);
+            in_selection = 0;
+        }
+
+        /* Handle highlight type change */
+        if (seg->hl_type != current_type) {
+            if (seg->hl_type == HL_TYPE_NONPRINT) {
+                if (!in_selection) {
+                    terminal_buffer_append(ab, "\x1b[7m", 4);
+                }
+            } else if (seg->hl_type == HL_TYPE_NORMAL) {
+                terminal_buffer_append(ab, "\x1b[39m", 5);
+            } else {
+                const char *color_code = "\x1b[39m";
+                switch (seg->hl_type) {
+                    case HL_TYPE_COMMENT:  color_code = "\x1b[90m"; break;
+                    case HL_TYPE_KEYWORD1: color_code = "\x1b[33m"; break;
+                    case HL_TYPE_KEYWORD2: color_code = "\x1b[32m"; break;
+                    case HL_TYPE_STRING:   color_code = "\x1b[36m"; break;
+                    case HL_TYPE_NUMBER:   color_code = "\x1b[35m"; break;
+                    case HL_TYPE_MATCH:    color_code = "\x1b[34m"; break;
+                    default: break;
+                }
+                terminal_buffer_append(ab, color_code, strlen(color_code));
+            }
+            current_type = seg->hl_type;
+        }
+
+        /* Render text (truncated to max_width) */
+        int take = seg->len;
+        if (take > max_width - col) take = max_width - col;
+        if (take > 0) {
+            if (seg->hl_type == HL_TYPE_NONPRINT && seg->len == 1) {
+                char sym = (seg->text[0] <= 26) ? '@' + seg->text[0] : '?';
+                terminal_buffer_append(ab, &sym, 1);
+                terminal_buffer_append(ab, "\x1b[0m", 4);
+                if (is_playing_line) {
+                    terminal_buffer_append(ab, "\x1b[48;5;22m", 10);
+                }
+                current_type = HL_TYPE_NORMAL;
+            } else {
+                terminal_buffer_append(ab, seg->text, take);
+            }
+            col += take;
+        }
+    }
+
+    /* Reset attributes */
+    terminal_buffer_append(ab, "\x1b[39m", 5);
+    if (in_selection) {
+        terminal_buffer_append(ab, "\x1b[27m", 5);
+    }
+    if (is_playing_line) {
+        terminal_buffer_append(ab, "\x1b[49m", 5);
+    }
+
+    /* Fill remaining space to max_width with spaces */
+    while (col < max_width) {
+        terminal_buffer_append(ab, " ", 1);
+        col++;
+    }
+
+    /* Note: No \r\n at end - positioned rendering doesn't advance lines */
+}
+
 static void terminal_render_status(Renderer *r, const StatusInfo *info, int width) {
     TerminalRendererData *data = (TerminalRendererData *)r->data;
     struct abuf *ab = &data->ab;
@@ -450,6 +597,45 @@ static void terminal_render_picker(Renderer *r, const PickerInfo *info, int widt
     terminal_buffer_append(ab, "\x1b[0m", 4);
 }
 
+static void terminal_render_separator(Renderer *r, int x, int y, int length,
+                                      int is_vertical, int active_side) {
+    TerminalRendererData *data = (TerminalRendererData *)r->data;
+    struct abuf *ab = &data->ab;
+    char buf[32];
+
+    /* Use box-drawing characters for separators */
+    /* Vertical: U+2502 (|), Horizontal: U+2500 (-) */
+    /* For ASCII compatibility, use | and - */
+    const char *sep_char = is_vertical ? "|" : "-";
+
+    /* Set separator color based on active side */
+    if (active_side > 0) {
+        /* Highlight separator when adjacent to active pane */
+        terminal_buffer_append(ab, "\x1b[33m", 5);  /* Yellow */
+    } else {
+        /* Dark gray for inactive */
+        terminal_buffer_append(ab, "\x1b[90m", 5);
+    }
+
+    if (is_vertical) {
+        /* Draw vertical separator */
+        for (int i = 0; i < length; i++) {
+            int len = snprintf(buf, sizeof(buf), "\x1b[%d;%dH%s", y + i, x, sep_char);
+            terminal_buffer_append(ab, buf, len);
+        }
+    } else {
+        /* Draw horizontal separator */
+        int len = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", y, x);
+        terminal_buffer_append(ab, buf, len);
+        for (int i = 0; i < length; i++) {
+            terminal_buffer_append(ab, sep_char, 1);
+        }
+    }
+
+    /* Reset color */
+    terminal_buffer_append(ab, "\x1b[39m", 5);
+}
+
 static void terminal_set_cursor(Renderer *r, int row, int col) {
     TerminalRendererData *data = (TerminalRendererData *)r->data;
     char buf[32];
@@ -510,10 +696,12 @@ Renderer *terminal_renderer_create(void) {
     r->end_frame = terminal_end_frame;
     r->render_tabs = terminal_render_tabs;
     r->render_row = terminal_render_row;
+    r->render_row_at = terminal_render_row_at;
     r->render_status = terminal_render_status;
     r->render_message = terminal_render_message;
     r->render_repl = terminal_render_repl;
     r->render_picker = terminal_render_picker;
+    r->render_separator = terminal_render_separator;
     r->set_cursor = terminal_set_cursor;
     r->show_cursor = terminal_show_cursor;
     r->hide_cursor = terminal_hide_cursor;
@@ -545,6 +733,16 @@ static void null_render_row(Renderer *r, int row_num,
     (void)gutter_width; (void)is_empty;
 }
 
+static void null_render_row_at(Renderer *r, int screen_row, int screen_col,
+                               int max_width, int row_num,
+                               const RenderSegment *segments, int seg_count,
+                               int gutter_width, int is_empty,
+                               int is_active) {
+    (void)r; (void)screen_row; (void)screen_col; (void)max_width;
+    (void)row_num; (void)segments; (void)seg_count;
+    (void)gutter_width; (void)is_empty; (void)is_active;
+}
+
 static void null_render_status(Renderer *r, const StatusInfo *info, int width) {
     (void)r; (void)info; (void)width;
 }
@@ -559,6 +757,11 @@ static void null_render_repl(Renderer *r, const ReplInfo *info, int width) {
 
 static void null_render_picker(Renderer *r, const PickerInfo *info, int width, int height) {
     (void)r; (void)info; (void)width; (void)height;
+}
+
+static void null_render_separator(Renderer *r, int x, int y, int length,
+                                  int is_vertical, int active_side) {
+    (void)r; (void)x; (void)y; (void)length; (void)is_vertical; (void)active_side;
 }
 
 static void null_set_cursor(Renderer *r, int row, int col) {
@@ -591,10 +794,12 @@ Renderer *null_renderer_create(void) {
     r->end_frame = null_end_frame;
     r->render_tabs = null_render_tabs;
     r->render_row = null_render_row;
+    r->render_row_at = null_render_row_at;
     r->render_status = null_render_status;
     r->render_message = null_render_message;
     r->render_repl = null_render_repl;
     r->render_picker = null_render_picker;
+    r->render_separator = null_render_separator;
     r->set_cursor = null_set_cursor;
     r->show_cursor = null_show_cursor;
     r->hide_cursor = null_hide_cursor;

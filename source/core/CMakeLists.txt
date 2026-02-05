@@ -136,6 +136,7 @@ function(psnd_build_loki)
         ${PSND_CORE_DIR}/loki/event.c
         ${PSND_CORE_DIR}/loki/renderer.c
         ${PSND_CORE_DIR}/loki/picker.c
+        ${PSND_CORE_DIR}/loki/window.c
         ${PSND_CORE_DIR}/loki/command.c
         ${PSND_CORE_DIR}/loki/command/file.c
         ${PSND_CORE_DIR}/loki/command/basic.c

@@ -15,6 +15,7 @@ All are practical for daily live-coding, REPL sketches, and headless playback. T
 ## Features
 
 - **Vim-style editor** with INSERT/NORMAL modes, live evaluation shortcuts, and opt-in Lua scripting (built on [loki](https://github.com/shakfu/loki), a fork of [kilo](https://github.com/antirez/kilo))
+- **Split window support** with vim-style `Ctrl-W` commands for horizontal/vertical splits, pane navigation, and per-pane independent view state
 - **TOML configuration** via `.psnd/config.toml` for themes, keybindings, audio settings, and editor options
 - **Tree-sitter syntax highlighting** in REPLs with 17 TOML themes (monokai, dracula, nord, gruvbox, solarized, catppuccin, tokyo-night, kanagawa, and more) plus custom theme support via `.psnd/themes/`
 - **MIDI tracker/step sequencer** with terminal UI, plugin-based cell notation, and pattern looping
@@ -316,6 +317,22 @@ Keybindings:
 | `i` | Enter INSERT mode |
 | `ESC` | Return to NORMAL mode |
 
+Split Window Commands (in NORMAL mode):
+
+| Key | Action |
+|-----|--------|
+| `Ctrl-W s` | Split horizontally (top/bottom) |
+| `Ctrl-W v` | Split vertically (left/right) |
+| `Ctrl-W h` | Move to left pane |
+| `Ctrl-W j` | Move to pane below |
+| `Ctrl-W k` | Move to pane above |
+| `Ctrl-W l` | Move to right pane |
+| `Ctrl-W w` | Cycle to next pane |
+| `Ctrl-W c` | Close current pane |
+| `Ctrl-W =` | Equalize split ratios |
+| `Ctrl-W n` | New buffer in current pane |
+| `Ctrl-W b` | Cycle buffers in current pane |
+
 Ex Commands (press `:` in NORMAL mode):
 
 | Command | Action |
@@ -456,6 +473,7 @@ tempo = 120              # Default tempo
 
 # Available commands: save, find, stop, lua_repl, new_buffer, copy, word_wrap
 # Note: quit, eval_line, play_file have special built-in handling
+# Note: ctrl-w is reserved for split window commands
 [keybindings]
 "ctrl-s" = "save"
 "ctrl-g" = "stop"
@@ -463,7 +481,6 @@ tempo = 120              # Default tempo
 "ctrl-l" = "lua_repl"    # Only works when Lua is enabled
 "ctrl-t" = "new_buffer"
 "ctrl-c" = "copy"
-"ctrl-w" = "word_wrap"
 ```
 
 ### Lua Scripting (Opt-in)

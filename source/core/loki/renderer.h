@@ -164,6 +164,25 @@ struct Renderer {
                        int seg_count, int gutter_width, int is_empty);
 
     /**
+     * Render a row at a specific position (for split panes).
+     * Unlike render_row, this positions cursor first and doesn't emit newline.
+     * @param r           Renderer instance
+     * @param screen_row  Screen row (1-based)
+     * @param screen_col  Screen column (1-based)
+     * @param max_width   Maximum width to render
+     * @param row_num     Row number (1-based, for gutter display)
+     * @param segments    Array of render segments
+     * @param seg_count   Number of segments
+     * @param gutter_width  Width of line number gutter (0 to disable)
+     * @param is_empty    True if this is an empty row (past end of file)
+     * @param is_active   True if this row is in the active/focused pane
+     */
+    void (*render_row_at)(Renderer *r, int screen_row, int screen_col, int max_width,
+                          int row_num, const RenderSegment *segments,
+                          int seg_count, int gutter_width, int is_empty,
+                          int is_active);
+
+    /**
      * Render the status bar.
      * @param r      Renderer instance
      * @param info   Status bar information
@@ -195,6 +214,18 @@ struct Renderer {
      * @param height Available height
      */
     void (*render_picker)(Renderer *r, const PickerInfo *info, int width, int height);
+
+    /**
+     * Render a window separator (for split panes).
+     * @param r           Renderer instance
+     * @param x           Starting column (1-based)
+     * @param y           Starting row (1-based)
+     * @param length      Length of separator
+     * @param is_vertical 1 for vertical separator, 0 for horizontal
+     * @param active_side Which side has focus: 0=none, 1=first(left/top), 2=second(right/bottom)
+     */
+    void (*render_separator)(Renderer *r, int x, int y, int length, int is_vertical,
+                             int active_side);
 
     /* ==================== Cursor Management ==================== */
 

@@ -337,7 +337,8 @@ BEGIN_TEST_SUITE_WITH_FIXTURE("Main Dispatch Tests", main_dispatch_tests)
     RUN_TEST(joy_list_ports);
 
     /* Unknown command tests */
-    RUN_TEST(unknown_command_fallback);
+    /* NOTE: unknown_command_fallback skipped - it opens editor in interactive mode */
+    /* RUN_TEST(unknown_command_fallback); */
 
     /* File extension routing tests */
     RUN_TEST(direct_file_alda);

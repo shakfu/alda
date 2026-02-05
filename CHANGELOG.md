@@ -17,6 +17,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Split Window Manager**: Vim-style binary tree tiling window manager for the editor
+  - `Ctrl+W s` - Split horizontally (top/bottom)
+  - `Ctrl+W v` - Split vertically (left/right)
+  - `Ctrl+W h/j/k/l` - Navigate between panes (left/down/up/right)
+  - `Ctrl+W c` - Close current pane
+  - `Ctrl+W w` - Cycle to next pane
+  - `Ctrl+W =` - Equalize split ratios
+  - `Ctrl+W n` - New empty buffer in current pane
+  - `Ctrl+W b` - Cycle through buffers in current pane
+  - Per-pane view state: independent cursor position, scroll offset, and selection per pane
+  - Visual focus indicator: active pane highlighted with yellow gutter and separator
+  - Different buffers per pane: each pane can show a different file
+  - Binary tree layout with configurable split ratios (default 50/50)
+  - New files: `source/core/loki/window.h`, `source/core/loki/window.c`
+  - 29 unit tests for window tree operations
+
 ### Changed
 
 - **MHS/MicroHs**: Disabled MHS language integration on Windows

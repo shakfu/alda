@@ -15,6 +15,11 @@
  * Returns 1 if selected, 0 otherwise */
 int is_selected(editor_ctx_t *ctx, int row, int col);
 
+/* Check if a position is within the selection defined by a view
+ * Used for rendering split panes with independent selection state
+ * Returns 1 if selected, 0 otherwise */
+int is_selected_view(const EditorView *view, int row, int col);
+
 /* Base64 encode a string (for OSC 52 clipboard protocol)
  * Caller must free the returned string
  * Returns NULL on allocation failure */

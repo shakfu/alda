@@ -62,6 +62,41 @@ int is_selected(editor_ctx_t *ctx, int row, int col) {
     }
 }
 
+/* Check if a position is within the selection defined by a view.
+ * Used for rendering split panes with independent selection state. */
+int is_selected_view(const EditorView *view, int row, int col) {
+    if (!view || !view->sel_active) return 0;
+
+    int start_y = view->sel_start_y;
+    int start_x = view->sel_start_x;
+    int end_y = view->sel_end_y;
+    int end_x = view->sel_end_x;
+
+    /* Ensure start comes before end */
+    if (start_y > end_y || (start_y == end_y && start_x > end_x)) {
+        int tmp;
+        tmp = start_y; start_y = end_y; end_y = tmp;
+        tmp = start_x; start_x = end_x; end_x = tmp;
+    }
+
+    /* Check if row is in range */
+    if (row < start_y || row > end_y) return 0;
+
+    /* Single line selection */
+    if (start_y == end_y) {
+        return col >= start_x && col < end_x;
+    }
+
+    /* Multi-line selection */
+    if (row == start_y) {
+        return col >= start_x;
+    } else if (row == end_y) {
+        return col < end_x;
+    } else {
+        return 1; /* Entire line selected */
+    }
+}
+
 /* Base64 encode a string for OSC 52 clipboard protocol.
  * Caller must free the returned string.
  * Returns NULL on allocation failure. */

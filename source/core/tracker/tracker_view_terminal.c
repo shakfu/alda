@@ -216,6 +216,15 @@ TrackerView* tracker_view_terminal_new_with_fds(int input_fd, int output_fd) {
     return view;
 }
 
+void tracker_view_terminal_set_fds(TrackerView* view, int input_fd, int output_fd) {
+    if (!view) return;
+    TerminalBackend* tb = (TerminalBackend*)view->callbacks.backend_data;
+    if (tb) {
+        tb->input_fd = input_fd;
+        tb->output_fd = output_fd;
+    }
+}
+
 TrackerView* tracker_view_terminal_new_with_config(const TrackerTerminalConfig* config) {
     /* Allocate backend data */
     TerminalBackend* tb = calloc(1, sizeof(TerminalBackend));

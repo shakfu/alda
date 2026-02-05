@@ -12,13 +12,41 @@
 #include "tracker_model.h"
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 /* Global test stats required by test framework */
 test_stats_t test_stats;
 
+/* File descriptor for /dev/null to suppress terminal output in tests */
+static int null_fd = -1;
+
 /*============================================================================
  * Test Helpers
  *============================================================================*/
+
+/* Get /dev/null fd for test output redirection */
+static int get_null_fd(void) {
+    if (null_fd < 0) {
+        null_fd = open("/dev/null", O_WRONLY);
+    }
+    return null_fd;
+}
+
+/* Create a test view with output redirected to /dev/null to prevent
+ * escape sequences from corrupting test output */
+static TrackerView* create_test_view(void) {
+    return tracker_view_terminal_new_with_fds(STDIN_FILENO, get_null_fd());
+}
+
+/* Create a test view with config, output redirected to /dev/null */
+static TrackerView* create_test_view_with_config(const TrackerTerminalConfig* config) {
+    TrackerView* view = tracker_view_terminal_new_with_config(config);
+    if (view) {
+        tracker_view_terminal_set_fds(view, STDIN_FILENO, get_null_fd());
+    }
+    return view;
+}
 
 static TrackerSong* create_test_song(int num_rows, int num_tracks) {
     TrackerSong* song = tracker_song_new("Test Song");
@@ -81,7 +109,7 @@ TEST(config_init_multiple_calls_consistent) {
  *============================================================================*/
 
 TEST(terminal_new_creates_view) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     /* Verify callbacks are set */
@@ -99,7 +127,7 @@ TEST(terminal_new_with_config_uses_config) {
     config.use_colors = false;
     config.use_unicode_borders = false;
 
-    TrackerView* view = tracker_view_terminal_new_with_config(&config);
+    TrackerView* view = create_test_view_with_config(&config);
     ASSERT_NOT_NULL(view);
 
     /* Verify config was applied */
@@ -131,14 +159,14 @@ TEST(has_colors_returns_config_value) {
 
     /* Test with colors enabled */
     config.use_colors = true;
-    TrackerView* view = tracker_view_terminal_new_with_config(&config);
+    TrackerView* view = create_test_view_with_config(&config);
     ASSERT_NOT_NULL(view);
     ASSERT_TRUE(tracker_view_terminal_has_colors(view));
     tracker_view_free(view);
 
     /* Test with colors disabled */
     config.use_colors = false;
-    view = tracker_view_terminal_new_with_config(&config);
+    view = create_test_view_with_config(&config);
     ASSERT_NOT_NULL(view);
     ASSERT_FALSE(tracker_view_terminal_has_colors(view));
     tracker_view_free(view);
@@ -149,13 +177,13 @@ TEST(has_256_colors_returns_config_value) {
     tracker_terminal_config_init(&config);
 
     config.use_256_colors = true;
-    TrackerView* view = tracker_view_terminal_new_with_config(&config);
+    TrackerView* view = create_test_view_with_config(&config);
     ASSERT_NOT_NULL(view);
     ASSERT_TRUE(tracker_view_terminal_has_256_colors(view));
     tracker_view_free(view);
 
     config.use_256_colors = false;
-    view = tracker_view_terminal_new_with_config(&config);
+    view = create_test_view_with_config(&config);
     ASSERT_NOT_NULL(view);
     ASSERT_FALSE(tracker_view_terminal_has_256_colors(view));
     tracker_view_free(view);
@@ -166,13 +194,13 @@ TEST(has_true_color_returns_config_value) {
     tracker_terminal_config_init(&config);
 
     config.use_true_color = true;
-    TrackerView* view = tracker_view_terminal_new_with_config(&config);
+    TrackerView* view = create_test_view_with_config(&config);
     ASSERT_NOT_NULL(view);
     ASSERT_TRUE(tracker_view_terminal_has_true_color(view));
     tracker_view_free(view);
 
     config.use_true_color = false;
-    view = tracker_view_terminal_new_with_config(&config);
+    view = create_test_view_with_config(&config);
     ASSERT_NOT_NULL(view);
     ASSERT_FALSE(tracker_view_terminal_has_true_color(view));
     tracker_view_free(view);
@@ -183,7 +211,7 @@ TEST(has_true_color_returns_config_value) {
  *============================================================================*/
 
 TEST(get_layout_returns_valid_layout) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     const TrackerTerminalLayout* layout = tracker_view_terminal_get_layout(view);
@@ -198,7 +226,7 @@ TEST(get_layout_returns_valid_layout) {
 }
 
 TEST(get_layout_with_song_calculates_tracks) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     TrackerSong* song = create_test_song(16, 4);
@@ -218,7 +246,7 @@ TEST(get_layout_with_song_calculates_tracks) {
 }
 
 TEST(layout_respects_screen_dimensions) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     /* Render to specific dimensions to set layout */
@@ -240,7 +268,7 @@ TEST(layout_respects_screen_dimensions) {
  *============================================================================*/
 
 TEST(render_to_string_returns_output) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     char* output = tracker_view_terminal_render_to_string(view, 80, 24);
@@ -252,7 +280,7 @@ TEST(render_to_string_returns_output) {
 }
 
 TEST(render_to_string_contains_escape_sequences) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     char* output = tracker_view_terminal_render_to_string(view, 80, 24);
@@ -266,7 +294,7 @@ TEST(render_to_string_contains_escape_sequences) {
 }
 
 TEST(render_to_string_with_song) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     TrackerSong* song = create_test_song(16, 4);
@@ -286,7 +314,7 @@ TEST(render_to_string_with_song) {
 }
 
 TEST(render_to_string_with_cell_content) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     TrackerSong* song = create_test_song(16, 4);
@@ -309,7 +337,7 @@ TEST(render_to_string_with_cell_content) {
 }
 
 TEST(render_to_string_help_mode) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     view->state.view_mode = TRACKER_VIEW_MODE_HELP;
@@ -326,7 +354,7 @@ TEST(render_to_string_help_mode) {
 }
 
 TEST(render_to_string_arrange_mode) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     TrackerSong* song = create_test_song(16, 4);
@@ -347,7 +375,7 @@ TEST(render_to_string_arrange_mode) {
 }
 
 TEST(render_to_string_mixer_mode) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     TrackerSong* song = create_test_song(16, 4);
@@ -368,7 +396,7 @@ TEST(render_to_string_mixer_mode) {
 }
 
 TEST(render_to_string_fx_mode) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     TrackerSong* song = create_test_song(16, 4);
@@ -389,7 +417,7 @@ TEST(render_to_string_fx_mode) {
 }
 
 TEST(render_to_string_different_dimensions) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     /* Test various dimensions */
@@ -416,7 +444,7 @@ TEST(render_to_string_different_dimensions) {
  *============================================================================*/
 
 TEST(inject_key_stores_input) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     tracker_view_terminal_inject_key(view, "j");
@@ -431,7 +459,7 @@ TEST(inject_key_stores_input) {
 }
 
 TEST(inject_key_multiple_chars) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     tracker_view_terminal_inject_key(view, "jjj");
@@ -452,7 +480,7 @@ TEST(inject_key_multiple_chars) {
 }
 
 TEST(inject_key_vim_navigation) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     TrackerInputEvent event;
@@ -476,7 +504,7 @@ TEST(inject_key_vim_navigation) {
 }
 
 TEST(inject_key_command_keys) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     TrackerInputEvent event;
@@ -495,7 +523,7 @@ TEST(inject_key_command_keys) {
 }
 
 TEST(inject_key_escape) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     tracker_view_terminal_inject_key(view, "\x1b");
@@ -509,7 +537,7 @@ TEST(inject_key_escape) {
 }
 
 TEST(inject_key_printable_char) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     /* Test a character that maps to TRACKER_INPUT_CHAR */
@@ -525,7 +553,7 @@ TEST(inject_key_printable_char) {
 }
 
 TEST(inject_key_replaces_previous) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     /* Inject first set */
@@ -551,7 +579,7 @@ TEST(inject_key_replaces_previous) {
  *============================================================================*/
 
 TEST(get_size_returns_values) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     int cols = 0, rows = 0;
@@ -565,7 +593,7 @@ TEST(get_size_returns_values) {
 }
 
 TEST(update_size_marks_layout_dirty) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     /* Get layout to clear dirty flag */
@@ -586,7 +614,7 @@ TEST(update_size_marks_layout_dirty) {
  *============================================================================*/
 
 TEST(show_message_displays_in_output) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     view->callbacks.show_message(view, "Test status message");
@@ -602,7 +630,7 @@ TEST(show_message_displays_in_output) {
 }
 
 TEST(show_error_displays_in_output) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     view->callbacks.show_error(view, "Test error message");
@@ -622,7 +650,7 @@ TEST(show_error_displays_in_output) {
  *============================================================================*/
 
 TEST(render_shows_play_state) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     view->state.is_playing = false;
@@ -641,7 +669,7 @@ TEST(render_shows_play_state) {
 }
 
 TEST(render_shows_record_state) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     view->state.is_recording = true;
@@ -658,7 +686,7 @@ TEST(render_shows_record_state) {
  *============================================================================*/
 
 TEST(render_shows_edit_mode) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     view->state.edit_mode = TRACKER_EDIT_MODE_NAVIGATE;
@@ -677,7 +705,7 @@ TEST(render_shows_edit_mode) {
 }
 
 TEST(render_shows_command_mode) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     view->state.edit_mode = TRACKER_EDIT_MODE_COMMAND;
@@ -704,7 +732,7 @@ TEST(config_unicode_borders) {
     tracker_terminal_config_init(&config);
     config.use_unicode_borders = true;
 
-    TrackerView* view = tracker_view_terminal_new_with_config(&config);
+    TrackerView* view = create_test_view_with_config(&config);
     ASSERT_NOT_NULL(view);
 
     char* output = tracker_view_terminal_render_to_string(view, 80, 24);
@@ -730,7 +758,7 @@ TEST(config_ascii_borders) {
     tracker_terminal_config_init(&config);
     config.use_unicode_borders = false;
 
-    TrackerView* view = tracker_view_terminal_new_with_config(&config);
+    TrackerView* view = create_test_view_with_config(&config);
     ASSERT_NOT_NULL(view);
 
     TrackerSong* song = create_test_song(16, 4);
@@ -754,7 +782,7 @@ TEST(config_ascii_borders) {
  *============================================================================*/
 
 TEST(render_shows_muted_track) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     TrackerSong* song = create_test_song(16, 4);
@@ -777,7 +805,7 @@ TEST(render_shows_muted_track) {
 }
 
 TEST(render_shows_solo_track) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     TrackerSong* song = create_test_song(16, 4);
@@ -804,7 +832,7 @@ TEST(render_shows_solo_track) {
  *============================================================================*/
 
 TEST(beep_does_not_crash) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     /* Just verify it doesn't crash */
@@ -818,7 +846,7 @@ TEST(beep_does_not_crash) {
  *============================================================================*/
 
 TEST(render_shows_visual_mode) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     TrackerSong* song = create_test_song(16, 4);
@@ -843,7 +871,7 @@ TEST(render_shows_visual_mode) {
  *============================================================================*/
 
 TEST(render_shows_bpm) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     TrackerSong* song = create_test_song(16, 4);
@@ -869,7 +897,7 @@ TEST(render_shows_bpm) {
  *============================================================================*/
 
 TEST(render_shows_step_and_octave) {
-    TrackerView* view = tracker_view_terminal_new();
+    TrackerView* view = create_test_view();
     ASSERT_NOT_NULL(view);
 
     view->state.step_size = 4;

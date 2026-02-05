@@ -40,6 +40,7 @@
 #include "lang_bridge.h"
 #include "keybind.h"
 #include "picker.h"
+#include "window.h"
 #ifdef BUILD_CSOUND_BACKEND
 #include "shared/audio/audio.h"  /* For CSD file playback */
 #endif
@@ -474,10 +475,7 @@ static void process_insert_mode(editor_ctx_t *ctx, int fd, int c) {
              * From non-terminal sources (modal_process_event), this is a no-op. */
             if (fd != 0) editor_find(ctx, fd);
             break;
-        case CTRL_W:
-            ctx->view.word_wrap = !ctx->view.word_wrap;
-            editor_set_status_msg(ctx, "Word wrap %s", ctx->view.word_wrap ? "enabled" : "disabled");
-            break;
+        /* CTRL_W is now a prefix key for window commands, handled in modal_process_event */
         case CTRL_L:
             /* Toggle REPL */
             if (ctx_repl(ctx)) {
@@ -662,6 +660,15 @@ void modal_process_keypress(editor_ctx_t *ctx, int fd) {
         return;
     }
 
+    /* Handle pending Ctrl-W prefix - read second key immediately from terminal */
+    if (ctx->view.pending_prefix == CTRL_W) {
+        /* Already have Ctrl-W pending, this key completes the sequence.
+         * Convert to event and let modal_process_event() handle it. */
+        EditorEvent ev = event_from_keycode(c);
+        modal_process_event(ctx, &ev);
+        return;
+    }
+
     /* Intercept CTRL_F for interactive find (requires terminal I/O).
      * This must be done before delegation because editor_find() has
      * its own event loop that reads from the terminal. */
@@ -744,6 +751,252 @@ static int handle_ctrl_x_command(editor_ctx_t *ctx, int c) {
                 return 1;
             }
             return 0;  /* Not a valid Ctrl-X command */
+    }
+}
+
+/* ============================================================================
+ * Ctrl-W Prefix Handling
+ * ============================================================================
+ * Ctrl-W is a prefix key for window operations. When received, we set
+ * pending_prefix and wait for the next key to complete the command.
+ */
+
+/* Handle the second key of a Ctrl-W sequence.
+ * Returns 1 if handled, 0 if the key was not a valid Ctrl-W command. */
+static int handle_ctrl_w_command(editor_ctx_t *ctx, int c) {
+    WindowManager *wm = ctx->wm;
+
+    switch (c) {
+        case 's': {
+            /* Split horizontally (top/bottom) */
+            /* Create window manager on first split */
+            if (!wm) {
+                int model_id = buffer_get_current_id();
+                ctx->wm = window_manager_create(model_id);
+                wm = ctx->wm;
+                if (!wm) {
+                    editor_set_status_msg(ctx, "Cannot create window manager");
+                    return 1;
+                }
+                /* Initialize first pane's view from current context */
+                if (wm->active && !wm->active->view) {
+                    wm->active->view = window_view_clone(&ctx->view);
+                }
+            }
+            /* Save current view state before split */
+            window_sync_view_from_ctx(ctx, wm->active);
+            if (window_split(wm, SPLIT_HORIZONTAL) == 0) {
+                /* Sync new active pane's view to ctx */
+                window_sync_view_to_ctx(ctx, wm->active);
+                editor_set_status_msg(ctx, "Split horizontal");
+            } else {
+                editor_set_status_msg(ctx, "Cannot split window");
+            }
+            return 1;
+        }
+        case 'v': {
+            /* Split vertically (left/right) */
+            /* Create window manager on first split */
+            if (!wm) {
+                int model_id = buffer_get_current_id();
+                ctx->wm = window_manager_create(model_id);
+                wm = ctx->wm;
+                if (!wm) {
+                    editor_set_status_msg(ctx, "Cannot create window manager");
+                    return 1;
+                }
+                /* Initialize first pane's view from current context */
+                if (wm->active && !wm->active->view) {
+                    wm->active->view = window_view_clone(&ctx->view);
+                }
+            }
+            /* Save current view state before split */
+            window_sync_view_from_ctx(ctx, wm->active);
+            if (window_split(wm, SPLIT_VERTICAL) == 0) {
+                /* Sync new active pane's view to ctx */
+                window_sync_view_to_ctx(ctx, wm->active);
+                editor_set_status_msg(ctx, "Split vertical");
+            } else {
+                editor_set_status_msg(ctx, "Cannot split window");
+            }
+            return 1;
+        }
+        case 'h': {
+            /* Navigate left */
+            if (!wm || window_count_panes(wm) <= 1) {
+                editor_set_status_msg(ctx, "Only one window");
+                return 1;
+            }
+            /* Save current view state before switching */
+            window_sync_view_from_ctx(ctx, wm->active);
+            if (window_navigate(wm, 'h') == 0) {
+                /* Load new active pane's view */
+                window_sync_view_to_ctx(ctx, wm->active);
+                editor_set_status_msg(ctx, "");
+            } else {
+                editor_set_status_msg(ctx, "No window to the left");
+            }
+            return 1;
+        }
+        case 'j': {
+            /* Navigate down */
+            if (!wm || window_count_panes(wm) <= 1) {
+                editor_set_status_msg(ctx, "Only one window");
+                return 1;
+            }
+            /* Save current view state before switching */
+            window_sync_view_from_ctx(ctx, wm->active);
+            if (window_navigate(wm, 'j') == 0) {
+                /* Load new active pane's view */
+                window_sync_view_to_ctx(ctx, wm->active);
+                editor_set_status_msg(ctx, "");
+            } else {
+                editor_set_status_msg(ctx, "No window below");
+            }
+            return 1;
+        }
+        case 'k': {
+            /* Navigate up */
+            if (!wm || window_count_panes(wm) <= 1) {
+                editor_set_status_msg(ctx, "Only one window");
+                return 1;
+            }
+            /* Save current view state before switching */
+            window_sync_view_from_ctx(ctx, wm->active);
+            if (window_navigate(wm, 'k') == 0) {
+                /* Load new active pane's view */
+                window_sync_view_to_ctx(ctx, wm->active);
+                editor_set_status_msg(ctx, "");
+            } else {
+                editor_set_status_msg(ctx, "No window above");
+            }
+            return 1;
+        }
+        case 'l': {
+            /* Navigate right */
+            if (!wm || window_count_panes(wm) <= 1) {
+                editor_set_status_msg(ctx, "Only one window");
+                return 1;
+            }
+            /* Save current view state before switching */
+            window_sync_view_from_ctx(ctx, wm->active);
+            if (window_navigate(wm, 'l') == 0) {
+                /* Load new active pane's view */
+                window_sync_view_to_ctx(ctx, wm->active);
+                editor_set_status_msg(ctx, "");
+            } else {
+                editor_set_status_msg(ctx, "No window to the right");
+            }
+            return 1;
+        }
+        case 'c': {
+            /* Close current pane */
+            if (!wm || window_count_panes(wm) <= 1) {
+                editor_set_status_msg(ctx, "Cannot close last window");
+                return 1;
+            }
+            if (window_close(wm) == 0) {
+                /* Load new active pane's view */
+                window_sync_view_to_ctx(ctx, wm->active);
+                editor_set_status_msg(ctx, "Closed window");
+            } else {
+                editor_set_status_msg(ctx, "Cannot close last window");
+            }
+            return 1;
+        }
+        case 'w': {
+            /* Cycle to next pane */
+            if (!wm || window_count_panes(wm) <= 1) {
+                editor_set_status_msg(ctx, "Only one window");
+                return 1;
+            }
+            /* Save current view state before switching */
+            window_sync_view_from_ctx(ctx, wm->active);
+            if (window_cycle(wm) == 0) {
+                /* Load new active pane's view */
+                window_sync_view_to_ctx(ctx, wm->active);
+                editor_set_status_msg(ctx, "");
+            } else {
+                editor_set_status_msg(ctx, "Only one window");
+            }
+            return 1;
+        }
+        case '=': {
+            /* Equalize split ratios */
+            if (!wm || window_count_panes(wm) <= 1) {
+                editor_set_status_msg(ctx, "Only one window");
+                return 1;
+            }
+            window_equalize(wm);
+            editor_set_status_msg(ctx, "Windows equalized");
+            return 1;
+        }
+        case 'n': {
+            /* Create new buffer in current pane */
+            if (!wm || !wm->active) {
+                editor_set_status_msg(ctx, "No active window");
+                return 1;
+            }
+            int new_id = buffer_create(NULL);  /* Create empty buffer */
+            if (new_id >= 0) {
+                /* Update pane to use new buffer */
+                wm->active->model_id = new_id;
+                /* Reset view for new buffer */
+                if (wm->active->view) {
+                    wm->active->view->cx = 0;
+                    wm->active->view->cy = 0;
+                    wm->active->view->rowoff = 0;
+                    wm->active->view->coloff = 0;
+                    wm->active->view->sel_active = 0;
+                }
+                window_sync_view_to_ctx(ctx, wm->active);
+                editor_set_status_msg(ctx, "New buffer in pane");
+            } else {
+                editor_set_status_msg(ctx, "Cannot create buffer");
+            }
+            return 1;
+        }
+        case 'b': {
+            /* Switch to next buffer in current pane */
+            if (!wm || !wm->active) {
+                editor_set_status_msg(ctx, "No active window");
+                return 1;
+            }
+            /* Get list of buffer IDs */
+            int ids[MAX_BUFFERS];
+            int count = buffer_get_list(ids);
+            if (count <= 1) {
+                editor_set_status_msg(ctx, "Only one buffer");
+                return 1;
+            }
+            /* Find current buffer and switch to next */
+            int current_id = wm->active->model_id;
+            int next_id = ids[0];
+            for (int i = 0; i < count; i++) {
+                if (ids[i] == current_id) {
+                    next_id = ids[(i + 1) % count];
+                    break;
+                }
+            }
+            if (next_id != current_id) {
+                wm->active->model_id = next_id;
+                /* Reset view for switched buffer */
+                if (wm->active->view) {
+                    wm->active->view->cx = 0;
+                    wm->active->view->cy = 0;
+                    wm->active->view->rowoff = 0;
+                    wm->active->view->coloff = 0;
+                    wm->active->view->sel_active = 0;
+                }
+                window_sync_view_to_ctx(ctx, wm->active);
+                const char *name = buffer_get_display_name(next_id);
+                editor_set_status_msg(ctx, "Switched to %s", name ? name : "[No Name]");
+            }
+            return 1;
+        }
+        default:
+            editor_set_status_msg(ctx, "Unknown Ctrl-W command");
+            return 0;  /* Not a valid Ctrl-W command */
     }
 }
 
@@ -865,6 +1118,16 @@ void modal_process_event(editor_ctx_t *ctx, const EditorEvent *event) {
         /* If not a valid Ctrl-X command, fall through to normal processing */
     }
 
+    /* Handle pending Ctrl-W prefix sequence */
+    if (ctx->view.pending_prefix == CTRL_W) {
+        ctx->view.pending_prefix = 0;  /* Clear prefix */
+        if (handle_ctrl_w_command(ctx, c)) {
+            quit_times = KILO_QUIT_TIMES;
+            return;
+        }
+        /* If not a valid Ctrl-W command, fall through to normal processing */
+    }
+
     /* REPL keypress handling */
     if (ctx_repl(ctx) && ctx_repl(ctx)->active) {
         lua_repl_handle_keypress(ctx, c);
@@ -906,6 +1169,13 @@ void modal_process_event(editor_ctx_t *ctx, const EditorEvent *event) {
     /* Handle Ctrl-X prefix */
     if (c == CTRL_X) {
         ctx->view.pending_prefix = CTRL_X;
+        quit_times = KILO_QUIT_TIMES;
+        return;
+    }
+
+    /* Handle Ctrl-W prefix */
+    if (c == CTRL_W) {
+        ctx->view.pending_prefix = CTRL_W;
         quit_times = KILO_QUIT_TIMES;
         return;
     }

@@ -76,6 +76,9 @@ struct undo_state;
 /* Shared audio/MIDI/Link context - see shared/context.h */
 struct SharedContext;
 
+/* Window manager - binary tree tiling window manager, see loki/window.h */
+struct WindowManager;
+
 /* Tree-sitter state - used when LOKI_USE_LINENOISE is defined */
 #ifdef LOKI_USE_LINENOISE
 struct TreeSitterState;
@@ -233,6 +236,7 @@ struct editor_ctx {
     EditorView view;          /* Presentation state (cursor, viewport, UI) */
     LuaHost *lua_host;        /* Lua host */
     Renderer *renderer;       /* Rendering abstraction (may be NULL for direct VT100) */
+    struct WindowManager *wm; /* Window manager for split windows (NULL if single pane) */
 };
 
 /* ======================= Compatibility Macros ============================== */

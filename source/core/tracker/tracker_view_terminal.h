@@ -46,6 +46,17 @@ TrackerView* tracker_view_terminal_new(void);
  */
 TrackerView* tracker_view_terminal_new_with_fds(int input_fd, int output_fd);
 
+/**
+ * Set file descriptors for an existing terminal view.
+ *
+ * Useful for redirecting output in tests after creating with config.
+ *
+ * @param view       The terminal view
+ * @param input_fd   File descriptor for input
+ * @param output_fd  File descriptor for output
+ */
+void tracker_view_terminal_set_fds(TrackerView* view, int input_fd, int output_fd);
+
 /*============================================================================
  * Terminal Configuration
  *============================================================================*/

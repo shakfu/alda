@@ -95,6 +95,7 @@ static ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
 #include "loki/link.h"
 #include "picker.h"
 #include "command/command_impl.h"
+#include "window.h"
 
 void editor_set_status_msg(editor_ctx_t *ctx, const char *fmt, ...) {
     if (!ctx) return;
@@ -143,6 +144,8 @@ void editor_ctx_init(editor_ctx_t *ctx) {
     undo_init(ctx, 1000, 10 * 1024 * 1024);
     /* Auto-indent system */
     indent_init(ctx);
+    /* Window manager for split windows (starts as NULL, single-pane mode) */
+    ctx->wm = NULL;
 }
 
 /* Free all dynamically allocated memory in a context.
@@ -176,6 +179,12 @@ void editor_ctx_free(editor_ctx_t *ctx) {
 
     /* Free indent configuration */
     free(ctx->model.indent_config);
+
+    /* Free window manager */
+    if (ctx->wm) {
+        window_manager_destroy(ctx->wm);
+        ctx->wm = NULL;
+    }
 
     /* Clear the structure */
     memset(ctx, 0, sizeof(editor_ctx_t));
@@ -660,6 +669,154 @@ static int build_render_segments(editor_ctx_t *ctx, t_erow *row, int row_idx,
     return seg_count;
 }
 
+/* Build render segments using explicit view (for split pane rendering).
+ * This version uses is_selected_view for independent selection state per pane. */
+static int build_render_segments_view(const EditorView *view, t_erow *row,
+                                      int row_idx, int coloff, int max_cols,
+                                      RenderSegment *segments) {
+    if (!row || row->rsize <= coloff) return 0;
+
+    int len = row->rsize - coloff;
+    if (len > max_cols) len = max_cols;
+    if (len <= 0) return 0;
+
+    char *c = row->render + coloff;
+    unsigned char *hl = row->hl + coloff;
+    int seg_count = 0;
+
+    /* Check if this row is the currently playing line (1-based) */
+    int is_playing_row = (view && view->playing_line > 0 &&
+                          view->playing_line == row_idx + 1);
+
+    int seg_start = 0;
+    int current_hl = hl[0];
+    int current_selected = is_selected_view(view, row_idx, coloff);
+
+    for (int j = 1; j <= len && seg_count < MAX_RENDER_SEGMENTS - 1; j++) {
+        int next_hl = (j < len) ? hl[j] : -1;
+        int next_selected = (j < len) ? is_selected_view(view, row_idx, coloff + j) : 0;
+
+        /* End segment if highlight or selection changes */
+        if (j == len || next_hl != current_hl || next_selected != current_selected) {
+            segments[seg_count].text = c + seg_start;
+            segments[seg_count].len = j - seg_start;
+            segments[seg_count].hl_type = hl_const_to_type(current_hl);
+            segments[seg_count].selected = current_selected;
+            segments[seg_count].is_playing = is_playing_row;
+            seg_count++;
+            seg_start = j;
+            current_hl = next_hl;
+            current_selected = next_selected;
+        }
+    }
+
+    return seg_count;
+}
+
+/* ======================= Split Window Rendering =========================== */
+
+/* Render a single pane's content at its geometry.
+ * This renders the editor content within the pane's bounds.
+ * Uses the pane's own view state and buffer (model_id) for rendering. */
+static void render_pane_content(editor_ctx_t *ctx, Renderer *r, WindowNode *pane,
+                                int is_active) {
+    /* Use pane's view if available, otherwise fall back to ctx->view */
+    EditorView *view = pane->view ? pane->view : &ctx->view;
+
+    /* Get the buffer for this pane's model_id */
+    editor_ctx_t *buffer_ctx = buffer_get(pane->model_id);
+    EditorModel *model = buffer_ctx ? &buffer_ctx->model : &ctx->model;
+
+    /* Calculate gutter width for this pane */
+    int gutter_width = 0;
+    if (view->line_numbers && model->numrows > 0) {
+        int max_line = model->numrows;
+        gutter_width = 1;
+        while (max_line >= 10) {
+            gutter_width++;
+            max_line /= 10;
+        }
+        gutter_width += 1; /* Space separator */
+    }
+
+    int text_cols = pane->width - gutter_width;
+    if (text_cols < 1) text_cols = 1;
+
+    /* Pane geometry: 0-based internal, but renderer uses 1-based */
+    int pane_x = pane->x + 1;  /* Convert to 1-based */
+    int pane_y = pane->y + 1;
+
+    /* Use pane's view scroll offset */
+    int rowoff = view->rowoff;
+    int coloff = view->coloff;
+
+    /* Render rows within this pane */
+    RenderSegment segments[MAX_RENDER_SEGMENTS];
+    for (int y = 0; y < pane->height; y++) {
+        int filerow = rowoff + y;
+        int is_empty = (filerow >= model->numrows);
+        int screen_row = pane_y + y;
+
+        if (is_empty) {
+            r->render_row_at(r, screen_row, pane_x, pane->width,
+                             0, NULL, 0, gutter_width, 1, is_active);
+        } else {
+            t_erow *row = &model->row[filerow];
+            int seg_count = build_render_segments_view(view, row, filerow,
+                                                       coloff, text_cols, segments);
+            r->render_row_at(r, screen_row, pane_x, pane->width,
+                             filerow + 1, segments, seg_count, gutter_width, 0,
+                             is_active);
+        }
+    }
+}
+
+/* Check if the active pane is in a subtree */
+static int subtree_contains_active(WindowNode *node, WindowNode *active) {
+    if (!node || !active) return 0;
+    if (node == active) return 1;
+    if (node->split == SPLIT_NONE) return 0;
+    return subtree_contains_active(node->first, active) ||
+           subtree_contains_active(node->second, active);
+}
+
+/* Recursively render the window tree, including separators */
+static void render_window_tree(editor_ctx_t *ctx, Renderer *r, WindowNode *node) {
+    if (!node) return;
+
+    if (node->split == SPLIT_NONE) {
+        /* Leaf node: render pane content */
+        int is_active = (ctx->wm && ctx->wm->active == node);
+        render_pane_content(ctx, r, node, is_active);
+    } else {
+        /* Container node: render children and separator */
+        render_window_tree(ctx, r, node->first);
+        render_window_tree(ctx, r, node->second);
+
+        /* Determine which side of the separator has the active pane */
+        WindowNode *active = ctx->wm ? ctx->wm->active : NULL;
+        int active_side = 0;
+        if (subtree_contains_active(node->first, active)) {
+            active_side = 1;  /* First child (left/top) */
+        } else if (subtree_contains_active(node->second, active)) {
+            active_side = 2;  /* Second child (right/bottom) */
+        }
+
+        /* Render separator between children */
+        if (node->split == SPLIT_VERTICAL) {
+            /* Vertical split: separator is a vertical line between left and right */
+            int sep_x = node->first->x + node->first->width + 1;  /* 1-based */
+            int sep_y = node->y + 1;
+            r->render_separator(r, sep_x, sep_y, node->height, 1, active_side);
+        } else {
+            /* Horizontal split: separator is a horizontal line between top and bottom */
+            int sep_x = node->x + 1;
+            int sep_y = node->first->y + node->first->height + 1;
+            r->render_separator(r, sep_x, sep_y, node->width, 0, active_side);
+        }
+    }
+}
+
 /* Refresh screen using renderer interface.
  * This is the abstract rendering path that doesn't emit VT100 directly. */
 static void editor_refresh_screen_via_renderer(editor_ctx_t *ctx) {
@@ -713,19 +870,36 @@ static void editor_refresh_screen_via_renderer(editor_ctx_t *ctx) {
         }
     }
 
-    /* Render each row */
-    RenderSegment segments[MAX_RENDER_SEGMENTS];
-    for (int y = 0; y < available_rows; y++) {
-        int filerow = ctx->view.rowoff + y;
-        int is_empty = (filerow >= ctx->model.numrows);
+    /* Check if we have split windows */
+    int has_splits = (ctx->wm && window_count_panes(ctx->wm) > 1);
 
-        if (is_empty) {
-            r->render_row(r, 0, NULL, 0, gutter_width, 1);
-        } else {
-            t_erow *row = &ctx->model.row[filerow];
-            int seg_count = build_render_segments(ctx, row, filerow,
-                                                  ctx->view.coloff, text_cols, segments);
-            r->render_row(r, filerow + 1, segments, seg_count, gutter_width, 0);
+    if (has_splits) {
+        /* Split window mode: compute layout and render window tree */
+        int content_start_y = tabs_showing;  /* 0 if no tabs, 1 if tabs */
+        int content_height = available_rows;
+
+        /* Recompute layout with current screen dimensions
+         * Account for status bar rows at bottom */
+        window_layout(ctx->wm, 0, content_start_y,
+                      ctx->view.screencols, content_height);
+
+        /* Render all panes and separators */
+        render_window_tree(ctx, r, ctx->wm->root);
+    } else {
+        /* Single pane mode: use traditional row-by-row rendering */
+        RenderSegment segments[MAX_RENDER_SEGMENTS];
+        for (int y = 0; y < available_rows; y++) {
+            int filerow = ctx->view.rowoff + y;
+            int is_empty = (filerow >= ctx->model.numrows);
+
+            if (is_empty) {
+                r->render_row(r, 0, NULL, 0, gutter_width, 1);
+            } else {
+                t_erow *row = &ctx->model.row[filerow];
+                int seg_count = build_render_segments(ctx, row, filerow,
+                                                      ctx->view.coloff, text_cols, segments);
+                r->render_row(r, filerow + 1, segments, seg_count, gutter_width, 0);
+            }
         }
     }
 
@@ -827,6 +1001,7 @@ static void editor_refresh_screen_via_renderer(editor_ctx_t *ctx) {
         if (cursor_col < 1) cursor_col = 1;
         if (cursor_col > ctx->view.screencols) cursor_col = ctx->view.screencols;
     } else {
+        /* Calculate cursor x position within content */
         int cx = 1;
         int filerow = ctx->view.rowoff + ctx->view.cy;
         t_erow *row = (filerow >= ctx->model.numrows) ? NULL : &ctx->model.row[filerow];
@@ -837,16 +1012,35 @@ static void editor_refresh_screen_via_renderer(editor_ctx_t *ctx) {
                 cx++;
             }
         }
+
+        /* Add gutter width */
         if (ctx->view.line_numbers && ctx->model.numrows > 0) {
             int gw = 1, max_ln = ctx->model.numrows;
             while (max_ln >= 10) { gw++; max_ln /= 10; }
             gw += 1;
             cx += gw;
         }
+
         int tab_offset = tabs_showing ? 1 : 0;
-        cursor_row = ctx->view.cy + 1 + tab_offset;
-        cursor_col = cx;
-        if (cursor_col > ctx->view.screencols) cursor_col = ctx->view.screencols;
+
+        if (has_splits && ctx->wm && ctx->wm->active) {
+            /* Split window mode: position cursor within active pane */
+            WindowNode *active_pane = ctx->wm->active;
+            cursor_row = active_pane->y + ctx->view.cy + 1;  /* +1 for 1-based */
+            cursor_col = active_pane->x + cx;
+            /* Clamp to pane bounds */
+            if (cursor_col > active_pane->x + active_pane->width) {
+                cursor_col = active_pane->x + active_pane->width;
+            }
+            if (cursor_row > active_pane->y + active_pane->height) {
+                cursor_row = active_pane->y + active_pane->height;
+            }
+        } else {
+            /* Single pane mode */
+            cursor_row = ctx->view.cy + 1 + tab_offset;
+            cursor_col = cx;
+            if (cursor_col > ctx->view.screencols) cursor_col = ctx->view.screencols;
+        }
     }
 
     r->set_cursor(r, cursor_row, cursor_col);
