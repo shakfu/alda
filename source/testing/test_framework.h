@@ -83,6 +83,16 @@ extern test_stats_t test_stats;
     } \
 } while(0)
 
+#define ASSERT_PTR_EQ(actual, expected) do { \
+    if ((actual) != (expected)) { \
+        printf(COLOR_RED "  ✗ " COLOR_RESET "%s:%d: Expected pointer %p, got %p\n", \
+               __FILE__, __LINE__, (const void*)(expected), (const void*)(actual)); \
+        test_stats.current_test_failed = 1; \
+        test_stats.failed_tests++; \
+        return; \
+    } \
+} while(0)
+
 #define ASSERT_NEQ(actual, expected) do { \
     if ((actual) == (expected)) { \
         printf(COLOR_RED "  ✗ " COLOR_RESET "%s:%d: Expected not equal to %d\n", \

@@ -160,7 +160,7 @@ TEST(attach_sets_song) {
 
     tracker_view_attach(view, song, NULL);
 
-    ASSERT_EQ(view->song, song);
+    ASSERT_PTR_EQ(view->song, song);
     ASSERT_EQ(view->state.cursor_pattern, 0);
     ASSERT_EQ(view->state.cursor_track, 0);
     ASSERT_EQ(view->state.cursor_row, 0);
