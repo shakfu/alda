@@ -76,6 +76,45 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
   - Consider libFuzzer or AFL++ for parser/scanner testing
   - Low priority unless targeting wider distribution
 
+### Code Coverage
+
+Current state: **54 test files**, **~1,400 test functions**, **~3,700 assertions**. Direct file mapping coverage ~44%.
+
+**Critical gaps (no unit tests):**
+
+- [ ] `main.c` / `lang_dispatch.c` - Entry point and mode selection
+- [x] ~~`midi.c` / `midi_input.c` - Core MIDI subsystem~~ **DONE** (68 tests)
+- [x] ~~`music_theory.c` - Chord construction, scale handling~~ **DONE** (73 tests)
+- [ ] Tracker module (11 files) - Only minimal integration tests
+  - tracker_engine.c, tracker_model.c, tracker_plugin.c
+  - tracker_view.c, tracker_view_clipboard.c, tracker_view_json.c
+  - tracker_view_terminal.c, tracker_view_theme.c, tracker_view_undo.c
+- [x] ~~Command system (11 files in `loki/command/`)~~ **DONE** (51 tests)
+  - All handlers tested: goto, substitute, basic, file, export, metronome, link, loop, csd, theme, plugin
+
+**Secondary gaps:**
+
+- [ ] `lua.c` - Lua integration only partially tested
+- [ ] `config.c`, `keybind.c`, `theme_toml.c` - Configuration loading
+- [ ] `renderer.c` - Terminal rendering
+- [ ] `async.c` / `shared_async.c` - Async scheduling
+- [ ] `jsonrpc.c`, `osc.c` - Protocol handlers
+- [ ] MHS (Scheme) - Entire 19-file module has no tests
+
+**Well-tested areas (for reference):**
+
+| Module | Tests | Notes |
+|--------|-------|-------|
+| Alda parser/scanner | 169 | Strong core parsing coverage |
+| Joy parser/primitives | 106 | Core language well tested |
+| Bog language | 187 | Tokenizer, parser, builtins |
+| TR7 reader/music | 102 | Good coverage |
+| Loki editor core | 365 | Modal editing, undo, search |
+| Shared backends | 168 | TSF, Csound, FluidSynth, Minihost |
+| Music theory | 73 | Pitch, chords, scales, microtonal |
+| Command handlers | 51 | All 11 command files covered |
+| MIDI I/O | 68 | Context, ports, callbacks, timing |
+
 ### Code Quality (Completed)
 
 - [x] ~~Extract shared REPL loop skeleton~~ **DONE**

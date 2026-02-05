@@ -129,3 +129,33 @@ add_test(
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 set_tests_properties(shared_repl_commands_tests PROPERTIES LABELS "unit")
+
+# Test for music theory utilities
+add_executable(test_music_theory test_music_theory.c)
+target_include_directories(test_music_theory PRIVATE
+    ${PSND_ROOT_DIR}/source/core/include
+    ${PSND_ROOT_DIR}/source/core/shared
+    ${PSND_ROOT_DIR}/source/testing
+)
+target_link_libraries(test_music_theory PRIVATE shared test_framework $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
+add_test(
+    NAME shared_music_theory_tests
+    COMMAND $<TARGET_FILE:test_music_theory>
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+set_tests_properties(shared_music_theory_tests PROPERTIES LABELS "unit")
+
+# Test for MIDI I/O subsystem
+add_executable(test_midi test_midi.c)
+target_include_directories(test_midi PRIVATE
+    ${PSND_ROOT_DIR}/source/core/include
+    ${PSND_ROOT_DIR}/source/core/shared
+    ${PSND_ROOT_DIR}/source/testing
+)
+target_link_libraries(test_midi PRIVATE shared test_framework $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
+add_test(
+    NAME shared_midi_tests
+    COMMAND $<TARGET_FILE:test_midi>
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+set_tests_properties(shared_midi_tests PROPERTIES LABELS "unit")
