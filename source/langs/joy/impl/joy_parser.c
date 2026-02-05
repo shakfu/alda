@@ -9,8 +9,8 @@
 #include <ctype.h>
 #include <errno.h>
 
-#ifdef _MSC_VER
-/* MSVC doesn't have strndup */
+#ifdef _WIN32
+/* Windows (MSVC and MinGW with -std=c11) doesn't have strndup */
 static char* strndup(const char* s, size_t n) {
     size_t len = strnlen(s, n);
     char* result = (char*)malloc(len + 1);
