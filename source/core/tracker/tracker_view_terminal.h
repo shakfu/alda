@@ -87,6 +87,21 @@ void tracker_terminal_config_init(TrackerTerminalConfig* config);
  */
 TrackerView* tracker_view_terminal_new_with_config(const TrackerTerminalConfig* config);
 
+/**
+ * Create terminal view with configuration and custom file descriptors.
+ *
+ * This sets the file descriptors BEFORE initialization, preventing any
+ * escape sequences from being written to the default stdout.
+ * Useful for testing.
+ *
+ * @param config     Configuration options
+ * @param input_fd   File descriptor for input
+ * @param output_fd  File descriptor for output
+ * @return           New view, or NULL on failure
+ */
+TrackerView* tracker_view_terminal_new_with_config_and_fds(
+    const TrackerTerminalConfig* config, int input_fd, int output_fd);
+
 /*============================================================================
  * Terminal State Access
  *============================================================================*/

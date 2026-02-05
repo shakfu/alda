@@ -206,14 +206,7 @@ TrackerView* tracker_view_terminal_new(void) {
 TrackerView* tracker_view_terminal_new_with_fds(int input_fd, int output_fd) {
     TrackerTerminalConfig config;
     tracker_terminal_config_init(&config);
-
-    TrackerView* view = tracker_view_terminal_new_with_config(&config);
-    if (view) {
-        TerminalBackend* tb = (TerminalBackend*)view->callbacks.backend_data;
-        tb->input_fd = input_fd;
-        tb->output_fd = output_fd;
-    }
-    return view;
+    return tracker_view_terminal_new_with_config_and_fds(&config, input_fd, output_fd);
 }
 
 void tracker_view_terminal_set_fds(TrackerView* view, int input_fd, int output_fd) {
@@ -226,12 +219,17 @@ void tracker_view_terminal_set_fds(TrackerView* view, int input_fd, int output_f
 }
 
 TrackerView* tracker_view_terminal_new_with_config(const TrackerTerminalConfig* config) {
+    return tracker_view_terminal_new_with_config_and_fds(config, STDIN_FILENO, STDOUT_FILENO);
+}
+
+TrackerView* tracker_view_terminal_new_with_config_and_fds(
+    const TrackerTerminalConfig* config, int input_fd, int output_fd) {
     /* Allocate backend data */
     TerminalBackend* tb = calloc(1, sizeof(TerminalBackend));
     if (!tb) return NULL;
 
-    tb->input_fd = STDIN_FILENO;
-    tb->output_fd = STDOUT_FILENO;
+    tb->input_fd = input_fd;
+    tb->output_fd = output_fd;
     tb->config = *config;
     tb->layout_dirty = true;
 

@@ -41,11 +41,7 @@ static TrackerView* create_test_view(void) {
 
 /* Create a test view with config, output redirected to /dev/null */
 static TrackerView* create_test_view_with_config(const TrackerTerminalConfig* config) {
-    TrackerView* view = tracker_view_terminal_new_with_config(config);
-    if (view) {
-        tracker_view_terminal_set_fds(view, STDIN_FILENO, get_null_fd());
-    }
-    return view;
+    return tracker_view_terminal_new_with_config_and_fds(config, STDIN_FILENO, get_null_fd());
 }
 
 static TrackerSong* create_test_song(int num_rows, int num_tracks) {
