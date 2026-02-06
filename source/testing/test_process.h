@@ -311,7 +311,7 @@ static inline int test_rmdir_recursive(const char *path) {
 
     /* Use system command for simplicity on Windows */
     char cmd[TEST_PROC_MAX_PATH + 32];
-    snprintf(cmd, sizeof(cmd), "rmdir /s /q \"%s\" 2>nul", path);
+    snprintf(cmd, sizeof(cmd), "rmdir /s /q \"%s\" 2>NUL", path);
     return system(cmd) == 0 ? 0 : -1;
 #else
     /* Safety check: don't remove root or home directories */

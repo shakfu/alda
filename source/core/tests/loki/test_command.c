@@ -53,7 +53,7 @@ static void cleanup_test_dir(void) {
     init_test_dir_path();
 #ifdef _WIN32
     char cmd[600];
-    snprintf(cmd, sizeof(cmd), "rmdir /s /q \"%s\" 2>nul", TEST_DIR);
+    snprintf(cmd, sizeof(cmd), "rmdir /s /q \"%s\" 2>NUL", TEST_DIR);
     system(cmd);
 #else
     char cmd[600];
