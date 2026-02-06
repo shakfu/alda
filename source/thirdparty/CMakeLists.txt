@@ -72,7 +72,12 @@ if(BUILD_CSOUND_BACKEND)
     set(SNDFILE_H_PATH ${CMAKE_CURRENT_SOURCE_DIR}/libsndfile/include CACHE PATH "" FORCE)
     # For the library, we'll use the target directly via target_link_libraries later
     # But Csound needs a path for find_library - point to build output
-    set(LIBSNDFILE_LIBRARY "${CMAKE_CURRENT_BINARY_DIR}/libsndfile/libsndfile.a" CACHE FILEPATH "" FORCE)
+    if(MSVC)
+        # MSVC uses .lib extension; for multi-config generators (Visual Studio), use Release path
+        set(LIBSNDFILE_LIBRARY "${CMAKE_CURRENT_BINARY_DIR}/libsndfile/Release/sndfile.lib" CACHE FILEPATH "" FORCE)
+    else()
+        set(LIBSNDFILE_LIBRARY "${CMAKE_CURRENT_BINARY_DIR}/libsndfile/libsndfile.a" CACHE FILEPATH "" FORCE)
+    endif()
     # Also set the include directory for Csound's include_directories call
     set(LIBSNDFILE_INCLUDE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/libsndfile/include CACHE PATH "" FORCE)
 
@@ -114,6 +119,20 @@ if(BUILD_CSOUND_BACKEND)
     # Csound uses NaN in a few places, so we need to allow it
     if(CMAKE_C_COMPILER_ID MATCHES "Clang")
         add_compile_options(-Wno-nan-infinity-disabled)
+    endif()
+
+    # Windows: provide dirent.h and POSIX compatibility headers for Csound
+    if(MSVC)
+        set(DIRENT_H "${CMAKE_CURRENT_SOURCE_DIR}/dirent/dirent.h" CACHE FILEPATH "" FORCE)
+        list(APPEND CMAKE_REQUIRED_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/dirent")
+        include_directories("${CMAKE_CURRENT_SOURCE_DIR}/dirent")
+
+        # Windows: use bundled winflexbison for Csound parser generation
+        set(FLEX_EXECUTABLE "${CMAKE_CURRENT_SOURCE_DIR}/winflexbison/win_flex.exe" CACHE FILEPATH "" FORCE)
+        set(BISON_EXECUTABLE "${CMAKE_CURRENT_SOURCE_DIR}/winflexbison/win_bison.exe" CACHE FILEPATH "" FORCE)
+
+        # Windows: force-include POSIX compatibility header for S_ISDIR etc.
+        add_compile_options(/FI"${CMAKE_CURRENT_SOURCE_DIR}/dirent/posix_compat.h")
     endif()
 
     add_subdirectory(csound-6.18.1)

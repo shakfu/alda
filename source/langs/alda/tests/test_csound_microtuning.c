@@ -12,7 +12,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <unistd.h>
+#else
+#include <windows.h>
+#define sleep(x) Sleep((x) * 1000)
+#define usleep(x) Sleep((x) / 1000)
+#endif
 #include <math.h>
 #include <alda/alda.h>
 #include <alda/context.h>

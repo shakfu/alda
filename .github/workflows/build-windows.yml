@@ -8,8 +8,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-windows:
-    name: Windows ${{ matrix.variant }}
+  # Build with MSYS2/MinGW (GCC toolchain)
+  build-windows-mingw:
+    name: Windows MinGW ${{ matrix.variant }}
     runs-on: windows-latest
     defaults:
       run:
@@ -21,17 +22,17 @@ jobs:
           # TinySoundFont only (default, smallest)
           - variant: tsf
             cmake_args: ""
-            artifact_suffix: windows-tsf
-
-          # TinySoundFont + Web host
-          - variant: tsf-web
-            cmake_args: "-DBUILD_WEB_HOST=ON"
-            artifact_suffix: windows-tsf-web
+            artifact_suffix: windows-mingw-tsf
 
           # TinySoundFont + Csound
           - variant: tsf-csound
             cmake_args: "-DBUILD_CSOUND_BACKEND=ON"
-            artifact_suffix: windows-tsf-csound
+            artifact_suffix: windows-mingw-tsf-csound
+
+          # Full: FluidSynth + Csound + Web
+          - variant: full
+            cmake_args: "-DBUILD_FLUID_BACKEND=ON -DBUILD_CSOUND_BACKEND=ON -DBUILD_WEB_HOST=ON"
+            artifact_suffix: windows-mingw-full
 
     env:
       BUILD_DIR: build
@@ -86,7 +87,9 @@ jobs:
           path: artifacts/*
           if-no-files-found: error
 
-  # Build with MSVC for comparison (optional)
+  # Build with MSVC (Visual Studio toolchain)
+  # Note: winflexbison is bundled in source/thirdparty/winflexbison/
+  #       dirent.h and posix_compat.h are bundled in source/thirdparty/dirent/
   build-windows-msvc:
     name: Windows MSVC ${{ matrix.variant }}
     runs-on: windows-latest
@@ -94,9 +97,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # TinySoundFont only (default, smallest)
           - variant: tsf
             cmake_args: ""
             artifact_suffix: windows-msvc-tsf
+
+          # TinySoundFont + Csound
+          - variant: tsf-csound
+            cmake_args: "-DBUILD_CSOUND_BACKEND=ON"
+            artifact_suffix: windows-msvc-tsf-csound
+
+          # Full: FluidSynth + Csound + Web
+          - variant: full
+            cmake_args: "-DBUILD_FLUID_BACKEND=ON -DBUILD_CSOUND_BACKEND=ON -DBUILD_WEB_HOST=ON"
+            artifact_suffix: windows-msvc-full
 
     env:
       BUILD_DIR: build
@@ -138,13 +152,13 @@ jobs:
   bundle-windows:
     name: Bundle Windows binaries
     runs-on: ubuntu-latest
-    needs: [build-windows, build-windows-msvc]
-    if: always() && needs.build-windows.result == 'success'
+    needs: [build-windows-mingw, build-windows-msvc]
+    if: always() && (needs.build-windows-mingw.result == 'success' || needs.build-windows-msvc.result == 'success')
     steps:
       - name: Download all Windows artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: psnd-windows*
+          pattern: psnd-windows-*
           path: dist
           merge-multiple: true
 

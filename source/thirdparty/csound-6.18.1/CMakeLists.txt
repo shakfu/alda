@@ -455,8 +455,15 @@ SET(BUILD_SHARED_LIBS OFF)
 
 ## HEADER/LIBRARY/OTHER CHECKS ##
 # First, required stuff
-if(MSVC)
+# If LIBSNDFILE_LIBRARY is already set (e.g., building libsndfile in-tree), use it directly
+if(LIBSNDFILE_LIBRARY)
+    message(STATUS "Using pre-configured libsndfile: ${LIBSNDFILE_LIBRARY}")
+elseif(MSVC)
     find_package(SndFile CONFIG REQUIRED)
+    # Extract library from target if needed
+    if(TARGET SndFile::sndfile)
+        get_target_property(LIBSNDFILE_LIBRARY SndFile::sndfile LOCATION)
+    endif()
 else()
     find_library(LIBSNDFILE_LIBRARY NAMES sndfile libsndfile-1 libsndfile)
 
