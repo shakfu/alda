@@ -136,9 +136,36 @@ if(BUILD_CSOUND_BACKEND)
         list(APPEND CMAKE_REQUIRED_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/dirent")
         include_directories("${CMAKE_CURRENT_SOURCE_DIR}/dirent")
 
-        # Windows: use bundled winflexbison for Csound parser generation
-        set(FLEX_EXECUTABLE "${CMAKE_CURRENT_SOURCE_DIR}/winflexbison/win_flex.exe" CACHE FILEPATH "" FORCE)
-        set(BISON_EXECUTABLE "${CMAKE_CURRENT_SOURCE_DIR}/winflexbison/win_bison.exe" CACHE FILEPATH "" FORCE)
+        # Windows: use winflexbison for Csound parser generation
+        set(WINFLEXBISON_DIR "${CMAKE_CURRENT_SOURCE_DIR}/winflexbison")
+        set(WINFLEX_EXE "${WINFLEXBISON_DIR}/win_flex.exe")
+        set(WINBISON_EXE "${WINFLEXBISON_DIR}/win_bison.exe")
+
+        # Download winflexbison if not present
+        if(NOT EXISTS "${WINFLEX_EXE}" OR NOT EXISTS "${WINBISON_EXE}")
+            set(WINFLEXBISON_URL "https://github.com/lexxmark/winflexbison/releases/download/v2.5.25/win_flex_bison-2.5.25.zip")
+            set(WINFLEXBISON_ZIP "${CMAKE_CURRENT_BINARY_DIR}/winflexbison.zip")
+            message(STATUS "Downloading winflexbison...")
+            file(DOWNLOAD "${WINFLEXBISON_URL}" "${WINFLEXBISON_ZIP}" STATUS download_status)
+            list(GET download_status 0 status_code)
+            if(NOT status_code EQUAL 0)
+                message(FATAL_ERROR "Failed to download winflexbison: ${download_status}")
+            endif()
+            file(MAKE_DIRECTORY "${WINFLEXBISON_DIR}")
+            execute_process(
+                COMMAND ${CMAKE_COMMAND} -E tar xf "${WINFLEXBISON_ZIP}"
+                WORKING_DIRECTORY "${WINFLEXBISON_DIR}"
+                RESULT_VARIABLE extract_result
+            )
+            if(NOT extract_result EQUAL 0)
+                message(FATAL_ERROR "Failed to extract winflexbison")
+            endif()
+            file(REMOVE "${WINFLEXBISON_ZIP}")
+            message(STATUS "winflexbison downloaded and extracted")
+        endif()
+
+        set(FLEX_EXECUTABLE "${WINFLEX_EXE}" CACHE FILEPATH "" FORCE)
+        set(BISON_EXECUTABLE "${WINBISON_EXE}" CACHE FILEPATH "" FORCE)
 
         # Windows: force-include POSIX compatibility header for S_ISDIR etc.
         add_compile_options(/FI"${CMAKE_CURRENT_SOURCE_DIR}/dirent/posix_compat.h")
