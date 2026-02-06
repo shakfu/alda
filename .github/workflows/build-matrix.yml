@@ -1,0 +1,129 @@
+name: Build All Variants
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.variant }} / ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        variant:
+          - tsf
+          - tsf-csound
+          - fluid
+          - fluid-csound
+          - tsf-web
+          - fluid-web
+          - fluid-csound-web
+        include:
+          # --- variant -> cmake flags mapping ---
+          - variant: tsf
+            cmake_args: ""
+          - variant: tsf-csound
+            cmake_args: "-DBUILD_CSOUND_BACKEND=ON"
+          - variant: fluid
+            cmake_args: "-DBUILD_FLUID_BACKEND=ON"
+          - variant: fluid-csound
+            cmake_args: "-DBUILD_FLUID_BACKEND=ON -DBUILD_CSOUND_BACKEND=ON"
+          - variant: tsf-web
+            cmake_args: "-DBUILD_WEB_HOST=ON"
+          - variant: fluid-web
+            cmake_args: "-DBUILD_FLUID_BACKEND=ON -DBUILD_WEB_HOST=ON"
+          - variant: fluid-csound-web
+            cmake_args: "-DBUILD_FLUID_BACKEND=ON -DBUILD_CSOUND_BACKEND=ON -DBUILD_WEB_HOST=ON"
+          # --- os -> platform label mapping ---
+          - os: ubuntu-latest
+            platform: linux
+            binary_path: build/psnd
+            artifact_ext: ""
+          - os: macos-latest
+            platform: macos
+            binary_path: build/psnd
+            artifact_ext: ""
+          - os: windows-latest
+            platform: windows
+            binary_path: build/Release/psnd.exe
+            artifact_ext: ".exe"
+    env:
+      BUILD_DIR: build
+      BUILD_TYPE: Release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure CMake (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cmake -S . -B ${{ env.BUILD_DIR }} \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DBUILD_TESTING=ON \
+            ${{ matrix.cmake_args }}
+
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $extraArgs = "${{ matrix.cmake_args }}" -split ' ' | Where-Object { $_ -ne '' }
+          cmake -S . -B ${{ env.BUILD_DIR }} `
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
+            -DBUILD_TESTING=ON `
+            @extraArgs
+
+      - name: Build
+        run: cmake --build ${{ env.BUILD_DIR }} --config ${{ env.BUILD_TYPE }}
+
+      - name: Run tests
+        run: ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure -C ${{ env.BUILD_TYPE }}
+
+      - name: Collect artifact (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p artifacts
+          cp "${{ matrix.binary_path }}" "artifacts/psnd-${{ matrix.variant }}-${{ matrix.platform }}"
+
+      - name: Collect artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts
+          Copy-Item "${{ matrix.binary_path }}" "artifacts/psnd-${{ matrix.variant }}-${{ matrix.platform }}.exe"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: psnd-${{ matrix.variant }}-${{ matrix.platform }}
+          path: artifacts/*
+          if-no-files-found: error
+
+  bundle:
+    name: Bundle all artifacts
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: ${{ !cancelled() }}
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: psnd-*
+          path: dist
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la dist/
+
+      - name: Create archive
+        run: tar -czf psnd-all-variants.tar.gz -C dist .
+
+      - name: Upload bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: psnd-all-variants-bundle
+          path: psnd-all-variants.tar.gz
+          if-no-files-found: error
