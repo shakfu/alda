@@ -16,20 +16,39 @@
 
 #ifdef _WIN32
 #include <io.h>
+#include <windows.h>
 #define access _access
 #define F_OK 0
 #define unlink _unlink
-/* Test output directory */
-static const char *TEST_DIR = "C:\\Temp";
 #else
 #include <unistd.h>
-/* Test output directory */
-static const char *TEST_DIR = "/tmp";
 #endif
+
+/* Dynamic test directory */
+static char TEST_DIR_BUF[512] = {0};
+static const char *TEST_DIR = NULL;
+
+static void init_test_dir(void) {
+    if (TEST_DIR) return;
+#ifdef _WIN32
+    const char *temp = getenv("TEMP");
+    if (!temp) temp = getenv("TMP");
+    if (!temp) temp = "C:\\Windows\\Temp";
+    snprintf(TEST_DIR_BUF, sizeof(TEST_DIR_BUF), "%s", temp);
+#else
+    snprintf(TEST_DIR_BUF, sizeof(TEST_DIR_BUF), "/tmp");
+#endif
+    TEST_DIR = TEST_DIR_BUF;
+}
 
 /* Helper to build test file path */
 static void build_test_path(char *buf, size_t size, const char *name) {
+    init_test_dir();
+#ifdef _WIN32
+    snprintf(buf, size, "%s\\psnd_test_%s.mid", TEST_DIR, name);
+#else
     snprintf(buf, size, "%s/psnd_test_%s.mid", TEST_DIR, name);
+#endif
 }
 
 /* Helper to check if file exists */

@@ -17,21 +17,45 @@
 #ifdef _WIN32
 #include <io.h>
 #include <direct.h>
+#include <windows.h>
 #define mkdir(path, mode) _mkdir(path)
-#define TEST_FILE_DIR "C:\\Temp\\loki_test"
 #else
 #include <unistd.h>
-#define TEST_FILE_DIR "/tmp/loki_test"
 #endif
+
+/* Dynamic test directory */
+static char TEST_FILE_DIR[512] = {0};
+
+static void init_test_dir_path(void) {
+    if (TEST_FILE_DIR[0]) return;  /* Already initialized */
+#ifdef _WIN32
+    const char *temp = getenv("TEMP");
+    if (!temp) temp = getenv("TMP");
+    if (!temp) temp = "C:\\Windows\\Temp";
+    snprintf(TEST_FILE_DIR, sizeof(TEST_FILE_DIR), "%s\\loki_test", temp);
+#else
+    snprintf(TEST_FILE_DIR, sizeof(TEST_FILE_DIR), "/tmp/loki_test");
+#endif
+}
 
 /* Setup: Create test directory */
 static void setup_test_dir(void) {
+    init_test_dir_path();
     mkdir(TEST_FILE_DIR, 0755);
 }
 
 /* Teardown: Clean up test files */
 static void cleanup_test_files(void) {
-    system("rm -rf " TEST_FILE_DIR);
+    init_test_dir_path();
+#ifdef _WIN32
+    char cmd[600];
+    snprintf(cmd, sizeof(cmd), "rmdir /s /q \"%s\" 2>nul", TEST_FILE_DIR);
+    system(cmd);
+#else
+    char cmd[600];
+    snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", TEST_FILE_DIR);
+    system(cmd);
+#endif
 }
 
 /* Helper: Create a test file with given content */
