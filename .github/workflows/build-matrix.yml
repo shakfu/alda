@@ -70,11 +70,9 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $extraArgs = "${{ matrix.cmake_args }}" -split ' ' | Where-Object { $_ -ne '' }
-          cmake -S . -B ${{ env.BUILD_DIR }} `
-            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
-            -DBUILD_TESTING=ON `
-            @extraArgs
+          $allArgs = "-DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DBUILD_TESTING=ON ${{ matrix.cmake_args }}"
+          $cmakeArgs = @($allArgs -split '\s+' | Where-Object { $_ -ne '' })
+          cmake -S . -B ${{ env.BUILD_DIR }} @cmakeArgs
 
       - name: Build
         run: cmake --build ${{ env.BUILD_DIR }} --config ${{ env.BUILD_TYPE }}
