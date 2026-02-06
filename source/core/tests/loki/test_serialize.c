@@ -13,9 +13,28 @@
 
 #ifdef _WIN32
 #include <io.h>
+#define unlink _unlink
 #else
 #include <unistd.h>
 #endif
+
+/* Cross-platform temp file path */
+static char g_test_snapshot_path[512] = {0};
+
+static const char *get_test_snapshot_path(void) {
+    if (g_test_snapshot_path[0]) return g_test_snapshot_path;
+#ifdef _WIN32
+    const char *temp = getenv("TEMP");
+    if (!temp) temp = getenv("TMP");
+    if (!temp) temp = "C:\\Windows\\Temp";
+    snprintf(g_test_snapshot_path, sizeof(g_test_snapshot_path),
+             "%s\\test_loki_snapshot.bin", temp);
+#else
+    snprintf(g_test_snapshot_path, sizeof(g_test_snapshot_path),
+             "/tmp/test_loki_snapshot.bin");
+#endif
+    return g_test_snapshot_path;
+}
 
 /* Helper: Create a test model with sample data */
 static void setup_test_model(EditorModel *model) {
@@ -184,7 +203,7 @@ TEST(save_load_snapshot) {
     setup_test_model(&src);
     memset(&dst, 0, sizeof(EditorModel));
 
-    const char *path = "/tmp/test_loki_snapshot.bin";
+    const char *path = get_test_snapshot_path();
 
     /* Save */
     ASSERT_EQ(editor_model_save_snapshot(&src, path), 0);
