@@ -39,7 +39,6 @@ build/
 
 # Executables
 *.exe
-!source/thirdparty/winflexbison/*.exe
 *.out
 *.app
 *.i*86

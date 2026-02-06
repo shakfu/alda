@@ -88,8 +88,7 @@ jobs:
           if-no-files-found: error
 
   # Build with MSVC (Visual Studio toolchain)
-  # Note: winflexbison is bundled in source/thirdparty/winflexbison/
-  #       dirent.h and posix_compat.h are bundled in source/thirdparty/dirent/
+  # Note: dirent.h and posix_compat.h are bundled in source/thirdparty/dirent/
   build-windows-msvc:
     name: Windows MSVC ${{ matrix.variant }}
     runs-on: windows-latest
@@ -101,16 +100,19 @@ jobs:
           - variant: tsf
             cmake_args: ""
             artifact_suffix: windows-msvc-tsf
+            needs_flexbison: false
 
           # TinySoundFont + Csound
           - variant: tsf-csound
             cmake_args: "-DBUILD_CSOUND_BACKEND=ON"
             artifact_suffix: windows-msvc-tsf-csound
+            needs_flexbison: true
 
           # Full: FluidSynth + Csound + Web
           - variant: full
             cmake_args: "-DBUILD_FLUID_BACKEND=ON -DBUILD_CSOUND_BACKEND=ON -DBUILD_WEB_HOST=ON"
             artifact_suffix: windows-msvc-full
+            needs_flexbison: true
 
     env:
       BUILD_DIR: build
@@ -121,6 +123,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Download WinFlexBison
+        if: matrix.needs_flexbison
+        run: |
+          $url = "https://github.com/lexxmark/winflexbison/releases/download/v2.5.25/win_flex_bison-2.5.25.zip"
+          $dest = "source/thirdparty/winflexbison"
+          New-Item -ItemType Directory -Force -Path $dest
+          Invoke-WebRequest -Uri $url -OutFile "$dest/winflexbison.zip"
+          Expand-Archive -Path "$dest/winflexbison.zip" -DestinationPath $dest -Force
+          Remove-Item "$dest/winflexbison.zip"
 
       - name: Configure CMake
         run: |

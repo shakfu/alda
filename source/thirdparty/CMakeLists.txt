@@ -81,6 +81,15 @@ if(BUILD_CSOUND_BACKEND)
     # Also set the include directory for Csound's include_directories call
     set(LIBSNDFILE_INCLUDE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/libsndfile/include CACHE PATH "" FORCE)
 
+    # Skip external codec libraries on Windows - they're built into libsndfile
+    if(WIN32)
+        set(FLAC_LIB "" CACHE STRING "" FORCE)
+        set(OGG_LIB "" CACHE STRING "" FORCE)
+        set(VORBIS_LIB "" CACHE STRING "" FORCE)
+        set(VORBISENC_LIB "" CACHE STRING "" FORCE)
+        set(SPEEX_LIB "" CACHE STRING "" FORCE)
+    endif()
+
     # Minimal Csound build configuration
     # Set these before add_subdirectory so they take effect
     set(BUILD_STATIC_LIBRARY ON CACHE BOOL "" FORCE)
