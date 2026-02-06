@@ -3,7 +3,9 @@
 		psnd-tsf default psnd-tsf-csound csound psnd-fluid psnd-fluid-csound \
 		psnd-tsf-web web psnd-fluid-web psnd-fluid-csound-web full \
 		psnd-minihost minihost psnd-minihost-csound \
-		mhs-small mhs-src mhs-src-small no-mhs
+		mhs-small mhs-src mhs-src-small no-mhs \
+		test-tsf test-csound test-fluid test-fluid-csound \
+		test-web test-fluid-web test-full test-minihost test-minihost-csound
 
 BUILD_DIR ?= build
 CMAKE ?= cmake
@@ -145,8 +147,38 @@ psnd: configure-tsf
 show-config: configure-tsf
 	@$(CMAKE) --build $(BUILD_DIR) --target show-config --config Release
 
+# Generic test - builds current configuration and runs tests
 test:
-	@$(CMAKE) -E chdir $(BUILD_DIR) ctest --output-on-failure
+	@$(CMAKE) --build $(BUILD_DIR) --config Release
+	@$(CMAKE) -E chdir $(BUILD_DIR) ctest -C Release --output-on-failure
+
+# Configuration-specific test targets
+test-tsf: psnd-tsf
+	@$(CMAKE) -E chdir $(BUILD_DIR) ctest -C Release --output-on-failure
+
+test-csound: psnd-tsf-csound
+	@$(CMAKE) -E chdir $(BUILD_DIR) ctest -C Release --output-on-failure
+
+test-fluid: psnd-fluid
+	@$(CMAKE) -E chdir $(BUILD_DIR) ctest -C Release --output-on-failure
+
+test-fluid-csound: psnd-fluid-csound
+	@$(CMAKE) -E chdir $(BUILD_DIR) ctest -C Release --output-on-failure
+
+test-web: psnd-tsf-web
+	@$(CMAKE) -E chdir $(BUILD_DIR) ctest -C Release --output-on-failure
+
+test-fluid-web: psnd-fluid-web
+	@$(CMAKE) -E chdir $(BUILD_DIR) ctest -C Release --output-on-failure
+
+test-full: psnd-fluid-csound-web
+	@$(CMAKE) -E chdir $(BUILD_DIR) ctest -C Release --output-on-failure
+
+test-minihost: psnd-minihost
+	@$(CMAKE) -E chdir $(BUILD_DIR) ctest -C Release --output-on-failure
+
+test-minihost-csound: psnd-minihost-csound
+	@$(CMAKE) -E chdir $(BUILD_DIR) ctest -C Release --output-on-failure
 
 clean:
 	@$(CMAKE) --build $(BUILD_DIR) --target clean 2>/dev/null || true
