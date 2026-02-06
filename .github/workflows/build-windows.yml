@@ -8,32 +8,13 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Build with MSYS2/MinGW (GCC toolchain)
+  # Build with MSYS2/MinGW (GCC toolchain) - TSF only
   build-windows-mingw:
-    name: Windows MinGW ${{ matrix.variant }}
+    name: Windows MinGW
     runs-on: windows-latest
     defaults:
       run:
         shell: msys2 {0}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # TinySoundFont only (default, smallest)
-          - variant: tsf
-            cmake_args: ""
-            artifact_suffix: windows-mingw-tsf
-
-          # TinySoundFont + Csound
-          - variant: tsf-csound
-            cmake_args: "-DBUILD_CSOUND_BACKEND=ON"
-            artifact_suffix: windows-mingw-tsf-csound
-
-          # Full: FluidSynth + Csound + Web
-          - variant: full
-            cmake_args: "-DBUILD_FLUID_BACKEND=ON -DBUILD_CSOUND_BACKEND=ON -DBUILD_WEB_HOST=ON"
-            artifact_suffix: windows-mingw-full
-
     env:
       BUILD_DIR: build
       BUILD_TYPE: Release
@@ -50,8 +31,6 @@ jobs:
             mingw-w64-ucrt-x86_64-ninja
             make
             git
-            flex
-            bison
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -63,8 +42,7 @@ jobs:
           cmake -S . -B ${{ env.BUILD_DIR }} \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DBUILD_TESTING=ON \
-            ${{ matrix.cmake_args }}
+            -DBUILD_TESTING=ON
 
       - name: Build
         run: cmake --build ${{ env.BUILD_DIR }} --config ${{ env.BUILD_TYPE }}
@@ -78,12 +56,12 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts
-          Copy-Item "build/psnd.exe" "artifacts/psnd-${{ matrix.artifact_suffix }}.exe"
+          Copy-Item "build/psnd.exe" "artifacts/psnd-windows-mingw.exe"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: psnd-${{ matrix.artifact_suffix }}
+          name: psnd-windows-mingw
           path: artifacts/*
           if-no-files-found: error
 

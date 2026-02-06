@@ -1,6 +1,9 @@
 .DS_Store
 
 build/
+
+# Auto-downloaded dependencies
+source/thirdparty/winflexbison/
 .cache
 .*_cache
 .*_history
