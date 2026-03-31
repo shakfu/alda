@@ -107,15 +107,19 @@ jobs:
       - name: Collect artifact (Unix)
         if: runner.os != 'Windows'
         run: |
+          name="psnd-${{ steps.version.outputs.version }}-${{ matrix.variant }}-${{ matrix.platform }}"
           mkdir -p artifacts
-          cp "${{ matrix.binary_path }}" "artifacts/psnd-${{ steps.version.outputs.version }}-${{ matrix.variant }}-${{ matrix.platform }}"
+          cp "${{ matrix.binary_path }}" "$name"
+          tar -czf "artifacts/${name}.tar.gz" "$name"
 
       - name: Collect artifact (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $name = "psnd-${{ steps.version.outputs.version }}-${{ matrix.variant }}-${{ matrix.platform }}"
           New-Item -ItemType Directory -Force -Path artifacts
-          Copy-Item "${{ matrix.binary_path }}" "artifacts/psnd-${{ steps.version.outputs.version }}-${{ matrix.variant }}-${{ matrix.platform }}.exe"
+          Copy-Item "${{ matrix.binary_path }}" "${name}.exe"
+          Compress-Archive -Path "${name}.exe" -DestinationPath "artifacts/${name}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
