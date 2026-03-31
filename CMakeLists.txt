@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(psnd_project C CXX)
+project(psnd_project VERSION 0.1.6 C CXX)
 
 set(PSND_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 list(APPEND CMAKE_MODULE_PATH "${PSND_ROOT_DIR}/scripts/cmake")

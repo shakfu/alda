@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.6]
+
 ### Fixed
 
 - **Alda Parser EOF Safety**: `peek()` now returns a static EOF sentinel token instead of NULL, eliminating a class of NULL pointer dereference bugs when parsing truncated or malformed input (lines 288, 534 of `parser.c`)
