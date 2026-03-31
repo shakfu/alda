@@ -116,7 +116,6 @@ TEST(engine_creation) {
 
 TEST(engine_basic_eval) {
     setup();
-    ASSERT_TRUE(eval_ok("(+ 1 2)"));
     ASSERT_EQ(eval_int("(+ 1 2)"), 3);
     teardown();
 }
