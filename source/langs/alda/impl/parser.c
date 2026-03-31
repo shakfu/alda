@@ -28,8 +28,16 @@ static int is_at_end(AldaParser* p) {
            p->tokens[p->current].type == ALDA_TOK_EOF;
 }
 
+static AldaToken _alda_eof_sentinel = {
+    .type = ALDA_TOK_EOF,
+    .lexeme = "",
+    .lexeme_len = 0,
+    .literal = {0},
+    .pos = {0, 0, NULL},
+};
+
 static AldaToken* peek(AldaParser* p) {
-    if (p->current >= p->token_count) return NULL;
+    if (p->current >= p->token_count) return &_alda_eof_sentinel;
     return &p->tokens[p->current];
 }
 
@@ -633,12 +641,14 @@ static int parse_rep_spec(const char* spec, int** out_reps, size_t* out_count) {
         while (*p && !isdigit((unsigned char)*p)) p++;
         if (!*p) break;
 
-        /* Parse first number */
+        /* Parse first number (capped at 10000 to prevent overflow) */
         int start = 0;
         while (*p && isdigit((unsigned char)*p)) {
             start = start * 10 + (*p - '0');
+            if (start > 10000) { start = 10000; break; }
             p++;
         }
+        while (*p && isdigit((unsigned char)*p)) p++;  /* skip remaining digits */
 
         int end = start;
 
@@ -648,8 +658,10 @@ static int parse_rep_spec(const char* spec, int** out_reps, size_t* out_count) {
             end = 0;
             while (*p && isdigit((unsigned char)*p)) {
                 end = end * 10 + (*p - '0');
+                if (end > 10000) { end = 10000; break; }
                 p++;
             }
+            while (*p && isdigit((unsigned char)*p)) p++;  /* skip remaining digits */
         }
 
         /* Add all numbers in range */

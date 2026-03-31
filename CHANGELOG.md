@@ -17,6 +17,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Alda Parser EOF Safety**: `peek()` now returns a static EOF sentinel token instead of NULL, eliminating a class of NULL pointer dereference bugs when parsing truncated or malformed input (lines 288, 534 of `parser.c`)
+- **Joy Dictionary SEQ Leak**: `joy_dict_set()` now frees sequence (SEQ) definitions when replacing an existing word, matching the cleanup logic already present in `joy_dict_remove()`
+- **Alda Repetition Overflow**: Repetition counts in `parse_rep_spec()` are now capped at 10,000 to prevent integer overflow from malformed input
+- **Joy String Primitive Safety**: Replaced unbounded `strcpy`/`strcat` with `memcpy` using pre-computed lengths in string cons and concatenation primitives (`joy_primitives.c`)
+- **REPL History Recall Safety**: Replaced unbounded `strcpy` with `strncpy` bounded to `REPL_MAX_INPUT_LENGTH` in the non-linenoise fallback path (`repl_line_editor.c`)
+
+### Added
+
+- **Alda Parser Fuzz Tests**: 26 truncation fuzz tests that parse valid Alda strings at every byte truncation point, asserting no crashes (`test_parser_fuzz.c`)
+
 ## [0.1.5]
 
 ### Added

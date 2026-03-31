@@ -878,7 +878,7 @@ static void prim_cons(JoyContext* ctx) {
         size_t len = strlen(agg.data.string);
         char* result = malloc(len + 2);
         result[0] = item.data.character;
-        strcpy(result + 1, agg.data.string);
+        memcpy(result + 1, agg.data.string, len + 1);
         joy_value_free(&item);
         joy_value_free(&agg);
         PUSH(joy_string(result));
@@ -968,10 +968,11 @@ static void prim_concat(JoyContext* ctx) {
         JoyValue v = {.type = JOY_QUOTATION, .data.quotation = result};
         PUSH(v);
     } else if (a.type == JOY_STRING && b.type == JOY_STRING) {
-        size_t len = strlen(a.data.string) + strlen(b.data.string) + 1;
-        char* result = malloc(len);
-        strcpy(result, a.data.string);
-        strcat(result, b.data.string);
+        size_t alen = strlen(a.data.string);
+        size_t blen = strlen(b.data.string);
+        char* result = malloc(alen + blen + 1);
+        memcpy(result, a.data.string, alen);
+        memcpy(result + alen, b.data.string, blen + 1);
         joy_value_free(&a);
         joy_value_free(&b);
         PUSH(joy_string_owned(result));

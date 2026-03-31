@@ -719,8 +719,10 @@ static void joy_dict_set(JoyDict* dict, const char* name, JoyWord* word) {
     JoyDictEntry* entry = dict->buckets[bucket];
     while (entry) {
         if (strcmp(entry->key, name) == 0) {
-            /* Replace existing */
-            if (!entry->word->is_primitive && entry->word->body.quotation) {
+            /* Replace existing - free old body */
+            if (entry->word->is_seq && entry->word->body.seq) {
+                seq_definition_free(entry->word->body.seq);
+            } else if (!entry->word->is_primitive && entry->word->body.quotation) {
                 joy_quotation_free(entry->word->body.quotation);
             }
             free(entry->word->name);
