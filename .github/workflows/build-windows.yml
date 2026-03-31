@@ -1,11 +1,11 @@
 name: Build Windows
 
-on:
-  push:
-    branches: [main, dev]
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
+on: [workflow_dispatch]
+  # push:
+  #   branches: [main, dev]
+  # pull_request:
+  #   branches: [main]
+  # workflow_dispatch:
 
 jobs:
   # Build with MSYS2/MinGW (GCC toolchain) - TSF only
