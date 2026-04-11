@@ -12,7 +12,7 @@
 
 /* Program identity */
 #define PSND_NAME           "psnd"
-#define PSND_VERSION        "0.1.3"
+#define PSND_VERSION        "0.1.6"
 
 /* Configuration */
 #define PSND_CONFIG_DIR     ".psnd"
