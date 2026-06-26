@@ -36,7 +36,7 @@ All are practical for daily live-coding, REPL sketches, and headless playback. T
 
 ## Status
 
-psnd is in active development. Alda, Joy, TR7 Scheme, and Bog are the four fully integrated languages, demonstrating the polyglot architecture. Languages register via a modular dispatch system (`lang_dispatch.h`), allowing new DSLs to be added without modifying core dispatch logic. Additional mini MIDI languages from [midi-langs](https://github.com/shakfu/midi-langs) can reuse the same editor, REPL, and audio stack. Expect iteration and occasional breaking changes as polyglot support expands.
+psnd is in active development. All five languages register through the same uniform integration layer (`lang_dispatch.h` plus the `LokiLangOps` editor bridge), demonstrating the polyglot architecture and letting new DSLs be added without modifying core dispatch logic. They differ in maturity: Alda and Joy are mature, fully bespoke implementations; Bog is a bespoke implementation in beta; TR7 Scheme and MHS are adapters over their upstream interpreters. Additional mini MIDI languages from [midi-langs](https://github.com/shakfu/midi-langs) can reuse the same editor, REPL, and audio stack. Expect iteration and occasional breaking changes as polyglot support expands.
 
 ## Prerequisites
 

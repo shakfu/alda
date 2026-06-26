@@ -10,6 +10,7 @@
 #include "joy_parser.h"
 #include <string.h>
 #include <math.h>
+#include <setjmp.h>
 
 /* ============================================================================
  * Helper Functions
@@ -410,6 +411,41 @@ TEST(string_concat) {
 }
 
 /* ============================================================================
+ * Security: shell execution gating
+ * ============================================================================ */
+
+/* The `system` primitive must not execute a shell command unless the binary
+ * was built with -DPSND_ENABLE_SHELL=ON. In the default (disabled) build it
+ * raises a Joy error instead, which we trap here using the same error_jmp
+ * recovery point the REPL relies on. */
+TEST(system_primitive_shell_gating) {
+    setup_context();
+
+    jmp_buf recovery;
+    ctx->error_jmp = &recovery;
+    joy_set_current_context(ctx);
+
+    volatile int errored = 0;
+    if (setjmp(recovery) == 0) {
+        eval_ok("\"true\" system");
+    } else {
+        errored = 1;
+    }
+    ctx->error_jmp = NULL;
+
+#ifdef PSND_ENABLE_SHELL
+    /* Shell enabled: system runs the command and pushes its exit status. */
+    ASSERT_FALSE(errored);
+    ASSERT_EQ(stack_depth(), 1);
+#else
+    /* Shell disabled (default): system raises an error and runs nothing. */
+    ASSERT_TRUE(errored);
+#endif
+
+    teardown_context();
+}
+
+/* ============================================================================
  * Test Runner
  * ============================================================================ */
 
@@ -471,5 +507,8 @@ BEGIN_TEST_SUITE("Joy Primitives Tests")
 
     /* Strings */
     RUN_TEST(string_concat);
+
+    /* Security: shell execution gating */
+    RUN_TEST(system_primitive_shell_gating);
 
 END_TEST_SUITE()

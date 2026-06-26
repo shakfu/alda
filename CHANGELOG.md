@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **Lua Sandbox On By Default**: The `LUA_SANDBOX` build option now defaults to `ON` (`CMakeLists.txt`). Because the editor auto-loads `.psnd/init.lua` and project Lua, an unsandboxed interpreter made opening any file or repository equivalent to arbitrary code execution. The sandbox disables `os`, `io`, `debug`, and `load`/`loadfile`/`dofile`; the bundled `init.lua` already guards these and degrades gracefully. Rebuild with `-DLUA_SANDBOX=OFF` to restore full access.
 - **Shell Execution Primitives Gated**: Joy's `system` word is now disabled unless the binary is built with the new `-DPSND_ENABLE_SHELL=ON` option (default `OFF`). When disabled it raises an error instead of running a shell command, preventing untrusted music scripts from executing arbitrary commands (`joy_primitives.c`).
 - **Web Host Binds Loopback By Default**: The optional web server now listens on `127.0.0.1` instead of `0.0.0.0` (`host_web.c`), so the filesystem-capable, unauthenticated editor is no longer exposed to the local network. Set `PSND_WEB_BIND=0.0.0.0` to deliberately expose it.
+- **Web Host Token Authentication**: The web server now generates a random 128-bit access token at startup and requires it (as a `?token=` query parameter) on the WebSocket control channel (`/ws`) and the REST API (`/api/*`), which run code and read/write files. The HTML page and static assets are still served freely so the browser can bootstrap, and the page forwards the token from its URL to the WebSocket. The full tokenized URL is printed at startup. Set `PSND_WEB_TOKEN` to use a fixed token, or `PSND_WEB_NO_AUTH=1` to disable the check (`host_web.c`, `host_web_ui.h`).
 
 ### Fixed
 
@@ -34,6 +35,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - **`PSND_ENABLE_SHELL` Build Option**: Opt-in flag (default `OFF`) controlling whether language-level shell execution primitives are compiled in (`CMakeLists.txt`)
 - **`PSND_WEB_BIND` Environment Variable**: Overrides the web host bind address (default `127.0.0.1`)
+- **`PSND_WEB_TOKEN` / `PSND_WEB_NO_AUTH` Environment Variables**: Set a fixed web access token (e.g. for automation) or disable token authentication entirely (`host_web.c`)
+- **Security Regression Tests**: A Joy test verifying that the `system` primitive raises an error when shell support is compiled out, and two tracker tests driving `:export` with an oversized `file_path` to exercise the MIDI-export filename buffer (catch overflow under AddressSanitizer) (`test_primitives.c`, `test_view.c`)
+
+### Documentation
+
+- **Corrected Source Paths and Language Counts**: Rewrote `CLAUDE.md` (stale `src/` tree and 2-language / line-count claims), resolved the README's "five languages" vs "four fully integrated" contradiction in the Status section with an accurate per-language maturity description, and fixed the outdated `src/lang/...` paths in `docs/new_lang.md` to match the real `source/langs/` and `source/core/` layout
 
 ## [0.1.6]
 

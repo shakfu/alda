@@ -1227,6 +1227,68 @@ TEST(view_end_undo_group_null_safe) {
 }
 
 /*============================================================================
+ * MIDI export filename buffer safety (regression tests)
+ *
+ * Exporting builds the .mid filename in a fixed 256-byte buffer from
+ * view->file_path. A long path previously overflowed it when appending or
+ * swapping the extension (strcat/strcpy into a near-full buffer). These drive
+ * the ":export" command with a long file_path; the writes fail cleanly (the
+ * directory does not exist) so the only thing under test is that filename
+ * construction does not corrupt memory. Run under ASan to catch regressions.
+ *============================================================================*/
+
+/* Long path with NO '.' -> old code hit strcat(filename, ".mid"). */
+TEST(export_long_file_path_no_extension_no_overflow) {
+    TrackerView* view = create_test_view_with_song(8, 2);
+    ASSERT_NOT_NULL(view);
+
+    char longpath[400];
+    memset(longpath, 'a', sizeof(longpath));
+    memcpy(longpath, "/psnd_no_such_dir/", 18);
+    longpath[sizeof(longpath) - 1] = '\0';
+    view->file_path = strdup(longpath);
+
+    view->state.command_buffer = calloc(256, 1);
+    ASSERT_NOT_NULL(view->state.command_buffer);
+    strcpy(view->state.command_buffer, "export");
+    view->state.command_buffer_len = (int)strlen("export");
+    tracker_view_exit_command(view, true);
+
+    ASSERT_TRUE(view->state.status_message != NULL ||
+                view->state.error_message != NULL);
+    ASSERT_EQ(view->state.edit_mode, TRACKER_EDIT_MODE_NAVIGATE);
+
+    free_test_view(view);
+}
+
+/* Long path whose only '.' sits near the buffer end -> old code hit
+ * strcpy(dot, ".mid") writing past the 256-byte buffer. */
+TEST(export_long_file_path_with_extension_no_overflow) {
+    TrackerView* view = create_test_view_with_song(8, 2);
+    ASSERT_NOT_NULL(view);
+
+    char longpath[400];
+    memset(longpath, 'b', sizeof(longpath));
+    memcpy(longpath, "/psnd_no_such_dir/", 18);
+    longpath[252] = '.';
+    longpath[253] = 'x';
+    longpath[sizeof(longpath) - 1] = '\0';
+    view->file_path = strdup(longpath);
+
+    view->state.command_buffer = calloc(256, 1);
+    ASSERT_NOT_NULL(view->state.command_buffer);
+    strcpy(view->state.command_buffer, "export");
+    view->state.command_buffer_len = (int)strlen("export");
+    tracker_view_exit_command(view, true);
+
+    ASSERT_TRUE(view->state.status_message != NULL ||
+                view->state.error_message != NULL);
+    ASSERT_EQ(view->state.edit_mode, TRACKER_EDIT_MODE_NAVIGATE);
+
+    free_test_view(view);
+}
+
+/*============================================================================
  * Main
  *============================================================================*/
 
@@ -1388,5 +1450,9 @@ BEGIN_TEST_SUITE("Tracker View Tests")
     RUN_TEST(view_redo_null_safe);
     RUN_TEST(view_begin_undo_group_null_safe);
     RUN_TEST(view_end_undo_group_null_safe);
+
+    /* MIDI export filename buffer safety */
+    RUN_TEST(export_long_file_path_no_extension_no_overflow);
+    RUN_TEST(export_long_file_path_with_extension_no_overflow);
 
 END_TEST_SUITE()

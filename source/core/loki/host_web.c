@@ -74,6 +74,10 @@ typedef struct {
 
     /* REPL state */
     char current_lang[32];          /* Current language for REPL (e.g., "alda", "joy") */
+
+    /* Access control: a random token required on /ws and /api/* requests as a
+     * ?token= query var. Empty string means auth is disabled. */
+    char token[33];
 } WebHostData;
 
 /* ======================= Event Queue ======================================= */
@@ -661,11 +665,62 @@ static void web_host_send_snapshot(WebHostData *data) {
 
 /* ======================= Mongoose Event Handler ============================ */
 
+/* Populate data->token. Honors PSND_WEB_NO_AUTH (disable, empty token) and
+ * PSND_WEB_TOKEN (fixed token, e.g. for automation); otherwise generates a
+ * random 128-bit hex token. */
+static void web_host_init_token(WebHostData *data) {
+    const char *no_auth = getenv("PSND_WEB_NO_AUTH");
+    if (no_auth && no_auth[0] && no_auth[0] != '0') {
+        data->token[0] = '\0';
+        return;
+    }
+    const char *fixed = getenv("PSND_WEB_TOKEN");
+    if (fixed && fixed[0]) {
+        snprintf(data->token, sizeof(data->token), "%s", fixed);
+        return;
+    }
+    unsigned char raw[16];
+    static const char hex[] = "0123456789abcdef";
+    if (!mg_random(raw, sizeof(raw))) {
+        /* Should not happen; fail closed by leaving auth enabled with a
+         * non-empty (if weak) token rather than disabling it. */
+        memset(raw, 0xA5, sizeof(raw));
+    }
+    for (size_t i = 0; i < sizeof(raw); i++) {
+        data->token[i * 2]     = hex[raw[i] >> 4];
+        data->token[i * 2 + 1] = hex[raw[i] & 0x0f];
+    }
+    data->token[sizeof(raw) * 2] = '\0';
+}
+
+/* Returns 1 if the request is authorized (auth disabled, or correct ?token=). */
+static int web_host_authorized(const WebHostData *data,
+                               struct mg_http_message *hm) {
+    if (data->token[0] == '\0') return 1; /* auth disabled */
+    char tok[64];
+    int n = mg_http_get_var(&hm->query, "token", tok, sizeof(tok));
+    if (n <= 0) return 0;
+    if ((size_t)n != strlen(data->token)) return 0;
+    return mg_strcmp(mg_str(tok), mg_str(data->token)) == 0 ? 1 : 0;
+}
+
 static void web_host_handler(struct mg_connection *c, int ev, void *ev_data) {
     WebHostData *data = (WebHostData *)c->fn_data;
 
     if (ev == MG_EV_HTTP_MSG) {
         struct mg_http_message *hm = (struct mg_http_message *)ev_data;
+
+        /* Require a valid token on the sensitive endpoints (WebSocket control
+         * channel and the REST API that runs code / reads & writes files). The
+         * HTML page and static assets are served freely so the browser can load
+         * them; the page forwards its ?token= to /ws. */
+        int is_ws = mg_match(hm->uri, mg_str("/ws"), NULL);
+        int is_api = hm->uri.len >= 5 && memcmp(hm->uri.buf, "/api/", 5) == 0;
+        if ((is_ws || is_api) && !web_host_authorized(data, hm)) {
+            mg_http_reply(c, 401, "Content-Type: text/plain\r\n",
+                          "Unauthorized: missing or invalid token\n");
+            return;
+        }
 
         /* WebSocket upgrade */
         if (mg_match(hm->uri, mg_str("/ws"), NULL)) {
@@ -816,6 +871,7 @@ EditorHost *editor_host_web_create(int port, const char *web_root) {
 
     data->port = port > 0 ? port : WEB_HOST_DEFAULT_PORT;
     data->running = 1;
+    web_host_init_token(data);
 
     if (web_root) {
         data->web_root = strdup(web_root);
@@ -877,7 +933,13 @@ int editor_host_web_run(int port, const char *web_root, const EditorConfig *conf
     }
 
     WebHostData *data = (WebHostData *)host->data;
-    fprintf(stderr, "Web editor running at http://localhost:%d\n", data->port);
+    if (data->token[0]) {
+        fprintf(stderr, "Web editor running. Open this URL (includes access token):\n");
+        fprintf(stderr, "  http://localhost:%d/?token=%s\n", data->port, data->token);
+    } else {
+        fprintf(stderr, "Web editor running at http://localhost:%d "
+                        "(token auth disabled)\n", data->port);
+    }
     if (data->web_root) {
         fprintf(stderr, "Serving static files from: %s\n", data->web_root);
     }

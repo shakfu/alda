@@ -137,7 +137,7 @@ static const char *EMBEDDED_HTML =
 "    if (ws && ws.readyState === WebSocket.OPEN) return;\n"
 "    setStatus('Connecting...', 'connecting');\n"
 "    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';\n"
-"    ws = new WebSocket(proto + '//' + location.host + '/ws');\n"
+"    ws = new WebSocket(proto + '//' + location.host + '/ws' + location.search);\n"
 "    ws.onopen = function() {\n"
 "      setStatus('Connected', 'connected');\n"
 "      send({cmd: 'resize', rows: term.rows, cols: term.cols});\n"
