@@ -12,7 +12,12 @@
 
 /* Program identity */
 #define PSND_NAME           "psnd"
-#define PSND_VERSION        "0.1.6"
+/* PSND_VERSION is normally injected by CMake from the project() VERSION (the
+ * single source of truth). This literal is only a fallback for non-CMake or
+ * IDE builds; keep it in sync with CMakeLists.txt. */
+#ifndef PSND_VERSION
+#define PSND_VERSION        "0.1.7"
+#endif
 
 /* Configuration */
 #define PSND_CONFIG_DIR     ".psnd"

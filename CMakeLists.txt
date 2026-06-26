@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(psnd_project VERSION 0.1.6 LANGUAGES C CXX)
+project(psnd_project VERSION 0.1.7 LANGUAGES C CXX)
 
 set(PSND_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 list(APPEND CMAKE_MODULE_PATH "${PSND_ROOT_DIR}/scripts/cmake")
@@ -13,6 +13,11 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 # Enable POSIX functions (strdup, strndup, usleep, etc.)
 add_compile_definitions(_DEFAULT_SOURCE)
+
+# Single source of truth for the version: inject project() VERSION as
+# PSND_VERSION so the binary, archive names, and CMake all agree. psnd.h
+# carries a matching fallback literal for non-CMake/IDE builds.
+add_compile_definitions(PSND_VERSION="${PROJECT_VERSION}")
 
 # C++ is needed for libremidi (alda dependency)
 set(CMAKE_CXX_STANDARD 17)

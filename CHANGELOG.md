@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.7]
+
 ### Security
 
 - **Lua Sandbox On By Default**: The `LUA_SANDBOX` build option now defaults to `ON` (`CMakeLists.txt`). Because the editor auto-loads `.psnd/init.lua` and project Lua, an unsandboxed interpreter made opening any file or repository equivalent to arbitrary code execution. The sandbox disables `os`, `io`, `debug`, and `load`/`loadfile`/`dofile`; the bundled `init.lua` already guards these and degrades gracefully. Rebuild with `-DLUA_SANDBOX=OFF` to restore full access.
