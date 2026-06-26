@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: build + test (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14        # Apple silicon
+            target: macos-arm64
+          - os: ubuntu-latest   # x86_64
+            target: linux-x86_64
+          - os: windows-latest  # x86_64 MSVC
+            target: windows-x86_64
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: install linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake git flex bison
+
+      - name: install macos deps
+        if: runner.os == 'macOS'
+        run: |
+          if ! command -v cmake >/dev/null 2>&1; then brew install cmake; fi
+
+      # Same single entry point as the release workflow, with --skip-package:
+      # configure (Release) -> build -> ctest -> smoke `psnd -V`. The secure
+      # defaults (LUA_SANDBOX=ON, PSND_ENABLE_SHELL=OFF, web loopback) are the
+      # ones exercised here, since build_release.py uses the project defaults.
+      - name: build + test
+        run: python3 scripts/build_release.py --target ${{ matrix.target }} --skip-package

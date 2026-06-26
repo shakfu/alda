@@ -66,6 +66,12 @@ dkms.conf
 # debug information files
 *.dwo
 
+# release artifacts
+/dist/
+/stage/
+release-notes.md
+scripts/__pycache__/
+
 # tmp
 REVIEW.md
 

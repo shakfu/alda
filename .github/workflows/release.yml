@@ -1,0 +1,131 @@
+name: release
+
+on:
+  push:
+    tags:
+      # Releases are tagged as bare semver (e.g. `0.1.7`). The `v`-prefixed
+      # form is also accepted in case the convention ever changes.
+      - '[0-9]+.[0-9]+.[0-9]+*'
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. 0.1.7 or v0.1.7). Must already exist on origin.'
+        required: true
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14        # Apple silicon
+            target: macos-arm64
+          - os: ubuntu-latest   # x86_64
+            target: linux-x86_64
+          - os: windows-latest  # x86_64 MSVC
+            target: windows-x86_64
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Fail fast and loudly when a manually-dispatched tag doesn't exist on
+      # origin. Without this, actions/checkout retries three times and fails
+      # with an opaque "git failed" message instead of "no such tag".
+      - name: verify tag exists on origin
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          TAG="${TAG#refs/tags/}"
+          REMOTE="${{ github.server_url }}/${{ github.repository }}"
+          echo "Verifying tag '$TAG' on $REMOTE..."
+          if git ls-remote --tags --exit-code "$REMOTE" "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Resolved: $TAG"
+          else
+            echo "::error::tag '$TAG' does not exist on origin."
+            echo "::error::Push it first:  git tag $TAG && git push origin $TAG"
+            echo "Available tags on $REMOTE:"
+            git ls-remote --tags "$REMOTE" 2>/dev/null \
+              | awk -F'refs/tags/' '{print "  " $2}' | sort -V | tail -20
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: install linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake git flex bison
+
+      - name: install macos deps
+        if: runner.os == 'macOS'
+        run: |
+          if ! command -v cmake >/dev/null 2>&1; then brew install cmake; fi
+
+      - name: build + package
+        # build_release.py configures (Release), builds, runs ctest, smoke-tests
+        # `psnd -V`, strips, and writes dist/psnd-<version>-<target>.{tar.gz,zip}.
+        run: python3 scripts/build_release.py --target ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: dist/psnd-*-${{ matrix.target }}.*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    # Strict: publish only when every matrix leg succeeded. No partial releases.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: list staged files
+        run: ls -la dist/
+
+      - name: extract release notes from CHANGELOG
+        # Pulls the `## [<version>]` section out of CHANGELOG.md into
+        # release-notes.md (falling back to `## [Unreleased]`). Exit 0 = found,
+        # use it as the release body; exit 2 = let GitHub auto-generate notes.
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          if python3 scripts/release_notes.py "${VERSION}"; then
+            echo "FOUND=1" >> "$GITHUB_ENV"
+            echo "--- release-notes.md ---"; cat release-notes.md
+          else
+            echo "FOUND=0" >> "$GITHUB_ENV"
+          fi
+
+      - name: create / update GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          body_path: ${{ env.FOUND == '1' && 'release-notes.md' || '' }}
+          generate_release_notes: ${{ env.FOUND != '1' }}
+          files: |
+            dist/psnd-*-macos-arm64.tar.gz
+            dist/psnd-*-linux-x86_64.tar.gz
+            dist/psnd-*-windows-x86_64.zip
+          fail_on_unmatched_files: true

@@ -37,6 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **`PSND_WEB_BIND` Environment Variable**: Overrides the web host bind address (default `127.0.0.1`)
 - **`PSND_WEB_TOKEN` / `PSND_WEB_NO_AUTH` Environment Variables**: Set a fixed web access token (e.g. for automation) or disable token authentication entirely (`host_web.c`)
 - **Security Regression Tests**: A Joy test verifying that the `system` primitive raises an error when shell support is compiled out, and two tracker tests driving `:export` with an oversized `file_path` to exercise the MIDI-export filename buffer (catch overflow under AddressSanitizer) (`test_primitives.c`, `test_view.c`)
+- **CI and Release Automation**: A `ci` workflow builds and tests psnd on macOS (arm64), Linux (x86_64), and Windows (x86_64) on every push and pull request to `main`; a tag-triggered `release` workflow builds each platform, packages versioned archives, and publishes a GitHub release with notes extracted from this CHANGELOG. Both drive a new `scripts/build_release.py` (configure -> build -> ctest -> smoke -> package) as the single build entry point, with `scripts/release_notes.py` extracting the per-version notes (`.github/workflows/ci.yml`, `.github/workflows/release.yml`, `scripts/`)
 
 ### Documentation
 
