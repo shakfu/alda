@@ -46,6 +46,11 @@ VARIANT_FLAGS: dict[str, list[str]] = {
     "fluid-csound": ["-DBUILD_FLUID_BACKEND=ON", "-DBUILD_CSOUND_BACKEND=ON"],
     "tsf-web": ["-DBUILD_WEB_HOST=ON"],
     "fluid-web": ["-DBUILD_FLUID_BACKEND=ON", "-DBUILD_WEB_HOST=ON"],
+    "fluid-csound-web": [
+        "-DBUILD_FLUID_BACKEND=ON",
+        "-DBUILD_CSOUND_BACKEND=ON",
+        "-DBUILD_WEB_HOST=ON",
+    ],
 }
 
 

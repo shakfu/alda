@@ -35,10 +35,11 @@ jobs:
 
       - name: install linux deps
         if: runner.os == 'Linux'
+        # libasound2-dev / libudev-dev are required by libremidi's ALSA backend.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake git flex bison
+            build-essential cmake git flex bison libasound2-dev libudev-dev
 
       - name: install macos deps
         if: runner.os == 'macOS'

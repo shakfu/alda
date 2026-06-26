@@ -15,17 +15,32 @@ on:
 
 jobs:
   build:
-    name: build (${{ matrix.target }})
+    name: build (${{ matrix.target }}, ${{ matrix.variant }})
     runs-on: ${{ matrix.os }}
     strategy:
+      # No fail-fast: a single bad variant should not cancel the others. The
+      # whole `build` job still reports failure if any leg fails, which gates
+      # `publish` below -- so a broken variant blocks the release rather than
+      # shipping a partial set.
       fail-fast: false
       matrix:
+        os: [macos-14, ubuntu-latest, windows-latest]
+        # Same seven variants as the "Build All Variants" matrix workflow.
+        variant:
+          - tsf
+          - tsf-csound
+          - fluid
+          - fluid-csound
+          - tsf-web
+          - fluid-web
+          - fluid-csound-web
         include:
-          - os: macos-14        # Apple silicon
+          # os -> release target label (also used to name the archive)
+          - os: macos-14
             target: macos-arm64
-          - os: ubuntu-latest   # x86_64
+          - os: ubuntu-latest
             target: linux-x86_64
-          - os: windows-latest  # x86_64 MSVC
+          - os: windows-latest
             target: windows-x86_64
     env:
       MACOSX_DEPLOYMENT_TARGET: "12.0"
@@ -64,10 +79,13 @@ jobs:
 
       - name: install linux deps
         if: runner.os == 'Linux'
+        # libasound2-dev / libudev-dev: libremidi's ALSA backend needs the
+        # alsa/asoundlib.h header and udev at configure time. flex/bison are
+        # used by the Csound parser generation in the *-csound variants.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake git flex bison
+            build-essential cmake git flex bison libasound2-dev libudev-dev
 
       - name: install macos deps
         if: runner.os == 'macOS'
@@ -76,18 +94,24 @@ jobs:
 
       - name: build + package
         # build_release.py configures (Release), builds, runs ctest, smoke-tests
-        # `psnd -V`, strips, and writes dist/psnd-<version>-<target>.{tar.gz,zip}.
-        run: python3 scripts/build_release.py --target ${{ matrix.target }}
+        # `psnd -V`, strips, and writes the versioned archive. The default `tsf`
+        # variant is named psnd-<version>-<target>.{tar.gz,zip}; every other
+        # variant appends its name, e.g. psnd-<version>-<target>-fluid-csound.*.
+        # On Windows the Csound variants trigger CMake's winflexbison download.
+        run: python3 scripts/build_release.py --variant ${{ matrix.variant }} --target ${{ matrix.target }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.target }}
-          path: dist/psnd-*-${{ matrix.target }}.*
+          # One artifact per (target, variant) leg; merged in publish.
+          name: ${{ matrix.target }}-${{ matrix.variant }}
+          path: dist/psnd-*
           if-no-files-found: error
 
   publish:
     needs: build
-    # Strict: publish only when every matrix leg succeeded. No partial releases.
+    # `needs: build` with the default success requirement means publish runs
+    # only when EVERY matrix leg (all 7 variants x 3 platforms) succeeded.
+    # Any failure blocks the release -- no partial publishes.
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -124,8 +148,11 @@ jobs:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           body_path: ${{ env.FOUND == '1' && 'release-notes.md' || '' }}
           generate_release_notes: ${{ env.FOUND != '1' }}
+          # Attach every variant archive: tar.gz from macOS/Linux, zip from
+          # Windows. Completeness is enforced by the matrix gate above (a
+          # missing variant fails its build leg and blocks this job), so broad
+          # globs are sufficient here. Both must match at least one file.
           files: |
-            dist/psnd-*-macos-arm64.tar.gz
-            dist/psnd-*-linux-x86_64.tar.gz
-            dist/psnd-*-windows-x86_64.zip
+            dist/psnd-*.tar.gz
+            dist/psnd-*.zip
           fail_on_unmatched_files: true
