@@ -877,6 +877,7 @@ static void prim_cons(JoyContext* ctx) {
         }
         size_t len = strlen(agg.data.string);
         char* result = malloc(len + 2);
+        if (!result) joy_error("cons: out of memory");
         result[0] = item.data.character;
         memcpy(result + 1, agg.data.string, len + 1);
         joy_value_free(&item);
@@ -971,6 +972,7 @@ static void prim_concat(JoyContext* ctx) {
         size_t alen = strlen(a.data.string);
         size_t blen = strlen(b.data.string);
         char* result = malloc(alen + blen + 1);
+        if (!result) joy_error("concat: out of memory");
         memcpy(result, a.data.string, alen);
         memcpy(result + alen, b.data.string, blen + 1);
         joy_value_free(&a);
@@ -1154,6 +1156,7 @@ static void prim_take(JoyContext* ctx) {
             size_t len = strlen(agg.data.string);
             size_t count = (size_t)n < len ? (size_t)n : len;
             char* result = malloc(count + 1);
+            if (!result) joy_error("take: out of memory");
             strncpy(result, agg.data.string, count);
             result[count] = '\0';
             joy_value_free(&agg);
@@ -1715,6 +1718,7 @@ static void prim_enconcat(JoyContext* ctx) {
         }
         size_t len = strlen(s.data.string) + 1 + strlen(t.data.string) + 1;
         char* result = malloc(len);
+        if (!result) joy_error("enconcat: out of memory");
         strcpy(result, s.data.string);
         size_t slen = strlen(s.data.string);
         result[slen] = x.data.character;
@@ -4748,9 +4752,17 @@ static void prim_system(JoyContext* ctx) {
     REQUIRE(1, "system");
     JoyValue v = POP();
     EXPECT_TYPE(v, JOY_STRING, "system");
+#ifdef PSND_ENABLE_SHELL
     int result = system(v.data.string);
     joy_value_free(&v);
     PUSH(joy_integer(result));
+#else
+    /* Shell execution disabled by default to avoid arbitrary-command-execution
+     * from untrusted scripts. Rebuild with -DPSND_ENABLE_SHELL=ON to allow it. */
+    joy_value_free(&v);
+    joy_error("system: shell execution is disabled "
+              "(rebuild with -DPSND_ENABLE_SHELL=ON to enable)");
+#endif
 }
 
 static void prim_getenv(JoyContext* ctx) {

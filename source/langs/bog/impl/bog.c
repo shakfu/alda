@@ -64,6 +64,8 @@ void* bog_arena_alloc(BogArena* arena, size_t size)
     if (!arena->head || arena->head->used + size > arena->head->capacity) {
         size_t cap = size > arena->default_block ? size : arena->default_block;
         ArenaBlock* block = arena_block_create(cap);
+        if (!block)
+            return NULL; /* allocation failed: propagate NULL to caller */
         block->next = arena->head;
         arena->head = block;
     }
@@ -957,6 +959,7 @@ static void term_to_string_rec(const BogTerm* term, BogArena* arena,
     if (!term) {
         const char* nil = "∅";
         char* out = (char*)bog_arena_alloc(arena, strlen(nil) + 1);
+        if (!out) { *buffer = NULL; *size = 0; return; }
         strcpy(out, nil);
         *buffer = out;
         *size = strlen(nil);
@@ -968,6 +971,7 @@ static void term_to_string_rec(const BogTerm* term, BogArena* arena,
         snprintf(tmp, sizeof(tmp), "%g", term->value.number);
         size_t len = strlen(tmp);
         char* out = (char*)bog_arena_alloc(arena, len + 1);
+        if (!out) { *buffer = NULL; *size = 0; return; }
         memcpy(out, tmp, len + 1);
         *buffer = out;
         *size = len;
@@ -977,6 +981,7 @@ static void term_to_string_rec(const BogTerm* term, BogArena* arena,
     case CPROLOG_TERM_VAR: {
         size_t len = strlen(term->value.atom);
         char* out = (char*)bog_arena_alloc(arena, len + 1);
+        if (!out) { *buffer = NULL; *size = 0; return; }
         memcpy(out, term->value.atom, len + 1);
         *buffer = out;
         *size = len;
@@ -991,6 +996,7 @@ static void term_to_string_rec(const BogTerm* term, BogArena* arena,
                 arena, sizeof(char*) * term->value.list.length);
             lengths = (size_t*)bog_arena_alloc(
                 arena, sizeof(size_t) * term->value.list.length);
+            if (!parts || !lengths) { *buffer = NULL; *size = 0; return; }
             for (size_t i = 0; i < term->value.list.length; ++i) {
                 term_to_string_rec(term->value.list.items[i], arena, &parts[i],
                                    &lengths[i]);
@@ -1007,6 +1013,7 @@ static void term_to_string_rec(const BogTerm* term, BogArena* arena,
             total += tail_len + 3;
         }
         char* out = (char*)bog_arena_alloc(arena, total + 1);
+        if (!out) { *buffer = NULL; *size = 0; return; }
         char* ptr = out;
         *ptr++ = '[';
         for (size_t i = 0; i < term->value.list.length; ++i) {
@@ -1040,6 +1047,7 @@ static void term_to_string_rec(const BogTerm* term, BogArena* arena,
                            &right_len);
         size_t total = left_len + right_len + 5;
         char* out = (char*)bog_arena_alloc(arena, total + 1);
+        if (!out) { *buffer = NULL; *size = 0; return; }
         char* ptr = out;
         *ptr++ = '(';
         memcpy(ptr, left_str, left_len);
@@ -1065,6 +1073,7 @@ static void term_to_string_rec(const BogTerm* term, BogArena* arena,
                 arena, sizeof(char*) * term->value.compound.arity);
             lengths = (size_t*)bog_arena_alloc(
                 arena, sizeof(size_t) * term->value.compound.arity);
+            if (!parts || !lengths) { *buffer = NULL; *size = 0; return; }
             for (size_t i = 0; i < term->value.compound.arity; ++i) {
                 term_to_string_rec(term->value.compound.args[i], arena,
                                    &parts[i], &lengths[i]);
@@ -1074,6 +1083,7 @@ static void term_to_string_rec(const BogTerm* term, BogArena* arena,
             }
         }
         char* out = (char*)bog_arena_alloc(arena, total + 1);
+        if (!out) { *buffer = NULL; *size = 0; return; }
         char* ptr = out;
         memcpy(ptr, term->value.compound.functor, name_len);
         ptr += name_len;
@@ -1097,11 +1107,14 @@ static void term_to_string_rec(const BogTerm* term, BogArena* arena,
 
 char* bog_term_to_string(const BogTerm* term, BogArena* arena)
 {
-    char* buffer;
-    size_t len;
+    char* buffer = NULL;
+    size_t len = 0;
     term_to_string_rec(term, arena, &buffer, &len);
+    if (!buffer) return NULL;
     char* out = (char*)malloc(len + 1);
-    memcpy(out, buffer, len + 1);
+    if (!out) return NULL;
+    memcpy(out, buffer, len);
+    out[len] = '\0';
     return out;
 }
 

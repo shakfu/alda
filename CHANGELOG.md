@@ -17,6 +17,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Security
+
+- **Lua Sandbox On By Default**: The `LUA_SANDBOX` build option now defaults to `ON` (`CMakeLists.txt`). Because the editor auto-loads `.psnd/init.lua` and project Lua, an unsandboxed interpreter made opening any file or repository equivalent to arbitrary code execution. The sandbox disables `os`, `io`, `debug`, and `load`/`loadfile`/`dofile`; the bundled `init.lua` already guards these and degrades gracefully. Rebuild with `-DLUA_SANDBOX=OFF` to restore full access.
+- **Shell Execution Primitives Gated**: Joy's `system` word is now disabled unless the binary is built with the new `-DPSND_ENABLE_SHELL=ON` option (default `OFF`). When disabled it raises an error instead of running a shell command, preventing untrusted music scripts from executing arbitrary commands (`joy_primitives.c`).
+- **Web Host Binds Loopback By Default**: The optional web server now listens on `127.0.0.1` instead of `0.0.0.0` (`host_web.c`), so the filesystem-capable, unauthenticated editor is no longer exposed to the local network. Set `PSND_WEB_BIND=0.0.0.0` to deliberately expose it.
+
+### Fixed
+
+- **Tracker MIDI Export Buffer Safety**: Replaced an unterminated `strncpy` into an uninitialized 256-byte buffer (out-of-bounds read on long `:export` arguments) and the `strcat`/`strcpy(dot, …)` extension-swap paths (up-to-4-byte overflow on near-256-char paths) with bounded `snprintf` strip-then-append logic (`tracker_view.c`)
+- **Async Scheduler Data Races**: The cross-thread `running` and `shutdown_requested` flags are now `volatile sig_atomic_t` for indivisible access, and the non-reentrant `g_sort_by_ticks` global comparator state was removed in favor of two self-contained comparators selected at the `qsort` call site (`shared_async.c`)
+- **Bog Allocation NULL Dereferences**: Fixed a latent NULL dereference in `bog_arena_alloc()` when `arena_block_create()` fails, and guarded every write site in `term_to_string_rec()`/`bog_term_to_string()` against allocation failure instead of dereferencing NULL (`bog.c`)
+- **Joy String Primitive NULL Checks**: Added out-of-memory guards after the unchecked `malloc` calls in the `cons`, `concat`, `take`, and `enconcat` primitives, which previously wrote to a NULL pointer on allocation failure (`joy_primitives.c`)
+
+### Added
+
+- **`PSND_ENABLE_SHELL` Build Option**: Opt-in flag (default `OFF`) controlling whether language-level shell execution primitives are compiled in (`CMakeLists.txt`)
+- **`PSND_WEB_BIND` Environment Variable**: Overrides the web host bind address (default `127.0.0.1`)
+
 ## [0.1.6]
 
 ### Fixed

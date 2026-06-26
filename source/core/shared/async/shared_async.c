@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <signal.h>
 
 /* ============================================================================
  * Active Note Tracking
@@ -80,8 +81,11 @@ typedef struct {
     uv_async_t wake_async;
     uv_mutex_t mutex;
 
-    int running;
-    int shutdown_requested;
+    /* Cross-thread flags: written by the control thread, read by the worker
+     * loop. sig_atomic_t + volatile gives indivisible access without a mutex
+     * (matches the convention in csound_backend.c). */
+    volatile sig_atomic_t running;
+    volatile sig_atomic_t shutdown_requested;
 
     AsyncSlot slots[SHARED_ASYNC_MAX_SLOTS];
     int active_count;
@@ -396,26 +400,30 @@ static void async_thread_fn(void* arg) {
  * Event Comparison for Sorting
  * ============================================================================ */
 
-/* Flag to indicate sorting mode - set before qsort call */
-static int g_sort_by_ticks = 0;
-
-static int compare_events(const void* a, const void* b) {
-    const SharedAsyncEvent* ea = (const SharedAsyncEvent*)a;
-    const SharedAsyncEvent* eb = (const SharedAsyncEvent*)b;
-
-    int time_diff;
-    if (g_sort_by_ticks) {
-        time_diff = ea->tick - eb->tick;
-    } else {
-        time_diff = ea->time_ms - eb->time_ms;
-    }
-
-    if (time_diff != 0) return time_diff;
-
-    /* At same time: note-offs before note-ons */
+/* Tie-break at the same time: note-offs before note-ons. */
+static int compare_event_type(const SharedAsyncEvent* ea,
+                              const SharedAsyncEvent* eb) {
     int type_a = (ea->type == SHARED_ASYNC_NOTE_OFF) ? 0 : 1;
     int type_b = (eb->type == SHARED_ASYNC_NOTE_OFF) ? 0 : 1;
     return type_a - type_b;
+}
+
+/* Two self-contained comparators select the timing axis without any shared
+ * global state, so concurrent sorts on different schedules cannot interfere. */
+static int compare_events_by_ms(const void* a, const void* b) {
+    const SharedAsyncEvent* ea = (const SharedAsyncEvent*)a;
+    const SharedAsyncEvent* eb = (const SharedAsyncEvent*)b;
+    int time_diff = ea->time_ms - eb->time_ms;
+    if (time_diff != 0) return time_diff;
+    return compare_event_type(ea, eb);
+}
+
+static int compare_events_by_ticks(const void* a, const void* b) {
+    const SharedAsyncEvent* ea = (const SharedAsyncEvent*)a;
+    const SharedAsyncEvent* eb = (const SharedAsyncEvent*)b;
+    int time_diff = ea->tick - eb->tick;
+    if (time_diff != 0) return time_diff;
+    return compare_event_type(ea, eb);
 }
 
 /* ============================================================================
@@ -819,9 +827,9 @@ int shared_async_play_ex(SharedAsyncSchedule* sched, SharedContext* ctx,
     slot->use_ticks = sched->use_ticks;
     slot->tempo = sched->initial_tempo > 0 ? sched->initial_tempo : SHARED_ASYNC_DEFAULT_TEMPO;
 
-    /* Sort by time (set global flag for comparison function) */
-    g_sort_by_ticks = sched->use_ticks;
-    qsort(slot->events, slot->event_count, sizeof(SharedAsyncEvent), compare_events);
+    /* Sort by time using the comparator for this schedule's timing axis. */
+    qsort(slot->events, slot->event_count, sizeof(SharedAsyncEvent),
+          sched->use_ticks ? compare_events_by_ticks : compare_events_by_ms);
 
     /* Initialize state */
     slot->event_index = 0;

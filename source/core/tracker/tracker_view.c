@@ -1603,14 +1603,12 @@ bool tracker_view_handle_input(TrackerView* view, const TrackerInputEvent* event
             /* Generate default filename based on song name or file path */
             char filename[256];
             if (view->file_path) {
-                /* Replace extension with .mid */
+                /* Replace extension with .mid (strip then append safely) */
                 snprintf(filename, sizeof(filename), "%s", view->file_path);
                 char* dot = strrchr(filename, '.');
-                if (dot) {
-                    strcpy(dot, ".mid");
-                } else {
-                    strcat(filename, ".mid");
-                }
+                if (dot) *dot = '\0';
+                size_t base = strlen(filename);
+                snprintf(filename + base, sizeof(filename) - base, ".mid");
             } else if (view->song && view->song->name) {
                 snprintf(filename, sizeof(filename), "%s.mid", view->song->name);
             } else {
@@ -2341,12 +2339,13 @@ static void execute_command(TrackerView* view, const char* cmd) {
         /* :export [filename.mid] - export MIDI */
         char filename[256];
         if (arg[0]) {
-            strncpy(filename, arg, sizeof(filename) - 1);
+            snprintf(filename, sizeof(filename), "%s", arg);
         } else if (view->file_path) {
             snprintf(filename, sizeof(filename), "%s", view->file_path);
             char* dot = strrchr(filename, '.');
-            if (dot) strcpy(dot, ".mid");
-            else strcat(filename, ".mid");
+            if (dot) *dot = '\0';
+            size_t base = strlen(filename);
+            snprintf(filename + base, sizeof(filename) - base, ".mid");
         } else {
             snprintf(filename, sizeof(filename), "song.mid");
         }

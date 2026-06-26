@@ -28,9 +28,20 @@ option(BUILD_CSOUND_BACKEND "Build with Csound synthesis backend (requires libsn
 option(BUILD_MINIHOST_BACKEND "Build with minihost VST/AU plugin support (fetches JUCE)" OFF)
 option(BUILD_TESTING "Build tests (default on)" ON)
 option(BUILD_WEB_HOST "Build web server host with mongoose" OFF)
-option(LUA_SANDBOX "Sandbox Lua: disable os, io, debug, load*" OFF)
+# Lua sandbox is ON by default: the editor auto-loads .psnd/init.lua and
+# project Lua, so an unsandboxed interpreter would make opening any file/repo
+# arbitrary code execution. Set -DLUA_SANDBOX=OFF to restore full os/io/debug.
+option(LUA_SANDBOX "Sandbox Lua: disable os, io, debug, load*" ON)
+# Shell-exec primitives (e.g. Joy's `system`) are OFF by default; they let a
+# music script run arbitrary shell commands. Opt in explicitly to enable them.
+option(PSND_ENABLE_SHELL "Allow language-level shell execution primitives" OFF)
 option(PSND_ENABLE_ASAN "Enable AddressSanitizer for memory error detection" OFF)
 option(PSND_ENABLE_COVERAGE "Enable code coverage instrumentation (gcov/lcov)" OFF)
+
+if(PSND_ENABLE_SHELL)
+    add_compile_definitions(PSND_ENABLE_SHELL)
+    message(STATUS "Shell execution primitives ENABLED (PSND_ENABLE_SHELL=ON)")
+endif()
 
 # AddressSanitizer configuration
 if(PSND_ENABLE_ASAN)

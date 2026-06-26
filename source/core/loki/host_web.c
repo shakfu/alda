@@ -830,9 +830,14 @@ EditorHost *editor_host_web_create(int port, const char *web_root) {
     /* Initialize mongoose */
     mg_mgr_init(&data->mgr);
 
-    /* Build listen URL */
+    /* Build listen URL.
+     * Default to loopback (127.0.0.1) so the editor, which has full filesystem
+     * access and no authentication, is NOT exposed to the local network.
+     * Set PSND_WEB_BIND=0.0.0.0 to deliberately expose it to other hosts. */
+    const char* bind_addr = getenv("PSND_WEB_BIND");
+    if (!bind_addr || !bind_addr[0]) bind_addr = "127.0.0.1";
     char url[64];
-    snprintf(url, sizeof(url), "http://0.0.0.0:%d", data->port);
+    snprintf(url, sizeof(url), "http://%s:%d", bind_addr, data->port);
 
     /* Start HTTP listener */
     data->listener = mg_http_listen(&data->mgr, url, web_host_handler, data);
