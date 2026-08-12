@@ -185,6 +185,29 @@ TEST(play_alda_nonexistent_file) {
  * =============================================================================
  */
 
+/* =============================================================================
+ * Option Placement
+ * =============================================================================
+ */
+
+TEST(play_options_before_filename) {
+    /* Regression: the play dispatcher located the file argument to select the
+     * language, then forwarded argv starting AT the file. Options preceding the
+     * filename (-v, -sf) were silently dropped, so `psnd play -sf x.sf2 y.alda`
+     * played to no output at all. Exit status stayed 0, so only the verbose
+     * banner reveals whether the flag survived dispatch. */
+    char filepath[TEST_PROC_MAX_PATH];
+    ASSERT_EQ(test_write_file(temp_dir, "optorder.joy", "42\n"), 0);
+    test_build_path(temp_dir, "optorder.joy", filepath);
+
+    char *args[] = {"psnd", "play", "-v", filepath, NULL};
+    char output[4096];
+    int result = test_exec_capture(PSND_BINARY, args, output, sizeof(output));
+
+    ASSERT_EQ(result, 0);
+    ASSERT_NOT_NULL(strstr(output, "Executing:"));
+}
+
 TEST(play_no_file_arg) {
     /* psnd play without file should fail */
     char *args[] = {"psnd", "play", NULL};
@@ -225,6 +248,9 @@ BEGIN_TEST_SUITE_WITH_FIXTURE("psnd play command", play_tests)
     RUN_TEST(play_alda_simple_note);
     RUN_TEST(play_alda_chord);
     RUN_TEST(play_alda_nonexistent_file);
+
+    /* Option placement */
+    RUN_TEST(play_options_before_filename);
 
     /* Error cases */
     RUN_TEST(play_no_file_arg);

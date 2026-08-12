@@ -169,9 +169,11 @@ int main(int argc, char **argv) {
         for (int i = 2; i < argc; i++) {
             const LangDispatchEntry *file_lang = lang_dispatch_find_by_extension(argv[i]);
             if (file_lang && file_lang->play_main) {
-                /* Route to language's play function */
-                /* Create argv starting from the file */
-                return file_lang->play_main(argc - i, argv + i);
+                /* Route to language's play function.
+                 * Pass every argument after "play" - the file argument is only
+                 * used to select the language, so options preceding it (-sf, -v)
+                 * must still reach the language's own argument parser. */
+                return file_lang->play_main(argc - 2, argv + 2);
             }
         }
 
