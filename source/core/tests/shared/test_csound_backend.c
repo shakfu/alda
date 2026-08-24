@@ -21,7 +21,7 @@
 #include "test_framework.h"
 #include <stdlib.h>
 #include <stdio.h>
-#include <time.h>
+#include <stdint.h>
 #include <uv.h>
 #include "audio/audio.h"
 
@@ -528,13 +528,13 @@ TEST(csound_render_returns_promptly_while_compiling) {
     long samples = 0;
 
     while (!g_compiler_done) {
-        struct timespec t0, t1;
-        clock_gettime(CLOCK_MONOTONIC, &t0);
+        /* uv_hrtime rather than clock_gettime: monotonic on every platform we
+         * build for, and MSVC has no CLOCK_MONOTONIC. */
+        uint64_t t0 = uv_hrtime();
         shared_csound_render(buffer, 512);
-        clock_gettime(CLOCK_MONOTONIC, &t1);
+        uint64_t t1 = uv_hrtime();
 
-        double ms = (t1.tv_sec - t0.tv_sec) * 1000.0 +
-                    (t1.tv_nsec - t0.tv_nsec) / 1e6;
+        double ms = (double)(t1 - t0) / 1e6;
         if (ms > worst_ms) worst_ms = ms;
         samples++;
     }

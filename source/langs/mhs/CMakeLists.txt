@@ -737,6 +737,12 @@ add_custom_command(
     VERBATIM
 )
 
+# One target owns the rule. Consumers depend on the target, never on the file
+# directly: a custom command output listed by two independent targets is
+# duplicated into both by the Makefile generator, and a parallel build then
+# runs the generator twice at once, leaving a half-written header behind.
+add_custom_target(mhs-embedded-src-header DEPENDS ${EMBEDDED_SRC_HEADER})
+
 # mhs-midi-src-zstd: compressed source embedding
 # Uses mhs_embedded_zstd.h (expected by vfs.c VFS_USE_ZSTD mode)
 set(EMBEDDED_SRC_ZSTD_HEADER ${CMAKE_CURRENT_BINARY_DIR}/mhs_embedded_zstd.h)
@@ -760,6 +766,8 @@ add_custom_command(
     COMMENT "Generating mhs_embedded_src_zstd.h (compressed source)"
     VERBATIM
 )
+
+add_custom_target(mhs-embedded-src-zstd-header DEPENDS ${EMBEDDED_SRC_ZSTD_HEADER})
 
 # ============================================
 # Generate embedded headers for package-based variants
@@ -858,6 +866,8 @@ add_custom_command(
     VERBATIM
 )
 
+add_custom_target(mhs-embedded-pkg-header DEPENDS ${EMBEDDED_PKG_HEADER})
+
 # mhs-midi-pkg-zstd: compressed package embedding (smallest + fast startup)
 # Uses mhs_embedded_pkgs_zstd.h (expected by vfs.c VFS_USE_PKG + VFS_USE_ZSTD mode)
 set(EMBEDDED_PKG_ZSTD_HEADER ${CMAKE_CURRENT_BINARY_DIR}/mhs_embedded_pkgs_zstd.h)
@@ -887,13 +897,15 @@ add_custom_command(
     VERBATIM
 )
 
+add_custom_target(mhs-embedded-pkg-zstd-header DEPENDS ${EMBEDDED_PKG_ZSTD_HEADER})
+
 endif() # BUILD_MHS_PKG_VARIANTS
 
 # ============================================
 # Function to create a standalone variant target
 # ============================================
 
-function(add_mhs_standalone_variant TARGET_NAME EMBEDDED_HEADER)
+function(add_mhs_standalone_variant TARGET_NAME HEADER_TARGET)
     set(options USE_ZSTD USE_PKG)
     cmake_parse_arguments(VARIANT "${options}" "" "" ${ARGN})
 
@@ -905,7 +917,6 @@ function(add_mhs_standalone_variant TARGET_NAME EMBEDDED_HEADER)
         ${CMAKE_CURRENT_SOURCE_DIR}/mhs_ffi_override.c
         ${CMAKE_CURRENT_SOURCE_DIR}/midi_ffi.c
         ${CMAKE_CURRENT_SOURCE_DIR}/vfs.c
-        ${EMBEDDED_HEADER}
     )
 
     if(VARIANT_USE_ZSTD)
@@ -913,6 +924,10 @@ function(add_mhs_standalone_variant TARGET_NAME EMBEDDED_HEADER)
     endif()
 
     add_executable(${TARGET_NAME} ${VARIANT_SOURCES})
+
+    # Ordering only - the header's own rule lives in HEADER_TARGET. Rebuilds on
+    # header change still come from CMake's dependency scan of vfs.c.
+    add_dependencies(${TARGET_NAME} ${HEADER_TARGET})
 
     target_include_directories(${TARGET_NAME} PRIVATE
         ${MHS_RUNTIME}
@@ -959,7 +974,7 @@ endfunction()
 # ============================================
 
 # mhs-midi-src: source embedding (default standalone behavior)
-add_mhs_standalone_variant(mhs-midi-src ${EMBEDDED_SRC_HEADER})
+add_mhs_standalone_variant(mhs-midi-src mhs-embedded-src-header)
 
 # Backward compatibility: mhs-midi-standalone as alias to mhs-midi-src
 add_custom_target(mhs-midi-standalone DEPENDS mhs-midi-src)
@@ -967,17 +982,17 @@ add_custom_target(mhs-midi-standalone DEPENDS mhs-midi-src)
 # Package-based variants (only if enabled)
 if(BUILD_MHS_PKG_VARIANTS)
     # mhs-midi-pkg: package embedding (fast startup)
-    add_mhs_standalone_variant(mhs-midi-pkg ${EMBEDDED_PKG_HEADER} USE_PKG)
+    add_mhs_standalone_variant(mhs-midi-pkg mhs-embedded-pkg-header USE_PKG)
 endif()
 
 # Zstd-compressed variants (only if zstd available)
 if(HAVE_ZSTD)
     # mhs-midi-src-zstd: source embedding + zstd compression
-    add_mhs_standalone_variant(mhs-midi-src-zstd ${EMBEDDED_SRC_ZSTD_HEADER} USE_ZSTD)
+    add_mhs_standalone_variant(mhs-midi-src-zstd mhs-embedded-src-zstd-header USE_ZSTD)
 
     if(BUILD_MHS_PKG_VARIANTS)
         # mhs-midi-pkg-zstd: compressed package embedding (smallest + fast startup)
-        add_mhs_standalone_variant(mhs-midi-pkg-zstd ${EMBEDDED_PKG_ZSTD_HEADER} USE_PKG USE_ZSTD)
+        add_mhs_standalone_variant(mhs-midi-pkg-zstd mhs-embedded-pkg-zstd-header USE_PKG USE_ZSTD)
     endif()
 endif()
 
@@ -1082,19 +1097,27 @@ if(ENABLE_MHS_INTEGRATION AND NOT WIN32)
         if(PSND_MHS_USE_PKG)
             if(PSND_MHS_USE_ZSTD)
                 set(PSND_HEADER_TARGET ${EMBEDDED_PKG_ZSTD_HEADER})
+                set(PSND_HEADER_GEN_TARGET mhs-embedded-pkg-zstd-header)
             else()
                 set(PSND_HEADER_TARGET ${EMBEDDED_PKG_HEADER})
+                set(PSND_HEADER_GEN_TARGET mhs-embedded-pkg-header)
             endif()
         else()
             if(PSND_MHS_USE_ZSTD)
                 set(PSND_HEADER_TARGET ${EMBEDDED_SRC_ZSTD_HEADER})
+                set(PSND_HEADER_GEN_TARGET mhs-embedded-src-zstd-header)
             else()
                 set(PSND_HEADER_TARGET ${EMBEDDED_SRC_HEADER})
+                set(PSND_HEADER_GEN_TARGET mhs-embedded-src-header)
             endif()
         endif()
 
-        # Create a custom target for the embedded header
-        add_custom_target(mhs-psnd-embedded-header DEPENDS ${PSND_HEADER_TARGET})
+        # Chain to the target that owns the generator rule rather than naming
+        # the file again - the standalone variants consume the same header, and
+        # two independent targets listing one custom command output is what
+        # makes a parallel build run the generator twice.
+        add_custom_target(mhs-psnd-embedded-header)
+        add_dependencies(mhs-psnd-embedded-header ${PSND_HEADER_GEN_TARGET})
     else()
         # Generate psnd-specific headers without libraries
         # This reduces binary size by ~1.3MB (no libremidi.a)

@@ -8,6 +8,7 @@
 #include "internal.h"
 #include "psnd.h"
 #include "syntax.h"
+#include "psnd_dirent.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,32 +19,8 @@
 #include <io.h>
 #define access _access
 #define F_OK 0
-
-/* Minimal dirent compatibility for Windows */
-struct dirent { char d_name[MAX_PATH]; };
-typedef struct { HANDLE hFind; WIN32_FIND_DATAA ffd; struct dirent ent; int first; } DIR;
-static DIR *opendir(const char *path) {
-    DIR *d = (DIR*)malloc(sizeof(DIR));
-    if (!d) return NULL;
-    char search[MAX_PATH];
-    snprintf(search, MAX_PATH, "%s\\*", path);
-    d->hFind = FindFirstFileA(search, &d->ffd);
-    if (d->hFind == INVALID_HANDLE_VALUE) { free(d); return NULL; }
-    d->first = 1;
-    return d;
-}
-static struct dirent *readdir(DIR *d) {
-    if (!d) return NULL;
-    if (d->first) { d->first = 0; }
-    else if (!FindNextFileA(d->hFind, &d->ffd)) return NULL;
-    strncpy(d->ent.d_name, d->ffd.cFileName, MAX_PATH - 1);
-    d->ent.d_name[MAX_PATH - 1] = '\0';
-    return &d->ent;
-}
-static void closedir(DIR *d) { if (d) { FindClose(d->hFind); free(d); } }
 #else
 #include <unistd.h>
-#include <dirent.h>
 #endif
 
 #include <toml.h>

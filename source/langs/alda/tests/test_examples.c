@@ -22,8 +22,8 @@
 #include <alda/context.h>
 #include <alda/interpreter.h>
 #include <alda/parser.h>
+#include <psnd_dirent.h>
 
-#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
