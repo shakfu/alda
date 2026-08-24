@@ -147,6 +147,14 @@ int alda_events_play(AldaContext* ctx);
 int alda_duration_to_ticks(int denominator, int dots);
 
 /**
+ * @brief Convert a possibly fractional note-length denominator to ticks.
+ * @param denominator Note value denominator (4 = quarter, 0.25 = quadruple whole).
+ * @param dots Number of augmentation dots.
+ * @return Duration in ticks.
+ */
+int alda_duration_to_ticks_frac(double denominator, int dots);
+
+/**
  * @brief Convert milliseconds to ticks.
  * @param ms Milliseconds.
  * @param tempo BPM.

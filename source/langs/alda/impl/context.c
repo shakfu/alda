@@ -179,6 +179,26 @@ AldaPartState* alda_find_part(AldaContext* ctx, const char* name) {
         }
     }
 
+    /* Dot accessor: "<group-alias>.<instrument>" selects one member of a
+     * previously declared group, e.g. "strings.cello" after
+     * violin/viola/cello "strings". Every member of an aliased group carries
+     * the group alias, so match on alias plus instrument name. */
+    const char* dot = strchr(name, '.');
+    if (dot && dot != name && dot[1] != '\0') {
+        size_t alias_len = (size_t)(dot - name);
+        const char* member = dot + 1;
+
+        for (int i = 0; i < ctx->part_count; i++) {
+            AldaPartState* part = &ctx->parts[i];
+            if (part->alias[0] == '\0') continue;
+            if (strlen(part->alias) != alias_len) continue;
+            if (strncmp(part->alias, name, alias_len) != 0) continue;
+            if (strcmp(part->name, member) == 0) {
+                return part;
+            }
+        }
+    }
+
     return NULL;
 }
 

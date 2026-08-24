@@ -20,7 +20,17 @@ extern "C" {
  * Constants
  * ============================================================================ */
 
-#define ALDA_MAX_PARTS          64
+/* Enough for a score that names every General MIDI instrument at once.
+ * examples/all-instruments.alda needs 129 - the 128 GM programs plus
+ * midi-percussion - so 128 is one short; 256 matches ALDA_MAX_MARKERS and
+ * ALDA_MAX_VARIABLES and leaves headroom.
+ *
+ * Parts are a fixed array inside AldaContext, so this sets the struct size:
+ * roughly 444 bytes per part, putting the context near 150KB. That is why
+ * callers allocate it on the heap or statically rather than on the stack.
+ * MIDI channels are a separate, much smaller limit - parts share the 15
+ * non-percussion channels dynamically. */
+#define ALDA_MAX_PARTS          256
 #define ALDA_MAX_VOICES         16
 #define ALDA_MAX_PORTS          32
 #define ALDA_MAX_EVENTS         16384
@@ -78,7 +88,7 @@ typedef struct {
     int pan;                 /* Pan position (0-127, 64=center) */
 
     /* Duration state */
-    int default_duration;    /* Note value denominator (4=quarter) */
+    double default_duration; /* Note value denominator (4=quarter, may be fractional) */
     int default_dots;        /* Dotted duration count */
 
     /* Timing */

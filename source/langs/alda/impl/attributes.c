@@ -393,7 +393,7 @@ int alda_eval_attribute(AldaContext* ctx, AldaPartState* part, AldaNode* lisp_li
             /* Value is in beats (1.0 = quarter note) */
             /* Convert to denominator: 1.0 -> 4, 0.5 -> 8, 2.0 -> 2 */
             if (num_val > 0) {
-                int denom = (int)(4.0 / num_val);
+                double denom = 4.0 / num_val;
                 if (denom > 0) {
                     part->default_duration = denom;
                     part->default_dots = 0;
@@ -407,7 +407,7 @@ int alda_eval_attribute(AldaContext* ctx, AldaPartState* part, AldaNode* lisp_li
     if (strcasecmp_local(name, "set-note-length") == 0 ||
         strcasecmp_local(name, "note-length") == 0) {
         if (has_num && part) {
-            int denom = (int)num_val;
+            double denom = num_val;
             if (denom > 0) {
                 part->default_duration = denom;
                 part->default_dots = 0;

@@ -121,7 +121,7 @@ int alda_ast_duration_to_ticks(AldaContext* ctx, AldaPartState* part, AldaNode* 
 
     /* If no duration node, use part's default */
     if (!duration) {
-        return alda_duration_to_ticks(part->default_duration, part->default_dots);
+        return alda_duration_to_ticks_frac(part->default_duration, part->default_dots);
     }
 
     /* Handle different duration node types */
@@ -139,9 +139,9 @@ int alda_ast_duration_to_ticks(AldaContext* ctx, AldaPartState* part, AldaNode* 
 
         case ALDA_NODE_NOTE_LENGTH: {
             /* Standard note length (e.g., 4 for quarter, 8 for eighth) */
-            int denom = duration->data.note_length.denominator;
+            double denom = duration->data.note_length.denominator;
             int dots = duration->data.note_length.dots;
-            return alda_duration_to_ticks(denom, dots);
+            return alda_duration_to_ticks_frac(denom, dots);
         }
 
         case ALDA_NODE_NOTE_LENGTH_MS: {
@@ -158,7 +158,7 @@ int alda_ast_duration_to_ticks(AldaContext* ctx, AldaPartState* part, AldaNode* 
 
         default:
             /* Unknown duration type - use default */
-            return alda_duration_to_ticks(part->default_duration, part->default_dots);
+            return alda_duration_to_ticks_frac(part->default_duration, part->default_dots);
     }
 }
 
@@ -260,10 +260,14 @@ static int visit_part_decl(AldaContext* ctx, AldaNode* node) {
         return -1;
     }
 
-    /* Apply alias if present */
-    if (node->data.part_decl.alias && ctx->current_part_count > 0) {
-        AldaPartState* part = alda_current_part(ctx);
-        if (part) {
+    /* Apply the alias to every part in the declaration. For a group such as
+     * violin/viola/cello "strings" the alias names the whole group, so each
+     * member carries it - that is what lets "strings.cello" resolve later. */
+    if (node->data.part_decl.alias) {
+        for (int i = 0; i < ctx->current_part_count; i++) {
+            int idx = ctx->current_part_indices[i];
+            if (idx < 0 || idx >= ctx->part_count) continue;
+            AldaPartState* part = &ctx->parts[idx];
             strncpy(part->alias, node->data.part_decl.alias,
                     sizeof(part->alias) - 1);
             part->alias[sizeof(part->alias) - 1] = '\0';
@@ -864,11 +868,11 @@ static double duration_weight(AldaContext* ctx, AldaPartState* part, AldaNode* d
     }
 
     if (dur->type == ALDA_NODE_NOTE_LENGTH) {
-        int denom = dur->data.note_length.denominator;
+        double denom = dur->data.note_length.denominator;
         int dots = dur->data.note_length.dots;
 
         /* Base weight: 4/denom (quarter=1, half=2, whole=4, eighth=0.5) */
-        double weight = 4.0 / (double)denom;
+        double weight = 4.0 / denom;
 
         /* Apply dots */
         double dot_add = weight / 2.0;

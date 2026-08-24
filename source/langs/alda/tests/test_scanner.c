@@ -247,6 +247,8 @@ TEST(scan_octave_down) {
  * ============================================================================ */
 
 TEST(scan_note_length_basic) {
+    /* Note-length literals are carried as float_val - the literal is a union,
+     * and lengths may be fractional (see scan_note_length_fractional). */
     const int lengths[] = {1, 2, 4, 8, 16, 32};
     for (int i = 0; i < 6; i++) {
         char source[8];
@@ -258,10 +260,71 @@ TEST(scan_note_length_basic) {
         ASSERT_FALSE(alda_scanner_has_error(scanner));
         ASSERT_NOT_NULL(tokens);
         ASSERT_EQ(tokens[0].type, ALDA_TOK_NOTE_LENGTH);
-        ASSERT_EQ(tokens[0].literal.int_val, lengths[i]);
+        ASSERT_EQ((int)tokens[0].literal.float_val, lengths[i]);
         alda_tokens_free(tokens, count);
         alda_scanner_free(scanner);
     }
+}
+
+TEST(scan_note_length_fractional) {
+    /* "c0.25" is a quadruple-whole note. The '.' is part of the number because
+     * a digit follows it. */
+    size_t count;
+    AldaScanner* scanner = alda_scanner_new("0.25", "test");
+    ASSERT_NOT_NULL(scanner);
+    AldaToken* tokens = alda_scanner_scan(scanner, &count);
+    ASSERT_FALSE(alda_scanner_has_error(scanner));
+    ASSERT_NOT_NULL(tokens);
+    ASSERT_EQ(tokens[0].type, ALDA_TOK_NOTE_LENGTH);
+    ASSERT_TRUE(tokens[0].literal.float_val > 0.24 &&
+                tokens[0].literal.float_val < 0.26);
+    alda_tokens_free(tokens, count);
+    alda_scanner_free(scanner);
+}
+
+TEST(scan_dot_after_length_is_augmentation) {
+    /* "4." is a dotted quarter: no digit follows the dot, so it stays a
+     * separate DOT token rather than being absorbed into the number. */
+    size_t count;
+    AldaScanner* scanner = alda_scanner_new("4.", "test");
+    ASSERT_NOT_NULL(scanner);
+    AldaToken* tokens = alda_scanner_scan(scanner, &count);
+    ASSERT_FALSE(alda_scanner_has_error(scanner));
+    ASSERT_NOT_NULL(tokens);
+    ASSERT_EQ(tokens[0].type, ALDA_TOK_NOTE_LENGTH);
+    ASSERT_EQ((int)tokens[0].literal.float_val, 4);
+    ASSERT_EQ(tokens[1].type, ALDA_TOK_DOT);
+    alda_tokens_free(tokens, count);
+    alda_scanner_free(scanner);
+}
+
+TEST(scan_hash_is_always_a_comment) {
+    /* A banner comment must not scan as a sharp accidental. */
+    size_t count;
+    AldaScanner* scanner = alda_scanner_new("######\nc", "test");
+    ASSERT_NOT_NULL(scanner);
+    AldaToken* tokens = alda_scanner_scan(scanner, &count);
+    ASSERT_FALSE(alda_scanner_has_error(scanner));
+    ASSERT_NOT_NULL(tokens);
+    ASSERT_EQ(tokens[0].type, ALDA_TOK_NEWLINE);
+    ASSERT_EQ(tokens[1].type, ALDA_TOK_NOTE_LETTER);
+    alda_tokens_free(tokens, count);
+    alda_scanner_free(scanner);
+}
+
+TEST(scan_dot_accessor_name) {
+    /* "strings.cello" is one NAME, not NAME DOT NAME. */
+    size_t count;
+    AldaScanner* scanner = alda_scanner_new("strings.cello", "test");
+    ASSERT_NOT_NULL(scanner);
+    AldaToken* tokens = alda_scanner_scan(scanner, &count);
+    ASSERT_FALSE(alda_scanner_has_error(scanner));
+    ASSERT_NOT_NULL(tokens);
+    ASSERT_EQ(tokens[0].type, ALDA_TOK_NAME);
+    ASSERT_STR_EQ(tokens[0].lexeme, "strings.cello");
+    ASSERT_EQ(tokens[1].type, ALDA_TOK_EOF);
+    alda_tokens_free(tokens, count);
+    alda_scanner_free(scanner);
 }
 
 TEST(scan_note_length_ms) {
@@ -743,6 +806,10 @@ BEGIN_TEST_SUITE("Alda Scanner Tests")
 
     /* Note lengths */
     RUN_TEST(scan_note_length_basic);
+    RUN_TEST(scan_note_length_fractional);
+    RUN_TEST(scan_dot_after_length_is_augmentation);
+    RUN_TEST(scan_hash_is_always_a_comment);
+    RUN_TEST(scan_dot_accessor_name);
     RUN_TEST(scan_note_length_ms);
     RUN_TEST(scan_note_length_s);
     RUN_TEST(scan_dotted_note);

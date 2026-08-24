@@ -1085,6 +1085,128 @@ TEST(parse_multiple_parts) {
  * Test Runner
  * ============================================================================ */
 
+
+/* Count how many top-level children are part declarations. */
+static int count_part_decls(AldaNode* root) {
+    int n = 0;
+    for (AldaNode* c = root->data.root.children; c; c = c->next) {
+        if (c->type == ALDA_NODE_PART_DECL) n++;
+    }
+    return n;
+}
+
+/* ============================================================================
+ * Cross-Implementation Regression Tests
+ *
+ * These constructs appear in the bundled examples/ scores but were rejected by
+ * this parser until they were fixed. Each was found by differential-testing
+ * against the aldakit Alda implementation over both projects' example corpora.
+ * ============================================================================ */
+
+/* A part declaration implicitly closes a voice group - "V0:" is optional. */
+TEST(parse_part_decl_ends_voice_group) {
+    AldaNode* ast = parse_ok("piano:\nV1: c\nclarinet: a");
+    ASSERT_NOT_NULL(ast);
+    /* Two parts, not one part swallowing the second declaration. */
+    ASSERT_EQ(count_part_decls(ast), 2);
+    alda_ast_free(ast);
+}
+
+TEST(parse_explicit_v0_still_works) {
+    AldaNode* ast = parse_ok("piano:\nV1: c\nV0: d\nclarinet: a");
+    ASSERT_NOT_NULL(ast);
+    ASSERT_EQ(count_part_decls(ast), 2);
+    alda_ast_free(ast);
+}
+
+TEST(parse_voice_group_then_multiple_parts) {
+    AldaNode* ast = parse_ok("piano:\nV1: c8 d\nV2: e8 f\nclarinet: a2\nflute: b2");
+    ASSERT_NOT_NULL(ast);
+    ASSERT_EQ(count_part_decls(ast), 3);
+    alda_ast_free(ast);
+}
+
+/* A tie may be split across a barline, on either side, and across lines. */
+TEST(parse_tie_across_barline) {
+    AldaNode* ast = parse_ok("piano: c4~|2");
+    ASSERT_NOT_NULL(ast);
+    alda_ast_free(ast);
+}
+
+TEST(parse_barline_before_tie) {
+    AldaNode* ast = parse_ok("piano: c4 |~2");
+    ASSERT_NOT_NULL(ast);
+    alda_ast_free(ast);
+}
+
+TEST(parse_tie_both_sides_of_barline) {
+    /* "d4.~4~|" continued by "|~4.~8" on the next line. */
+    AldaNode* ast = parse_ok("piano: d4.~4~|\n\n  |~4.~8 g8");
+    ASSERT_NOT_NULL(ast);
+    alda_ast_free(ast);
+}
+
+TEST(parse_tie_across_barline_dotted) {
+    AldaNode* ast = parse_ok("piano: a8~|2. a4");
+    ASSERT_NOT_NULL(ast);
+    alda_ast_free(ast);
+}
+
+/* A tilde before a note letter is still a slur, not a tied duration. */
+TEST(parse_slur_not_confused_with_tied_duration) {
+    AldaNode* ast = parse_ok("piano: c4~d");
+    ASSERT_NOT_NULL(ast);
+    alda_ast_free(ast);
+}
+
+TEST(parse_plain_barline_still_an_event) {
+    AldaNode* ast = parse_ok("piano: c4 | d4");
+    ASSERT_NOT_NULL(ast);
+    alda_ast_free(ast);
+}
+
+/* Fractional note lengths: c0.25 is a quadruple-whole note. */
+TEST(parse_fractional_note_length) {
+    AldaNode* ast = parse_ok("piano: c0.25");
+    ASSERT_NOT_NULL(ast);
+    alda_ast_free(ast);
+}
+
+TEST(parse_fractional_tied_note_length) {
+    AldaNode* ast = parse_ok("piano: c0.25~0.25");
+    ASSERT_NOT_NULL(ast);
+    alda_ast_free(ast);
+}
+
+TEST(parse_dotted_length_not_read_as_fraction) {
+    /* "c4. d" must remain a dotted quarter followed by a note. */
+    AldaNode* ast = parse_ok("piano: c4. d");
+    ASSERT_NOT_NULL(ast);
+    alda_ast_free(ast);
+}
+
+/* Dot accessor: address one member of a named group. */
+TEST(parse_dot_accessor_part) {
+    AldaNode* ast = parse_ok("violin/viola/cello \"strings\": g1\nstrings.cello: c1");
+    ASSERT_NOT_NULL(ast);
+    ASSERT_EQ(count_part_decls(ast), 2);
+    alda_ast_free(ast);
+}
+
+/* Banner comments must not scan as sharp accidentals. */
+TEST(parse_banner_comment) {
+    AldaNode* ast = parse_ok("piano: c\n########################\nd");
+    ASSERT_NOT_NULL(ast);
+    alda_ast_free(ast);
+}
+
+TEST(parse_hash_comment_variants) {
+    ASSERT_NOT_NULL(parse_ok("piano: c # trailing\nd"));
+    ASSERT_NOT_NULL(parse_ok("piano: c\n#no-space\nd"));
+    ASSERT_NOT_NULL(parse_ok("piano: c\n#\nd"));
+    ASSERT_NOT_NULL(parse_ok("piano: c\n#123\nd"));
+}
+
 BEGIN_TEST_SUITE("Alda Parser Tests")
 
     /* ROOT tests */
@@ -1225,5 +1347,22 @@ BEGIN_TEST_SUITE("Alda Parser Tests")
     RUN_TEST(parse_multiline);
     RUN_TEST(parse_comments);
     RUN_TEST(parse_multiple_parts);
+
+    /* Cross-implementation regressions (see comment block above) */
+    RUN_TEST(parse_part_decl_ends_voice_group);
+    RUN_TEST(parse_explicit_v0_still_works);
+    RUN_TEST(parse_voice_group_then_multiple_parts);
+    RUN_TEST(parse_tie_across_barline);
+    RUN_TEST(parse_barline_before_tie);
+    RUN_TEST(parse_tie_both_sides_of_barline);
+    RUN_TEST(parse_tie_across_barline_dotted);
+    RUN_TEST(parse_slur_not_confused_with_tied_duration);
+    RUN_TEST(parse_plain_barline_still_an_event);
+    RUN_TEST(parse_fractional_note_length);
+    RUN_TEST(parse_fractional_tied_note_length);
+    RUN_TEST(parse_dotted_length_not_read_as_fraction);
+    RUN_TEST(parse_dot_accessor_part);
+    RUN_TEST(parse_banner_comment);
+    RUN_TEST(parse_hash_comment_variants);
 
 END_TEST_SUITE()

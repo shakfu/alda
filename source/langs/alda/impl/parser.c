@@ -221,6 +221,7 @@ static char* strdup_safe(const char* s) {
 static AldaNode* parse_event(AldaParser* p);
 static AldaNode* parse_event_sequence(AldaParser* p, AldaTokenType stop);
 static AldaNode* parse_duration(AldaParser* p);
+static int is_part_declaration(AldaParser* p);
 
 /* Parse a note or chord */
 static AldaNode* parse_note(AldaParser* p) {
@@ -277,7 +278,7 @@ static AldaNode* parse_duration_component(AldaParser* p) {
     AldaSourcePos pos = tok->pos;
 
     if (tok->type == ALDA_TOK_NOTE_LENGTH) {
-        int denominator = tok->literal.int_val;
+        double denominator = tok->literal.float_val;
         int dots = 0;
         while (match(p, ALDA_TOK_DOT)) {
             dots++;
@@ -302,25 +303,53 @@ static AldaNode* parse_duration(AldaParser* p) {
     }
 
     /* Handle tied durations (e.g., c4~4).
-     * Only consume TIE if followed by another duration component.
-     * If TIE is followed by a note letter, it's a slur and should
-     * be handled by parse_note. */
-    while (check(p, ALDA_TOK_TIE)) {
-        /* Peek ahead: is there a duration after the TIE? */
-        AldaToken* next = peek_next(p);
-        if (next &&
-            (next->type == ALDA_TOK_NOTE_LENGTH ||
-             next->type == ALDA_TOK_NOTE_LENGTH_MS ||
-             next->type == ALDA_TOK_NOTE_LENGTH_S)) {
-            /* Consume the TIE and parse the duration */
-            advance(p);  /* consume TIE */
-            comp = parse_duration_component(p);
-            if (comp) {
-                alda_node_append(&components, comp);
-            }
-        } else {
-            /* TIE is followed by something else (note letter = slur), stop here */
+     *
+     * A tie may be split across a barline, and the barline may sit on either
+     * side of the tilde and be separated by newlines - all of these are one
+     * tied duration:
+     *
+     *     c4~2        c4~|2        c4 |~2        c4~|
+     *                                            |2
+     *
+     * So scan past any barlines and newlines looking for a TIE, then past any
+     * more of them looking for a duration component. Only commit (advance the
+     * real cursor) once both are found; otherwise the tilde is a slur onto the
+     * next note and belongs to parse_note, and the barline is a standalone
+     * event. */
+    while (1) {
+        size_t probe = p->current;
+
+        while (probe < p->token_count &&
+               (p->tokens[probe].type == ALDA_TOK_BARLINE ||
+                p->tokens[probe].type == ALDA_TOK_NEWLINE)) {
+            probe++;
+        }
+        if (probe >= p->token_count || p->tokens[probe].type != ALDA_TOK_TIE) break;
+        probe++;  /* the TIE itself */
+
+        /* The tie may also be written on both sides of the barline, as in
+         * "d4.~4~|" at the end of one bar continued by "|~4.~8" at the start of
+         * the next, so absorb any further tildes here too. */
+        while (probe < p->token_count &&
+               (p->tokens[probe].type == ALDA_TOK_BARLINE ||
+                p->tokens[probe].type == ALDA_TOK_NEWLINE ||
+                p->tokens[probe].type == ALDA_TOK_TIE)) {
+            probe++;
+        }
+        if (probe >= p->token_count) break;
+
+        AldaTokenType t = p->tokens[probe].type;
+        if (t != ALDA_TOK_NOTE_LENGTH &&
+            t != ALDA_TOK_NOTE_LENGTH_MS &&
+            t != ALDA_TOK_NOTE_LENGTH_S) {
+            /* Slur onto a following note, not a tied duration. */
             break;
+        }
+
+        p->current = probe;
+        comp = parse_duration_component(p);
+        if (comp) {
+            alda_node_append(&components, comp);
         }
     }
 
@@ -521,11 +550,14 @@ static AldaNode* parse_voice(AldaParser* p) {
     int number = atoi(tok->lexeme + 1); /* Skip 'V' */
     AldaSourcePos pos = tok->pos;
 
-    /* Parse events until next voice marker or end */
+    /* Parse events until the next voice marker, a new part declaration, or the
+     * end of input. A part declaration implicitly closes the voice group - an
+     * explicit "V0:" is optional, not required. */
     AldaNode* events = NULL;
     while (!is_at_end(p) && !check(p, ALDA_TOK_VOICE_MARKER)) {
         skip_newlines(p);
         if (is_at_end(p) || check(p, ALDA_TOK_VOICE_MARKER)) break;
+        if (is_part_declaration(p)) break;
 
         AldaNode* event = parse_event(p);
         if (event) {

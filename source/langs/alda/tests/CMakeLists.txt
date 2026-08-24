@@ -26,6 +26,12 @@ add_alda_test(parser_fuzz)
 add_alda_test(backends)
 add_alda_test(integration)
 add_alda_test(microtuning)
+add_alda_test(examples)
+
+# The examples test parses every score in examples/ as a real-world corpus.
+target_compile_definitions(test_alda_examples PRIVATE
+    ALDA_EXAMPLES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../examples"
+)
 
 # Apply Csound backend definition if enabled
 if(BUILD_CSOUND_BACKEND)

@@ -261,23 +261,30 @@ int alda_events_play(AldaContext* ctx) {
  * Duration Calculation
  * ============================================================================ */
 
-int alda_duration_to_ticks(int denominator, int dots) {
-    if (denominator <= 0) {
-        denominator = 4;  /* Default to quarter note */
+int alda_duration_to_ticks_frac(double denominator, int dots) {
+    if (!(denominator > 0.0)) {
+        denominator = 4.0;  /* Default to quarter note */
     }
 
-    /* Base duration: whole note = 4 * TICKS_PER_QUARTER */
-    int base_ticks = (4 * ALDA_TICKS_PER_QUARTER) / denominator;
+    /* Base duration: whole note = 4 * TICKS_PER_QUARTER. Computed in floating
+     * point so fractional note lengths (c0.25, a double whole note) are exact
+     * rather than truncated to zero by integer division. */
+    double base_ticks = (4.0 * ALDA_TICKS_PER_QUARTER) / denominator;
 
     /* Apply dots: each dot adds half of the previous value */
-    int total = base_ticks;
-    int add = base_ticks;
+    double total = base_ticks;
+    double add = base_ticks;
     for (int d = 0; d < dots; d++) {
-        add = add / 2;
+        add = add / 2.0;
         total += add;
     }
 
-    return total;
+    if (total < 0.0) total = 0.0;
+    return (int)(total + 0.5);
+}
+
+int alda_duration_to_ticks(int denominator, int dots) {
+    return alda_duration_to_ticks_frac((double)denominator, dots);
 }
 
 int alda_ms_to_ticks(int ms, int tempo) {
