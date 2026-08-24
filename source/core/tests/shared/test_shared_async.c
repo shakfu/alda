@@ -17,6 +17,7 @@
 #include "test_framework.h"
 #include "async/shared_async.h"
 #include "context.h"
+#include <uv.h>
 #include <string.h>
 
 test_stats_t test_stats;
@@ -667,6 +668,323 @@ TEST(async_schedule_note_off_tick_ex_null_safe) {
  * Test Runner
  * ============================================================================ */
 
+
+/* ==========================================================================
+ * Live Playback (exercises the libuv loop thread)
+ *
+ * The tests above stop at the argument-validation paths and never reach the
+ * event loop. These drive real schedules through it.
+ *
+ * A context with builtin_synth_enabled set but no synth initialized passes
+ * shared_async_play_ex()'s output check while every shared_send_*() call
+ * short-circuits on its backend's is_enabled() guard, so playback runs with no
+ * audio side effects.
+ * ========================================================================== */
+
+typedef struct {
+    int calls;
+    int last_slot;
+    int last_stopped;
+} CompletionRecord;
+
+static CompletionRecord g_completion;
+static uv_mutex_t g_completion_mutex;
+static int g_completion_mutex_ready = 0;
+
+static void completion_record_reset(void) {
+    if (!g_completion_mutex_ready) {
+        uv_mutex_init(&g_completion_mutex);
+        g_completion_mutex_ready = 1;
+    }
+    uv_mutex_lock(&g_completion_mutex);
+    g_completion.calls = 0;
+    g_completion.last_slot = -1;
+    g_completion.last_stopped = -1;
+    uv_mutex_unlock(&g_completion_mutex);
+}
+
+static void completion_record_cb(int slot_id, int stopped, void *userdata) {
+    (void)userdata;
+    uv_mutex_lock(&g_completion_mutex);
+    g_completion.calls++;
+    g_completion.last_slot = slot_id;
+    g_completion.last_stopped = stopped;
+    uv_mutex_unlock(&g_completion_mutex);
+}
+
+static CompletionRecord completion_record_get(void) {
+    uv_mutex_lock(&g_completion_mutex);
+    CompletionRecord r = g_completion;
+    uv_mutex_unlock(&g_completion_mutex);
+    return r;
+}
+
+/* Context that satisfies the output check without producing output. */
+static void playable_context(SharedContext *ctx) {
+    memset(ctx, 0, sizeof(*ctx));
+    ctx->builtin_synth_enabled = 1;
+}
+
+/* Short schedule: a handful of notes inside ~60ms. */
+static SharedAsyncSchedule *short_schedule(void) {
+    SharedAsyncSchedule *sched = shared_async_schedule_new();
+    if (!sched) return NULL;
+    for (int i = 0; i < 4; i++) {
+        shared_async_schedule_note(sched, i * 15, 1, 60 + i, 100, 10);
+    }
+    return sched;
+}
+
+/* Long schedule: runs for several seconds so a stop always lands mid-flight. */
+static SharedAsyncSchedule *long_schedule(void) {
+    SharedAsyncSchedule *sched = shared_async_schedule_new();
+    if (!sched) return NULL;
+    for (int i = 0; i < 40; i++) {
+        shared_async_schedule_note(sched, i * 200, 1, 60 + (i % 12), 100, 100);
+    }
+    return sched;
+}
+
+TEST(async_play_runs_to_completion) {
+    ASSERT_EQ(shared_async_init(), 0);
+    completion_record_reset();
+
+    SharedContext ctx;
+    playable_context(&ctx);
+
+    SharedAsyncSchedule *sched = short_schedule();
+    ASSERT_NOT_NULL(sched);
+
+    int slot = shared_async_play_ex(sched, &ctx, completion_record_cb, NULL);
+    ASSERT_TRUE(slot >= 0);
+
+    /* The timer is started on the loop thread now, so completion is what proves
+     * the handoff actually happened. */
+    ASSERT_EQ(shared_async_wait(slot, 5000), 0);
+    ASSERT_EQ(shared_async_is_slot_playing(slot), 0);
+
+    CompletionRecord r = completion_record_get();
+    ASSERT_EQ(r.calls, 1);
+    ASSERT_EQ(r.last_slot, slot);
+    ASSERT_EQ(r.last_stopped, 0);
+
+    shared_async_schedule_free(sched);
+}
+
+TEST(async_stop_finalizes_and_reports_stopped) {
+    ASSERT_EQ(shared_async_init(), 0);
+    completion_record_reset();
+
+    SharedContext ctx;
+    playable_context(&ctx);
+
+    SharedAsyncSchedule *sched = long_schedule();
+    ASSERT_NOT_NULL(sched);
+
+    int slot = shared_async_play_ex(sched, &ctx, completion_record_cb, NULL);
+    ASSERT_TRUE(slot >= 0);
+
+    shared_async_stop(slot);
+    ASSERT_EQ(shared_async_wait(slot, 5000), 0);
+
+    CompletionRecord r = completion_record_get();
+    ASSERT_EQ(r.calls, 1);
+    ASSERT_EQ(r.last_slot, slot);
+    ASSERT_EQ(r.last_stopped, 1);
+
+    shared_async_schedule_free(sched);
+}
+
+TEST(async_repeated_stop_finalizes_once) {
+    /* uv_async_send coalesces, and a duplicate stop must not double-invoke the
+     * completion callback or tear down a later activation. */
+    ASSERT_EQ(shared_async_init(), 0);
+    completion_record_reset();
+
+    SharedContext ctx;
+    playable_context(&ctx);
+
+    SharedAsyncSchedule *sched = long_schedule();
+    ASSERT_NOT_NULL(sched);
+
+    int slot = shared_async_play_ex(sched, &ctx, completion_record_cb, NULL);
+    ASSERT_TRUE(slot >= 0);
+
+    shared_async_stop(slot);
+    shared_async_stop(slot);
+    shared_async_stop(slot);
+
+    ASSERT_EQ(shared_async_wait(slot, 5000), 0);
+    uv_sleep(50);  /* Let any straggling signal be processed */
+
+    CompletionRecord r = completion_record_get();
+    ASSERT_EQ(r.calls, 1);
+
+    shared_async_schedule_free(sched);
+}
+
+TEST(async_stop_on_idle_slot_is_noop) {
+    ASSERT_EQ(shared_async_init(), 0);
+    completion_record_reset();
+
+    /* Slot never started: stop must not invoke a callback or crash. */
+    shared_async_stop(0);
+    uv_sleep(30);
+
+    CompletionRecord r = completion_record_get();
+    ASSERT_EQ(r.calls, 0);
+    ASSERT_EQ(shared_async_is_slot_playing(0), 0);
+}
+
+TEST(async_slot_reuse_after_stop) {
+    /* The stop signal for the first activation must not kill the second one
+     * that reuses the same slot. */
+    ASSERT_EQ(shared_async_init(), 0);
+
+    SharedContext ctx;
+    playable_context(&ctx);
+
+    SharedAsyncSchedule *lng = long_schedule();
+    SharedAsyncSchedule *shrt = short_schedule();
+    ASSERT_NOT_NULL(lng);
+    ASSERT_NOT_NULL(shrt);
+
+    int first = shared_async_play(lng, &ctx);
+    ASSERT_TRUE(first >= 0);
+    shared_async_stop(first);
+    ASSERT_EQ(shared_async_wait(first, 5000), 0);
+
+    completion_record_reset();
+
+    int second = shared_async_play_ex(shrt, &ctx, completion_record_cb, NULL);
+    ASSERT_TRUE(second >= 0);
+    ASSERT_EQ(shared_async_wait(second, 5000), 0);
+
+    /* Ran to completion rather than being stopped by a stale signal. */
+    CompletionRecord r = completion_record_get();
+    ASSERT_EQ(r.calls, 1);
+    ASSERT_EQ(r.last_stopped, 0);
+
+    shared_async_schedule_free(lng);
+    shared_async_schedule_free(shrt);
+}
+
+TEST(async_concurrent_slots_all_complete) {
+    ASSERT_EQ(shared_async_init(), 0);
+    completion_record_reset();
+
+    SharedContext ctx;
+    playable_context(&ctx);
+
+    SharedAsyncSchedule *sched = short_schedule();
+    ASSERT_NOT_NULL(sched);
+
+    const int n = 4;
+    int slots[4];
+    for (int i = 0; i < n; i++) {
+        slots[i] = shared_async_play_ex(sched, &ctx, completion_record_cb, NULL);
+        ASSERT_TRUE(slots[i] >= 0);
+    }
+
+    /* Slot ids must be distinct. */
+    for (int i = 0; i < n; i++) {
+        for (int j = i + 1; j < n; j++) {
+            ASSERT_TRUE(slots[i] != slots[j]);
+        }
+    }
+
+    ASSERT_EQ(shared_async_wait_all(5000), 0);
+    ASSERT_EQ(shared_async_active_count(), 0);
+
+    CompletionRecord r = completion_record_get();
+    ASSERT_EQ(r.calls, n);
+
+    shared_async_schedule_free(sched);
+}
+
+TEST(async_stop_all_stops_every_slot) {
+    ASSERT_EQ(shared_async_init(), 0);
+    completion_record_reset();
+
+    SharedContext ctx;
+    playable_context(&ctx);
+
+    SharedAsyncSchedule *sched = long_schedule();
+    ASSERT_NOT_NULL(sched);
+
+    const int n = 3;
+    for (int i = 0; i < n; i++) {
+        ASSERT_TRUE(shared_async_play_ex(sched, &ctx, completion_record_cb, NULL) >= 0);
+    }
+
+    shared_async_stop_all();
+    ASSERT_EQ(shared_async_wait_all(5000), 0);
+    ASSERT_EQ(shared_async_active_count(), 0);
+
+    CompletionRecord r = completion_record_get();
+    ASSERT_EQ(r.calls, n);
+    ASSERT_EQ(r.last_stopped, 1);
+
+    shared_async_schedule_free(sched);
+}
+
+TEST(async_rapid_play_stop_cycles) {
+    /* Stress the control-thread/loop-thread handshake. Before the timer start
+     * was moved onto the loop thread this hammered uv_timer_start from the
+     * wrong thread; it is the case most likely to expose a regression under a
+     * thread sanitizer. */
+    ASSERT_EQ(shared_async_init(), 0);
+    completion_record_reset();
+
+    SharedContext ctx;
+    playable_context(&ctx);
+
+    SharedAsyncSchedule *sched = long_schedule();
+    ASSERT_NOT_NULL(sched);
+
+    const int cycles = 40;
+    for (int i = 0; i < cycles; i++) {
+        int slot = shared_async_play(sched, &ctx);
+        ASSERT_TRUE(slot >= 0);
+        shared_async_stop(slot);
+        ASSERT_EQ(shared_async_wait(slot, 5000), 0);
+    }
+
+    ASSERT_EQ(shared_async_wait_all(5000), 0);
+    ASSERT_EQ(shared_async_active_count(), 0);
+
+    shared_async_schedule_free(sched);
+}
+
+TEST(async_immediate_stop_after_play) {
+    /* Stop issued before the loop thread has run on_start_signal: the start
+     * must be cancelled rather than starting a timer on a finalized slot. */
+    ASSERT_EQ(shared_async_init(), 0);
+
+    SharedContext ctx;
+    playable_context(&ctx);
+
+    SharedAsyncSchedule *sched = long_schedule();
+    ASSERT_NOT_NULL(sched);
+
+    for (int i = 0; i < 20; i++) {
+        completion_record_reset();
+
+        int slot = shared_async_play_ex(sched, &ctx, completion_record_cb, NULL);
+        ASSERT_TRUE(slot >= 0);
+        shared_async_stop(slot);  /* No sleep: races the start signal */
+
+        ASSERT_EQ(shared_async_wait(slot, 5000), 0);
+        uv_sleep(5);
+
+        CompletionRecord r = completion_record_get();
+        ASSERT_EQ(r.calls, 1);
+    }
+
+    ASSERT_EQ(shared_async_active_count(), 0);
+    shared_async_schedule_free(sched);
+}
+
 BEGIN_TEST_SUITE("Shared Async Playback Tests")
 
     /* Schedule creation */
@@ -743,6 +1061,17 @@ BEGIN_TEST_SUITE("Shared Async Playback Tests")
     RUN_TEST(async_play_null_context);
     RUN_TEST(async_play_no_output);
     RUN_TEST(async_play_ex_null_schedule);
+
+    /* Live playback through the loop thread */
+    RUN_TEST(async_play_runs_to_completion);
+    RUN_TEST(async_stop_finalizes_and_reports_stopped);
+    RUN_TEST(async_repeated_stop_finalizes_once);
+    RUN_TEST(async_stop_on_idle_slot_is_noop);
+    RUN_TEST(async_slot_reuse_after_stop);
+    RUN_TEST(async_concurrent_slots_all_complete);
+    RUN_TEST(async_stop_all_stops_every_slot);
+    RUN_TEST(async_rapid_play_stop_cycles);
+    RUN_TEST(async_immediate_stop_after_play);
 
 #ifdef SHARED_SOURCE_TRACKING
     /* Source tracking */

@@ -20,6 +20,196 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
 
 ## High Priority
 
+### Security Hardening
+
+**Trust model (decided 2026-08-24): psnd is a local single-user tool. Untrusted
+input is out of scope.** The web host stays on loopback for the user's own use,
+and the `.hs` / `.joy` / `.csd` files it runs are the user's own. This is written
+down because the repo contradicts itself on it - `README.md` says the web host
+should not be network-exposed without auth, while the Cross-Platform section
+below lists multi-client web UI as a goal. **If the multi-client work is ever
+picked up, this decision is void and the path sandbox becomes a prerequisite.**
+
+Findings from `REVIEW.md` (2026-08-24), re-verified against the tree. Ordered by
+validated exploitability, not by the review's original ranking: the REPL overflow
+outranked the web host because it needed neither a build flag nor a network peer.
+The memory-safety items are all fixed; what remains is scoped by the trust model
+above.
+
+- [x] ~~**P0 - Stack buffer overflow in REPL tab-completion**~~ **DONE**
+  - `prefix[REPL_MAX_INPUT_LENGTH]` was 1024 bytes while linenoise hands the
+    callback a `LINENOISE_MAX_LINE` (4096) buffer. When `word_len >= 1024` the
+    `memcpy` was skipped but `prefix[word_len] = '\0'` still executed, writing up
+    to ~3KB past the buffer. Reachable in the default build
+    (`WITH_LINENOISE` defaults `ON`) with no auth and no opt-in flag.
+  - Extracted `repl_extract_completion_prefix()` (`loki/repl.h`,
+    `loki/repl_line_editor.c`) as a bounds-checked, testable seam. It returns -1
+    when the word plus terminator does not fit and the adapter skips completion -
+    correct rather than truncating, since such a word would not survive
+    `repl_readline()`'s truncation into `ReplLineEditor.buf` anyway.
+  - `test_repl_line_editor.c`: 17 tests, guard-byte buffers around the output.
+    Verified the four boundary tests fail against the pre-fix logic.
+
+- [ ] **P3 (was P1) - Sandbox the web host file endpoints** (`loki/host_web.c:434-451`, `:484-491`, `:600-616`)
+  - Demoted by the trust model above: this is only reachable by someone the user
+    does not trust, which is out of scope. Auth plus the loopback bind is the
+    accepted mitigation. **Promote back to P1 before any multi-client work.**
+  - `handle_api_save` / `handle_api_load` and the WebSocket `load` command `fopen`
+    a caller-supplied `filename` verbatim - no traversal, absolute-path, or symlink
+    check. With `/api/run` and `/api/repl` evaluating arbitrary language code this
+    is a full host-compromise primitive.
+  - Mitigated by default, not fixed: `/api/*` and `/ws` require a random 128-bit
+    token (`web_host_authorized`) and the listener binds `127.0.0.1`. It becomes
+    remotely reachable under `PSND_WEB_NO_AUTH=1` or `PSND_WEB_BIND=0.0.0.0`.
+  - Fix: resolve against a configured root, reject `..`, absolute paths, and
+    symlinks escaping it. Do this before the multi-client work below.
+
+- [x] ~~**P1 - Unchecked `ftell` in web host file reads**~~ **DONE**
+  - Both sites now reject a negative `ftell` before allocating:
+    `handle_api_load` returns HTTP 400 "Not a regular file"; the WebSocket `load`
+    command skips the read. Sizes are cast to `size_t` only after the check.
+  - Mirrors the existing `file_size <= 0` pattern in
+    `minihost_backend.c:756-779` and `serialize.c:293-315`.
+
+- [x] ~~**P2 - Unbounded recursion in the JSON parser**~~ **DONE**
+  - `JsonParser` gained a `depth` counter, capped at `JSON_MAX_DEPTH` (64, defined
+    in `json.h`). The check lives in `parse_value` at the single container
+    recursion site rather than inside `parse_object`/`parse_array`, so the
+    accounting stays symmetric across their many error-return paths.
+  - Verified: with the cap removed, `test_json` **segfaults (exit 139)** on the
+    100k-deep input. With it, the input is rejected cleanly.
+  - Two further bugs found while reading the parser for the tests:
+    - `json_parse(NULL)` dereferenced NULL in `strlen`. Also confirmed by
+      removing the guard: exit 139. Now returns `JSON_ERROR`.
+    - `parse_object`'s grow path called `realloc` on both the key and value
+      arrays before testing either result. If the first succeeded and the second
+      failed, `keys` was left dangling and the cleanup read through it and freed
+      it twice. Each realloc is now adopted immediately. OOM-only, so it is fixed
+      by inspection rather than covered by a test.
+
+- [x] ~~**P1 - libuv handle mutation off the loop thread**~~ **DONE**
+  - `shared_async_play_ex` called `uv_timer_start` from the caller's thread while
+    the loop thread ran `uv_run`, corrupting libuv's internal timer heap.
+    `slot->stop_requested` and `slot->active` were also read/written outside the
+    mutex while the loop thread used them.
+  - Each slot gained a `start_async` handle. `play_ex` now computes the first
+    delay under the mutex, stores it, and `uv_async_send`s; `on_start_signal`
+    starts the timer on the loop thread. `uv_async_send` is the only libuv call
+    safe to make cross-thread, so it is now the only one made.
+  - `shared_async_stop`/`stop_all` no longer write `stop_requested` directly.
+    They set a mutex-guarded `stop_pending`, and `on_stop_signal` acts on it. This
+    also closes a latent bug: `uv_async_send` coalesces, so a stale stop signal
+    could previously tear down a slot that had already been recycled for a new
+    schedule. Both handlers now verify the pending flag under the mutex.
+  - `shared_async_cleanup` waits up to 250ms for stops to drain before shutting
+    the loop down, so note-offs are still emitted now that stops are processed
+    asynchronously.
+  - `last_source_line` is `volatile sig_atomic_t`, matching the convention
+    already documented for the `g_async` cross-thread flags.
+  - Verified with helgrind: **3,745 races in 120 contexts before, 3 in 3 after**.
+    The before-run showed the race inside libuv's own `heap_insert` from
+    `shared_async.c:875`. The 3 remaining are the pre-existing
+    `volatile sig_atomic_t` shutdown flags, which helgrind cannot model as
+    synchronization - see below.
+  - `test_shared_async.c` gained 9 tests that drive real schedules through the
+    loop thread (completion, stop, repeated stop, slot reuse, concurrent slots,
+    stop-all, 40 rapid play/stop cycles, and a stop racing the start signal).
+    The pre-existing tests never reached the event loop at all.
+
+- [ ] Consider C11 atomics for the async shutdown flags
+  - `g_async.running` and `g_async.shutdown_requested` are `volatile
+    sig_atomic_t`, a convention this file and `csound_backend.c` document
+    deliberately. It is safe in practice but is not a synchronization primitive,
+    and it is the only thing helgrind still reports in the async layer.
+  - Moving them (and the `csound_backend.c` equivalents) to `atomic_int` would
+    make the intent checkable by tooling. Deliberately left alone here to keep
+    the thread-safety fix reviewable and to avoid changing a shared convention
+    in one place only.
+
+- [x] ~~**P2 - Blocking mutex in the realtime audio callback**~~ **DONE**
+  - `shared_csound_render` runs on the miniaudio device thread and took
+    `cs_mutex_lock`, holding it across `csoundPerformKsmps`. A control-thread
+    compile on the same mutex stalled the audio thread - a priority inversion
+    where a non-realtime thread blocks a realtime one.
+  - Now try-locks (`cs_mutex_trylock`, added to both the POSIX and Windows
+    mutex wrappers) and emits one period of silence on contention. This is a
+    bounded, self-correcting glitch instead of a missed callback deadline, and
+    it lets the compile finish sooner since it no longer contends with rendering.
+  - `shared_csound_render_skip_count()` reports how many buffers were dropped
+    this way, so the degradation is observable rather than silent. Reset on load.
+  - Measured on a 600-instrument orchestra (~56KB, a realistic live-coding
+    recompile): the compile holds the mutex for **~30ms against a 23.2ms audio
+    period**, so it always outlasts a callback deadline. Worst-case
+    `shared_csound_render` call, compile running on another thread:
+
+    | | worst render call | render calls completed |
+    |---|---|---|
+    | blocking lock | 101.43 ms | 1,232 |
+    | try-lock | 0.02 - 0.24 ms | ~1.6M |
+
+  - `test_csound_backend.c` gained 3 tests. Both contention tests were confirmed
+    to fail against the pre-fix locking. They need a playback device to put the
+    engine in its enabled state and report-and-return without failing where none
+    is available.
+
+- [ ] Consider Csound's async APIs to shorten the engine lock hold
+  - Csound 6.18 provides `csoundCompileOrcAsync` (parses on the caller's thread,
+    queues the merge for the performance thread) and `csoundReadScoreAsync`.
+    Using them in `shared_csound_compile_orc` and the note senders would cut the
+    contention window rather than just making it non-blocking, so recompiles
+    would not drop audio at all.
+  - Not done here: it changes when compile errors surface and when score events
+    take effect, which is a semantic change beyond the thread-safety fix.
+
+- [x] ~~`g_play.mutex` in `csound_backend.c` is locked only by `play_audio_callback`~~ **DONE**
+  - Removed. It was worse than merely dead: the state that *is* shared across
+    threads - `finished` and `active` - was read and written entirely outside it
+    (`shared_csound_play_stop`, the blocking wait loop, and the audio callback).
+  - `playback_sigint_handler` also writes `finished`, and a signal handler may
+    only touch `volatile sig_atomic_t`, so a mutex could never have covered it.
+    Both flags are now `volatile sig_atomic_t`, matching `g_interrupted` directly
+    below them.
+  - Everything else in `PlaybackState` is published before `ma_device_start` and
+    torn down after `ma_device_stop`, so the device lifecycle orders it.
+  - Verified end to end by playing a 400ms CSD through `shared_csound_play_file`:
+    returns 0 after ~514ms, so the callback still signals completion correctly.
+
+- [x] ~~**P2 - Unchecked `realloc` in the Joy string lexer**~~ **DONE**
+  - `lexer_read_string` assigned the `realloc` result straight into `buffer`,
+    which both leaked the old block and left a NULL to write through on the very
+    next line. The initial `malloc` was unchecked too. Both now return NULL,
+    which propagates safely: `joy_strdup` is NULL-safe and the token cleanup at
+    `joy_parser.c:220` already guards on the pointer.
+  - The other two sites `REVIEW.md` lists under this heading are false positives.
+    `search.c:143` guards with `if (saved_hl)` and `async_queue.c:296-300` guards
+    with `if (!event.heap_data) return -1`.
+
+- [x] ~~**P3 - MHS gives untrusted `.hs` files shell and filesystem access**~~ **WON'T FIX**
+  - Closed by the trust model above: `.hs` files are the user's own. Recorded here
+    rather than deleted so the analysis is not redone.
+  - `vfs_cleanup_temp` (`langs/mhs/vfs.c:829-836`) shells out via `system("rm -rf ...")`.
+    The path comes from `mkdtemp`, so it is not directly injectable, but it should
+    be `nftw`-based like the CLI test harness already is.
+  - The `system` primitive at `langs/mhs/impl/eval.c:6765` is the real exposure.
+    Two caveats the review missed: that file is vendored MicroHs upstream
+    (Augustsson, 7,288 lines), so gating it means carrying a patch; and the
+    adjacent `mhs_fopen`, `mhs_open`, and `mhs_unlink` grant equivalent filesystem
+    access, so gating `system` alone does not sandbox anything.
+  - Gating `system` alone would buy nothing regardless, and a `WANT_STDIO`-scoped
+    build variant is a large change against vendored upstream. Joy's
+    `PSND_ENABLE_SHELL` gate (`joy_primitives.c:4755-4764`) already exists and can
+    stay as-is; it is not worth mirroring in MHS.
+  - [x] ~~`vfs_cleanup_temp` shelling out to `rm -rf`~~ **DONE** - now walks the
+    tree with `nftw(FTW_DEPTH | FTW_PHYS)` like `test_process.h` already did.
+    `FTW_PHYS` keeps it from following symlinks out of the temp directory. The
+    Windows branch still uses `rmdir /s /q`, matching the same precedent.
+
+- [ ] **P4 - Web host auth hygiene**
+  - The token travels as a `?token=` query parameter, so it lands in browser
+    history and any intermediary log. Prefer a header or cookie for the API.
+  - `web_host_authorized` compares with `mg_strcmp` (not constant-time). Low impact
+    while loopback-bound; worth fixing alongside any bind-address change.
+
 ### Cross-Platform Support
 
 - [ ] Windows support (in progress)
@@ -46,9 +236,14 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
 
 - [ ] Web host as primary cross-platform UI
   - Already functional with xterm.js terminal emulator
+  - [x] ~~Authentication~~ **DONE** - random 128-bit token gates `/api/*` and `/ws`
+    (`web_host_authorized`), listener binds `127.0.0.1` by default. Escape hatches:
+    `PSND_WEB_NO_AUTH`, `PSND_WEB_TOKEN`, `PSND_WEB_BIND`. See "Web host auth
+    hygiene" under Security Hardening for the remaining nits.
+  - [ ] Path sandbox for `/api/save`, `/api/load`, and the WebSocket `load` command
+    - Blocks network exposure regardless of auth; tracked as P1 above
   - [ ] Multiple client support (currently single WebSocket connection)
   - [ ] Session persistence (save/restore editor state across restarts)
-  - [ ] Authentication (required before exposing to network)
 
 ### Stability & Robustness
 
@@ -75,10 +270,27 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
 - [ ] Add fuzzing infrastructure (optional)
   - Consider libFuzzer or AFL++ for parser/scanner testing
   - Low priority unless targeting wider distribution
+  - If it happens, `loki/json.c` and the web host request path are the best targets
+
+- [x] ~~Prune the dead CMake scripts in `scripts/cmake/`~~ **DONE**
+  - Deleted all seven (`psnd_shared_library`, `psnd_loki_library`,
+    `psnd_psnd_binary`, `psnd_tests`, `psnd_alda_library`, `psnd_joy_library`,
+    `psnd_bog_library`). Only `psnd_platform` and `psnd_languages` remain, and
+    both are live. Verified with a clean `cmake -B` configure.
+  - Follow-on found while pruning: `docs/new_lang.md` documented the whole
+    add-a-language workflow against those dead files, and also had contributors
+    hand-editing `lang_config.h` and `lang_dispatch.c`. Both are now generated
+    (`lang_config_generated.h`, `lang_dispatch_generated.h`) and marked DO NOT
+    EDIT, so that guide would have produced a language that silently did not
+    build. Steps 5-8 and the Key Files table rewritten against the real
+    `psnd_register_language()` auto-discovery. `scripts/new_lang.py` was already
+    correct - only the prose was stale.
 
 ### Code Coverage
 
-Current state: **72 test files**, **~2,390 test functions**, **~5,800 assertions**. Direct file mapping coverage ~70%.
+Current state (recounted 2026-08-24): **77 first-party test files** (90 tree-wide
+including vendored), **~2,515 test functions**. 75 CTest suites, all passing.
+Direct file mapping coverage ~70%.
 
 **Critical gaps (no unit tests):**
 
@@ -108,6 +320,33 @@ Current state: **72 test files**, **~2,390 test functions**, **~5,800 assertions
 - [x] ~~`jsonrpc.c`, `osc.c` - Protocol handlers~~ **DONE** (67 tests: 42 jsonrpc + 25 osc)
 
 **Remaining test coverage work:**
+
+- [x] ~~`loki/json.c` - hand-rolled JSON parser, **no test file at all**~~ **DONE**
+  - `test_json.c`: 54 tests covering the builder (escaping, nesting, buffer
+    growth past `INITIAL_CAP`, reset, error stub) and the parser (scalars,
+    containers, capacity growth, depth limit, 12 malformed-input cases,
+    accessors, round-trip). Valgrind clean: 608 allocs, 608 frees, 0 errors.
+  - Note it is used well beyond the web host - `jsonrpc.c`,
+    `tracker_view_json.c`, and `host_webview.cpp` all depend on it.
+  - Several tests deliberately pin *current* lenient behaviour rather than
+    correct JSON, since callers rely on it: `\uXXXX` decodes to `'?'` rather
+    than the real codepoint, and numbers keep only the integer part (`3.99`
+    parses as `3`). Both are marked in the test file so changing them is a
+    deliberate act rather than an accidental regression.
+
+- [ ] Web/host layer - `host.c`, `host_web.c`, `session.c`, `event.c`
+  - `host.h` already defines the `EditorHost` / `EditorSession` seam these need,
+    so a queue-backed test host is the natural harness. Nothing exercises it today.
+
+- [ ] Smaller uncovered modules: `export.c`, `live_loop.c`, `cli.c`, `lang_toml.c`,
+  `repl_helpers.c`, `repl_launcher.c`, `repl_line_editor.c`, `terminal_win.c`
+  - `repl_line_editor.c` should get its test alongside the P0 overflow fix
+  - `keybind.c` and `theme_toml.c` are covered transitively via `test_config.c`;
+    `midi_input.c` via `test_midi.c`. Not gaps.
+  - `editor.c` is **not** a meaningful gap despite `REVIEW.md` calling it the
+    largest untested module. It is 697 lines of CLI entry point, Lua highlight
+    glue, and teardown. The editor logic it appears to own actually lives in
+    `core.c`, `modal.c`, `renderer.c`, `undo.c`, and `search.c` - all tested.
 
 - [ ] `lua.c` - Lua integration (extend existing `test_lua_api.c`)
   - [ ] Lua state lifecycle (init, cleanup, error recovery)
@@ -145,6 +384,24 @@ Current state: **72 test files**, **~2,390 test functions**, **~5,800 assertions
 | Tracker view | 415 | JSON, undo, theme, clipboard, core, terminal |
 | MHS (MicroHaskell) | 47 | MIDI FFI, context state, port API |
 
+### Code Quality
+
+- [ ] Consolidate the in-editor Lua REPL onto the shared line-editor API
+  - `REVIEW.md` reports the REPL line editor "duplicated three times across
+    `repl.c`, `loki/repl_line_editor.c`, and `lua.c`". Two of the three are fine:
+    `repl.c` and `repl_line_editor.c` export the *same* symbols
+    (`repl_add_history`, `repl_history_load`, `repl_history_save`) and are selected
+    mutually exclusively by `WITH_LINENOISE` (`source/core/CMakeLists.txt:191`,
+    `:334-337`). That is a backend split behind one API, not drift.
+  - The real third copy is `lua.c:3111-3160`, which carries its own `history[]`,
+    `history_index`, and key loop for the in-editor REPL. That one can diverge.
+
+- [ ] Consider splitting the largest first-party files
+  - `lua.c` (3,644), `tracker/tracker_view.c` (3,058),
+    `tracker/tracker_view_terminal.c` (2,044), `joy/impl/joy_primitives.c` (5,185).
+  - Low urgency - all four are well covered by tests. Note `REVIEW.md` names
+    `editor.c` as the largest module; it is 697 lines.
+
 ### Code Quality (Completed)
 
 - [x] ~~Extract shared REPL loop skeleton~~ **DONE**
@@ -165,6 +422,22 @@ Current state: **72 test files**, **~2,390 test functions**, **~5,800 assertions
 
 - [ ] Contributing guide
   - Code style, PR process, test requirements
+
+- [ ] Refresh the design docs against the current tree
+  - `docs/design_review.md` (13 hits) and `docs/refactor.md` (41 hits) still cite
+    pre-rename paths `src/loki/...` and `src/shared/...`, now `source/core/loki/...`
+    and `source/core/shared/...`, with `terminal.c` split into
+    `terminal_posix.c` / `terminal_win.c`.
+  - More misleading than the paths: both still present the model/view split and the
+    host/session seam as future work. Both landed. Reviewers reading these docs
+    reach wrong conclusions about the code - `REVIEW.md` did exactly that.
+
+- [x] ~~README build-table fixes~~ **DONE**
+  - Dropped the misleading "(smallest)" on `make psnd-tsf` and added a note that
+    every preset includes MHS by default, so it is the smallest *backend* choice
+    rather than the smallest binary.
+  - Added the two minihost presets, and a utility-target table covering `psnd`,
+    `library`, `rebuild`, `reset`, `remake`, and `test-minihost`.
 
 ### Editor Features
 
@@ -213,9 +486,22 @@ Current state: **72 test files**, **~2,390 test functions**, **~5,800 assertions
 
 ### Future Architecture
 
+- [ ] Route the terminal path through the existing host abstraction
+  - Scoped down from `REVIEW.md` recommendation 4, most of which is already done:
+    `internal.h:143-236` splits `EditorModel` (document) from `EditorView`
+    (presentation) inside `editor_ctx`, and `host.h` / `session.h` already define
+    the `EditorHost` / `EditorSession` seam that the web and webview hosts use.
+  - What is actually left: `loki_editor_main` (`editor.c:317-660`) still runs its
+    own `while(1)` against `STDIN_FILENO` and calls `editor_refresh_screen`
+    directly, bypassing that seam. Moving it onto `EditorHost` would leave one
+    loop instead of two and make the terminal path testable like the others.
+  - The design docs oversell this: `docs/design_review.md` and `docs/refactor.md`
+    still describe the pre-split code and pre-rename paths (see Documentation).
+
 - [ ] Wrap editor core in standalone service process
   - Small RPC protocol (stdio JSON or gRPC)
   - Would enable embedding editor in other applications
+  - Depends on the terminal-path work above
 
 - [ ] Lua-to-language primitive callbacks for TR7/Bog
   - Joy already implemented (`loki.joy.register_primitive`)

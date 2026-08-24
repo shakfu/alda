@@ -32,7 +32,14 @@ typedef struct {
  * ============================================================================ */
 
 typedef struct {
+    /* Guarded by g_async.mutex. `active` and the two *_pending flags form the
+     * control-thread <-> loop-thread handshake. */
     int active;
+    int start_pending;          /* A start was requested for this activation */
+    int stop_pending;           /* A stop was requested for this activation */
+    int pending_start_delay;    /* First timer delay, in ms */
+
+    /* Loop thread only. Set by on_stop_signal(), read by the timer callbacks. */
     int stop_requested;
 
     /* Event data (deep copy) */
@@ -62,12 +69,18 @@ typedef struct {
     int slot_id;            /* Store slot ID for callback */
 
 #ifdef SHARED_SOURCE_TRACKING
-    /* Last played source line (for visualization) */
-    int last_source_line;
+    /* Last played source line (for visualization). Written by the loop thread in
+     * send_event() and polled by the editor thread each frame, so it uses the
+     * same lock-free convention as the g_async flags below. */
+    volatile sig_atomic_t last_source_line;
 #endif
 
-    /* libuv handles */
+    /* libuv handles. These are owned by the loop thread: uv_timer_start/stop
+     * must only be called from loop-thread callbacks. uv_async_send is the one
+     * libuv call that is safe to make from another thread, so it is how the
+     * control thread asks the loop to start or stop a slot. */
     uv_timer_t timer;
+    uv_async_t start_async;
     uv_async_t stop_async;
 } AsyncSlot;
 
@@ -98,6 +111,7 @@ static AsyncSystem g_async = {0};
  * ============================================================================ */
 
 static void on_timer(uv_timer_t* handle);
+static void on_start_signal(uv_async_t* handle);
 static void schedule_next_timer(AsyncSlot* slot);
 static void finalize_slot(AsyncSlot* slot);
 static void send_event(AsyncSlot* slot, SharedAsyncEvent* evt);
@@ -357,14 +371,46 @@ static void finalize_slot(AsyncSlot* slot) {
  * Stop Handler
  * ============================================================================ */
 
+/* Runs on the loop thread in response to shared_async_stop(). The pending flag
+ * is checked under the mutex so that a stale signal - uv_async_send coalesces,
+ * and a send may still be in flight when a slot is recycled - cannot tear down
+ * a slot that has since been handed to a new schedule. */
 static void on_stop_signal(uv_async_t* handle) {
     AsyncSlot* slot = (AsyncSlot*)handle->data;
-    slot->stop_requested = 1;
+
+    uv_mutex_lock(&g_async.mutex);
+    int do_stop = slot->active && slot->stop_pending;
+    slot->stop_pending = 0;
+    if (do_stop) {
+        slot->stop_requested = 1;
+        slot->start_pending = 0;  /* Cancel a start that has not run yet */
+    }
+    uv_mutex_unlock(&g_async.mutex);
+
+    if (!do_stop) return;
+
     uv_timer_stop(&slot->timer);
     send_all_note_offs(slot);
 
     /* Use finalize_slot to handle callback invocation */
     finalize_slot(slot);
+}
+
+/* Runs on the loop thread in response to shared_async_play_ex(). Starting the
+ * timer here rather than from the caller is the whole point of this handle:
+ * uv_timer_start on a live loop is only safe from the loop's own thread. */
+static void on_start_signal(uv_async_t* handle) {
+    AsyncSlot* slot = (AsyncSlot*)handle->data;
+
+    uv_mutex_lock(&g_async.mutex);
+    int do_start = slot->active && slot->start_pending && !slot->stop_requested;
+    int delay_ms = slot->pending_start_delay;
+    slot->start_pending = 0;
+    uv_mutex_unlock(&g_async.mutex);
+
+    if (!do_start) return;
+
+    uv_timer_start(&slot->timer, on_timer, delay_ms, 0);
 }
 
 /* ============================================================================
@@ -714,12 +760,18 @@ int shared_async_init(void) {
     for (int i = 0; i < SHARED_ASYNC_MAX_SLOTS; i++) {
         AsyncSlot* slot = &g_async.slots[i];
         slot->active = 0;
+        slot->start_pending = 0;
+        slot->stop_pending = 0;
+        slot->pending_start_delay = 0;
         slot->events = NULL;
         slot->event_count = 0;
         slot->active_note_count = 0;
 
         uv_timer_init(g_async.loop, &slot->timer);
         slot->timer.data = slot;
+
+        uv_async_init(g_async.loop, &slot->start_async, on_start_signal);
+        slot->start_async.data = slot;
 
         uv_async_init(g_async.loop, &slot->stop_async, on_stop_signal);
         slot->stop_async.data = slot;
@@ -746,6 +798,11 @@ void shared_async_cleanup(void) {
 
     shared_async_stop_all();
 
+    /* Stops are now processed on the loop thread, so give it a bounded window to
+     * run on_stop_signal and emit note-offs. Without this the loop can be torn
+     * down with notes still sounding. */
+    shared_async_wait_all(250);
+
     g_async.shutdown_requested = 1;
     uv_async_send(&g_async.wake_async);
 
@@ -756,6 +813,7 @@ void shared_async_cleanup(void) {
     for (int i = 0; i < SHARED_ASYNC_MAX_SLOTS; i++) {
         AsyncSlot* slot = &g_async.slots[i];
         uv_close((uv_handle_t*)&slot->timer, NULL);
+        uv_close((uv_handle_t*)&slot->start_async, NULL);
         uv_close((uv_handle_t*)&slot->stop_async, NULL);
 
         if (slot->events) {
@@ -786,6 +844,13 @@ int shared_async_play_ex(SharedAsyncSchedule* sched, SharedContext* ctx,
     /* Initialize if needed */
     if (!g_async.loop) {
         if (shared_async_init() != 0) return -1;
+    }
+
+    /* Resolve launch quantization before taking the lock: this reaches into the
+     * Link layer and must not run with g_async.mutex held. */
+    int quant_delay = 0;
+    if (sched->launch_quantize > 0) {
+        quant_delay = shared_link_ms_to_next_beat((double)sched->launch_quantize);
     }
 
     /* Find free slot */
@@ -837,6 +902,7 @@ int shared_async_play_ex(SharedAsyncSchedule* sched, SharedContext* ctx,
     slot->current_tick = 0;
     slot->active_note_count = 0;
     slot->stop_requested = 0;
+    slot->stop_pending = 0;
     slot->ctx = ctx;
     slot->callback = callback;
     slot->callback_userdata = userdata;
@@ -847,9 +913,8 @@ int shared_async_play_ex(SharedAsyncSchedule* sched, SharedContext* ctx,
     slot->active = 1;
     g_async.active_count++;
 
-    uv_mutex_unlock(&g_async.mutex);
-
-    /* Schedule first timer */
+    /* Compute the first delay here, while the slot state we just wrote is still
+     * under the lock. */
     int first_delay = 0;
     if (slot->event_count > 0) {
         if (slot->use_ticks) {
@@ -865,14 +930,16 @@ int shared_async_play_ex(SharedAsyncSchedule* sched, SharedContext* ctx,
             }
         }
     }
+    first_delay += quant_delay;
 
-    /* Apply launch quantization if enabled */
-    if (sched->launch_quantize > 0) {
-        int quant_delay = shared_link_ms_to_next_beat((double)sched->launch_quantize);
-        first_delay += quant_delay;
-    }
+    slot->pending_start_delay = first_delay;
+    slot->start_pending = 1;
 
-    uv_timer_start(&slot->timer, on_timer, first_delay, 0);
+    uv_mutex_unlock(&g_async.mutex);
+
+    /* Hand the timer start to the loop thread. Calling uv_timer_start from here
+     * would mutate a handle owned by a running loop from the wrong thread. */
+    uv_async_send(&slot->start_async);
     uv_async_send(&g_async.wake_async);
 
     return slot_id;
@@ -891,20 +958,29 @@ void shared_async_stop(int slot_id) {
     }
 
     AsyncSlot* slot = &g_async.slots[slot_id];
-    if (slot->active) {
-        slot->stop_requested = 1;
-        uv_async_send(&slot->stop_async);
-    }
+
+    /* Record the request under the lock and let the loop thread act on it.
+     * stop_requested itself is loop-thread state and is set in on_stop_signal. */
+    uv_mutex_lock(&g_async.mutex);
+    int notify = slot->active && !slot->stop_pending;
+    if (slot->active) slot->stop_pending = 1;
+    uv_mutex_unlock(&g_async.mutex);
+
+    if (notify) uv_async_send(&slot->stop_async);
 }
 
 void shared_async_stop_all(void) {
     if (!g_async.loop) return;
 
     for (int i = 0; i < SHARED_ASYNC_MAX_SLOTS; i++) {
-        if (g_async.slots[i].active) {
-            g_async.slots[i].stop_requested = 1;
-            uv_async_send(&g_async.slots[i].stop_async);
-        }
+        AsyncSlot* slot = &g_async.slots[i];
+
+        uv_mutex_lock(&g_async.mutex);
+        int notify = slot->active && !slot->stop_pending;
+        if (slot->active) slot->stop_pending = 1;
+        uv_mutex_unlock(&g_async.mutex);
+
+        if (notify) uv_async_send(&slot->stop_async);
     }
 }
 

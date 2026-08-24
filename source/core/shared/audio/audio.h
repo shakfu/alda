@@ -236,10 +236,28 @@ int shared_csound_get_channels(void);
 
 /**
  * @brief Render audio samples.
+ *
+ * Called from the realtime audio callback. Never blocks: if the engine mutex is
+ * held elsewhere (a compile in progress), this writes silence and returns rather
+ * than waiting, incrementing the counter reported by
+ * shared_csound_render_skip_count().
+ *
  * @param output Buffer to write interleaved float samples.
  * @param frames Number of frames to render.
  */
 void shared_csound_render(float* output, int frames);
+
+/**
+ * @brief Number of buffers the render path filled with silence because the
+ *        engine mutex was busy.
+ *
+ * A non-zero value is expected around compiles; a continuously climbing value
+ * means the engine is being held for longer than the audio period. Reset when
+ * an orchestra is loaded.
+ *
+ * @return Skip count since the last load.
+ */
+long shared_csound_render_skip_count(void);
 
 /**
  * @brief Get the last error message.

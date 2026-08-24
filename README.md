@@ -87,19 +87,36 @@ Build presets select the synthesizer backend and optional features:
 
 | Target | Alias | Description |
 |--------|-------|-------------|
-| `make psnd-tsf` | `make`, `make default` | TinySoundFont only (smallest) |
+| `make psnd-tsf` | `make`, `make default`, `make build` | TinySoundFont only |
 | `make psnd-tsf-csound` | `make csound` | TinySoundFont + Csound |
 | `make psnd-fluid` | | FluidSynth only (higher quality) |
 | `make psnd-fluid-csound` | | FluidSynth + Csound |
 | `make psnd-tsf-web` | `make web` | TinySoundFont + Web UI |
 | `make psnd-fluid-web` | | FluidSynth + Web UI |
 | `make psnd-fluid-csound-web` | `make full` | Everything |
+| `make psnd-minihost` | `make minihost` | TinySoundFont + audio plugin host |
+| `make psnd-minihost-csound` | | TinySoundFont + plugin host + Csound |
+
+All of the above include MHS (Micro Haskell) by default - see the variants
+below for smaller builds. `make psnd-tsf` is the smallest of the *backend*
+choices, not the smallest binary overall.
+
+Utility targets:
+
+| Target | Description |
+|--------|-------------|
+| `make psnd` | Build just the `psnd` binary (TinySoundFont config) |
+| `make library` | Build just `libloki` |
+| `make rebuild` | `clean`, then build TinySoundFont + Csound, then `test` |
+| `make reset` | Delete the build directory |
+| `make remake` | `reset`, then a default build |
+| `make test-minihost` | Build the plugin-host config and run its tests |
 
 **MHS (Micro Haskell) build variants:**
 
 | Target | Binary Size | Description |
 |--------|-------------|-------------|
-| `make` | ~5.7MB | Full MHS with fast startup (~2s) and compilation support |
+| `make` (default) | ~5.7MB | Full MHS with fast startup (~2s) and compilation support |
 | `make mhs-small` | ~4.5MB | MHS without compilation to executable |
 | `make mhs-src` | ~4.1MB | MHS with source embedding (~17s startup) |
 | `make mhs-src-small` | ~2.9MB | Smallest binary with MHS |

@@ -156,6 +156,7 @@ static char* lexer_read_string(Lexer* lex) {
 
     size_t capacity = 64;
     char* buffer = malloc(capacity);
+    if (!buffer) return NULL;
     size_t len = 0;
 
     while (lex->pos < lex->length) {
@@ -175,8 +176,16 @@ static char* lexer_read_string(Lexer* lex) {
         }
 
         if (len + 1 >= capacity) {
+            /* Keep the original block if realloc fails: assigning the result
+             * straight into `buffer` would both leak it and leave a NULL to
+             * write through on the next line. */
+            char* grown = realloc(buffer, capacity * 2);
+            if (!grown) {
+                free(buffer);
+                return NULL;
+            }
+            buffer = grown;
             capacity *= 2;
-            buffer = realloc(buffer, capacity);
         }
         buffer[len++] = c;
     }

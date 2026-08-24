@@ -123,7 +123,18 @@ struct JsonValue {
     } data;
 };
 
-/* Parse JSON string into JsonValue. Returns JSON_ERROR on failure. */
+/**
+ * Maximum container nesting depth accepted by json_parse().
+ *
+ * The parser is recursive descent, so input nesting depth maps directly onto
+ * C stack depth. Without a cap, a deeply nested document exhausts the stack.
+ * Anything this project serializes is nested well under 10 deep; 64 leaves
+ * generous headroom while keeping worst-case stack use bounded.
+ */
+#define JSON_MAX_DEPTH 64
+
+/* Parse JSON string into JsonValue. Returns JSON_ERROR on failure, including
+ * NULL input and nesting deeper than JSON_MAX_DEPTH. */
 JsonValue json_parse(const char *json);
 
 /* Free parsed JSON value and all children */

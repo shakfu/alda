@@ -12,6 +12,8 @@
 
 #include "internal.h"
 
+#include <stddef.h>  /* size_t */
+
 #ifdef LOKI_USE_LINENOISE
 #include <linenoise.h>
 #include "repl_linenoise.h"
@@ -121,5 +123,16 @@ void repl_set_completion(ReplLineEditor *ed, ReplCompletionCallback cb, void *us
 
 /* Clear completion state (call when input changes non-TAB) */
 void repl_completion_clear(ReplLineEditor *ed);
+
+/* Extract the completion word ending at buf[pos] into out[out_size].
+ *
+ * Returns the word length, or -1 if the word plus its terminator does not fit
+ * in out_size (callers must then skip completion, not truncate). On success
+ * *word_start, when non-NULL, receives the buffer index where the word begins.
+ *
+ * Exposed for the linenoise completion adapter, which receives a buffer larger
+ * than REPL_MAX_INPUT_LENGTH, and for tests. */
+int repl_extract_completion_prefix(const char *buf, int pos, char *out,
+                                   size_t out_size, int *word_start);
 
 #endif /* LOKI_REPL_H */

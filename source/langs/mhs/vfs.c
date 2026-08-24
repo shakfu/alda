@@ -20,6 +20,20 @@
  *   cc -DVFS_USE_PKG -DVFS_USE_ZSTD -c vfs.c -o vfs.o
  */
 
+/* Feature test macros must precede the system includes: nftw() and FTW_DEPTH
+ * come from the XSI extension. Matches source/testing/test_process.h. */
+#ifndef _WIN32
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 700
+#endif
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE 1
+#endif
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+#define _DARWIN_C_SOURCE
+#endif
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,6 +41,9 @@
 #include <errno.h>
 #include <libgen.h>
 #include <unistd.h>
+#ifndef _WIN32
+#include <ftw.h>
+#endif
 
 /* Include the appropriate embedded header based on compile mode.
  * MHS_EMBEDDED_HEADER can be defined to override the default selection.
@@ -826,14 +843,38 @@ char* vfs_extract_to_temp(void) {
     return result;
 }
 
+#ifndef _WIN32
+/* nftw callback: remove each entry as it is visited (FTW_DEPTH gives us
+ * children before parents, so plain remove() suffices). */
+static int vfs_remove_entry(const char* path, const struct stat* sb,
+                            int typeflag, struct FTW* ftwbuf) {
+    (void)sb;
+    (void)typeflag;
+    (void)ftwbuf;
+    return remove(path);
+}
+#endif
+
 void vfs_cleanup_temp(char* temp_dir) {
-    if (temp_dir) {
-        VFS_LOG("Cleaning up: %s\n", temp_dir);
+    if (!temp_dir) return;
+
+    VFS_LOG("Cleaning up: %s\n", temp_dir);
+
+    /* Walk and unlink rather than shelling out to `rm -rf`. The path comes from
+     * mkdtemp() so it was never attacker-controlled, but spawning a shell to
+     * delete a directory tree is both slower and a needless way to get quoting
+     * wrong. FTW_PHYS keeps us from following symlinks out of the tree. */
+    if (temp_dir[0] != '\0') {
+#ifdef _WIN32
         char cmd[4096];
-        snprintf(cmd, sizeof(cmd), "rm -rf '%s'", temp_dir);
+        snprintf(cmd, sizeof(cmd), "rmdir /s /q \"%s\" 2>NUL", temp_dir);
         system(cmd);
-        free(temp_dir);
+#else
+        nftw(temp_dir, vfs_remove_entry, 16, FTW_DEPTH | FTW_PHYS);
+#endif
     }
+
+    free(temp_dir);
 }
 
 #ifdef VFS_USE_ZSTD

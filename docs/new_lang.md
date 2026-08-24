@@ -20,12 +20,13 @@ Use the generator script to create all boilerplate:
 The script generates:
 
 - `source/langs/<name>/` - Register, REPL, dispatch, `impl/`, and `tests/` files
-- `scripts/cmake/psnd_<name>_library.cmake` - CMake configuration
-- `source/langs/<name>/tests/` - Test scaffolding
+- `source/langs/<name>/CMakeLists.txt` - Build and registration, auto-discovered
+- `source/langs/<name>/tests/` - Test scaffolding (also auto-discovered)
 - `source/langs/<name>/docs/README.md` - Documentation template
 - `.psnd/languages/<name>.lua` - Syntax highlighting
 
-It also updates `lang_config.h`, `lang_dispatch.c`, and CMake files automatically.
+No parent CMake file, `lang_config.h`, or `lang_dispatch.c` edit is needed: the
+build discovers the language directory and generates those declarations.
 
 After running the script:
 
@@ -111,7 +112,8 @@ int example_eval(ExampleContext *ctx, const char *code) {
 
 ### CMake Library
 
-Create `scripts/cmake/psnd_example_library.cmake`:
+Create `source/langs/example/CMakeLists.txt`. It is discovered automatically -
+no parent CMake file references it:
 
 ```cmake
 include_guard(GLOBAL)
@@ -682,114 +684,85 @@ void example_loki_lang_init(void) {
 }
 ```
 
-## Step 5: Add Language Configuration
+## Step 5: Register the Language
 
-Add your language to `source/core/lang_config.h`. This file centralizes **all** language-specific declarations, so you only need to modify this one file:
+There is nothing to hand-edit here. `psnd_register_language()` in your language's
+`CMakeLists.txt` (Step 1) is the single registration point. At configure time
+`scripts/cmake/psnd_languages.cmake` walks `source/langs/*`, and for every
+directory containing a `CMakeLists.txt` it defines a `LANG_<NAME>` option
+(default `ON`), processes the directory, and collects what you registered.
 
-```c
-/* In source/core/lang_config.h */
+It then generates two headers into `${CMAKE_BINARY_DIR}/generated/`:
 
-/* 1. Add helper macro */
-#ifdef LANG_EXAMPLE
-#define IF_LANG_EXAMPLE(x) x
-#else
-#define IF_LANG_EXAMPLE(x)
-#endif
+| Generated header | Provides |
+|------------------|----------|
+| `lang_config_generated.h` | `IF_LANG_<NAME>` macros, `struct Loki<Name>State` forward decls, `LOKI_LANG_STATE_FIELDS_GENERATED`, `LOKI_LANG_INIT_ALL_GENERATED` |
+| `lang_dispatch_generated.h` | `<name>_dispatch_init()` decls and `LANG_DISPATCH_INIT_ALL_GENERATED` |
 
-/* 2. Add forward declaration (in Forward Declarations section) */
-IF_LANG_EXAMPLE(struct LokiExampleState;)
+`source/core/lang_config.h` and `source/core/lang_dispatch.c` are thin shims that
+include these and expand the generated macros. Both are marked DO NOT EDIT -
+earlier revisions of this guide had you edit them by hand, which is no longer
+correct and will be overwritten.
 
-/* 3. Add to LOKI_LANG_STATE_FIELDS macro */
-#define LOKI_LANG_STATE_FIELDS \
-    IF_LANG_ALDA(struct LokiAldaState *alda_state;) \
-    IF_LANG_JOY(struct LokiJoyState *joy_state;) \
-    IF_LANG_TR7(struct LokiTr7State *tr7_state;) \
-    IF_LANG_BOG(struct LokiBogState *bog_state;) \
-    IF_LANG_EXAMPLE(struct LokiExampleState *example_state;)
+What this requires of your code is only that the symbols the generator declares
+actually exist:
 
-/* 4. Add init declaration (in Language Init Declarations section) */
-IF_LANG_EXAMPLE(void example_loki_lang_init(void);)
+- `void example_loki_lang_init(void);` - called by `LOKI_LANG_INIT_ALL()`
+- `void example_dispatch_init(void);` - called by `LANG_DISPATCH_INIT_ALL()`
+- `struct LokiExampleState` - the type named in `ctx->model.example_state`
 
-/* 5. Add to LOKI_LANG_INIT_ALL macro */
-#define LOKI_LANG_INIT_ALL() \
-    IF_LANG_ALDA(alda_loki_lang_init();) \
-    IF_LANG_JOY(joy_loki_lang_init();) \
-    IF_LANG_TR7(tr7_loki_lang_init();) \
-    IF_LANG_BOG(bog_loki_lang_init();) \
-    IF_LANG_EXAMPLE(example_loki_lang_init();)
+The `Loki<Name>State` spelling is derived by title-casing the `NAME` you passed to
+`psnd_register_language()`, so `NAME example` must pair with `LokiExampleState`.
+
+## Step 6: Build Configuration
+
+Also nothing to do. The `LANG_EXAMPLE` option and the `LANG_EXAMPLE=1` compile
+definition are created by the discovery pass; `psnd_collect_lang_sources()` folds
+your `SOURCES`, `INCLUDE_DIRS`, `REPL_SOURCES`, `REGISTER_SOURCES`, and
+`LINK_LIBRARIES` into the `loki` library and the `psnd` binary.
+
+To build without your language:
+
+```sh
+cmake -B build -DLANG_EXAMPLE=OFF
 ```
 
-No other core files need modification.
+Confirm discovery worked by looking for these lines in the configure output:
 
-## Step 6: Update CMake Build Files
-
-### Add language option to CMakeLists.txt
-
-```cmake
-option(LANG_EXAMPLE "Include the Example language" ON)
-
-if(LANG_EXAMPLE)
-    include(psnd_example_library)
-endif()
 ```
-
-### Update psnd_loki_library.cmake
-
-Add to the language sources section:
-
-```cmake
-if(LANG_EXAMPLE)
-    list(APPEND LOKI_LANG_SOURCES ${PSND_ROOT_DIR}/source/langs/example/register.c)
-endif()
-```
-
-Add to the library linking section:
-
-```cmake
-if(LANG_EXAMPLE)
-    list(APPEND LOKI_PUBLIC_LIBS example)
-    target_compile_definitions(libloki PUBLIC LANG_EXAMPLE=1)
-endif()
-```
-
-### Update psnd_psnd_binary.cmake
-
-Add to the REPL/dispatch sources:
-
-```cmake
-if(LANG_EXAMPLE)
-    list(APPEND PSND_LANG_SOURCES
-        ${PSND_ROOT_DIR}/source/langs/example/repl.c
-        ${PSND_ROOT_DIR}/source/langs/example/dispatch.c
-    )
-endif()
+-- Discovered language: example
+--   Registered: example (Example)
 ```
 
 ## Step 7: Add CLI Dispatch
 
-Update `source/core/lang_dispatch.c`:
+`source/core/lang_dispatch.c` needs no per-language edit - it expands
+`LANG_DISPATCH_INIT_ALL_GENERATED()`, which calls the `example_dispatch_init()`
+you provide in `source/langs/example/dispatch.c`. Register your entry points
+there against the `LangDispatchEntry` table (`source/core/lang_dispatch.h:25-45`):
 
 ```c
-#ifdef LANG_EXAMPLE
-#include "lang/example/repl.h"
-#endif
-
-int lang_dispatch(const char *lang, int argc, char **argv) {
-    /* ... existing dispatches ... */
-
-#ifdef LANG_EXAMPLE
-    if (strcmp(lang, "example") == 0 || strcmp(lang, "ex") == 0) {
-        return example_repl_main(argc, argv);
-    }
-#endif
-
-    return -1;  /* Unknown language */
+/* source/langs/example/dispatch.c */
+void example_dispatch_init(void) {
+    static const LangDispatchEntry entry = {
+        .name       = "example",
+        .commands   = (const char *[]){ "example", "ex", NULL },
+        .extensions = (const char *[]){ ".ex", NULL },
+        .repl_main  = example_repl_main,
+        .play_main  = example_play_main,
+    };
+    lang_dispatch_register(&entry);
 }
 ```
 
+The commands and extensions you pass to `psnd_register_language()` are what the
+build advertises; keep them in sync with this table.
+
 ## Step 8: Add Tests
 
-Create `tests/example/CMakeLists.txt`:
+Create `source/langs/example/tests/CMakeLists.txt`. Any language directory with a
+`tests/CMakeLists.txt` is added automatically when `BUILD_TESTING` is on
+(`source/langs/CMakeLists.txt:24-33`):
 
 ```cmake
 # Example language tests
@@ -825,13 +798,8 @@ int main(void) {
 }
 ```
 
-Add to `scripts/cmake/psnd_tests.cmake`:
-
-```cmake
-if(LANG_EXAMPLE)
-    add_subdirectory(${PSND_ROOT_DIR}/tests/example ${CMAKE_BINARY_DIR}/tests/example)
-endif()
-```
+No parent test file needs updating - the `add_subdirectory` is driven by the
+discovery loop, not a hand-maintained list.
 
 ## Step 9: Add Documentation
 
@@ -928,7 +896,10 @@ double shared_link_tempo(SharedContext *ctx);
 
 | File | Purpose |
 |------|---------|
-| `source/core/lang_config.h` | **Modify this for new languages** - state fields, forward decls, init calls |
+| `source/langs/<name>/CMakeLists.txt` | **The only file you register in** - `psnd_register_language()` |
+| `scripts/cmake/psnd_languages.cmake` | Discovery, registration, and header generation |
+| `source/core/lang_config.h` | Generated-header shim - do not hand-edit |
+| `source/core/lang_dispatch.c` | Generated-macro dispatch - do not hand-edit |
 | `source/core/shared/context.h` | Shared MIDI/audio context |
 | `source/core/shared/repl_commands.h` | Common REPL command handling |
 | `source/langs/alda/register.c` | Reference: Alda integration |

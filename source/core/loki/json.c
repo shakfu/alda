@@ -199,6 +199,7 @@ typedef struct {
     const char *json;
     size_t pos;
     size_t len;
+    int depth;      /* Current container nesting; capped at JSON_MAX_DEPTH */
 } JsonParser;
 
 static void skip_whitespace(JsonParser *p) {
@@ -408,8 +409,16 @@ static JsonValue parse_object(JsonParser *p) {
         while (1) {
             if (count >= cap) {
                 cap *= 2;
+                /* Adopt each successful realloc immediately. Testing both
+                 * before reassigning would leave `keys` dangling when the first
+                 * call succeeded and the second failed, and the cleanup below
+                 * would then read through it and free it twice. */
                 char **new_keys = realloc(keys, cap * sizeof(char *));
+                if (new_keys) keys = new_keys;
+
                 JsonValue *new_values = realloc(values, cap * sizeof(JsonValue));
+                if (new_values) values = new_values;
+
                 if (!new_keys || !new_values) {
                     for (size_t i = 0; i < count; i++) {
                         free(keys[i]);
@@ -419,8 +428,6 @@ static JsonValue parse_object(JsonParser *p) {
                     free(values);
                     return result;
                 }
-                keys = new_keys;
-                values = new_values;
             }
 
             JsonValue key_val = parse_string(p);
@@ -496,10 +503,15 @@ static JsonValue parse_value(JsonParser *p) {
 
     if (c == '"') {
         return parse_string(p);
-    } else if (c == '{') {
-        return parse_object(p);
-    } else if (c == '[') {
-        return parse_array(p);
+    } else if (c == '{' || c == '[') {
+        /* Containers are the only recursive case. Track depth here rather than
+         * inside parse_object/parse_array so the accounting stays symmetric
+         * across their many error-return paths. */
+        if (p->depth >= JSON_MAX_DEPTH) return result;
+        p->depth++;
+        result = (c == '{') ? parse_object(p) : parse_array(p);
+        p->depth--;
+        return result;
     } else if (c == '-' || isdigit(c)) {
         return parse_number(p);
     } else if (strncmp(p->json + p->pos, "true", 4) == 0) {
@@ -522,10 +534,16 @@ static JsonValue parse_value(JsonParser *p) {
 }
 
 JsonValue json_parse(const char *json) {
+    if (!json) {
+        JsonValue result = { .type = JSON_ERROR };
+        return result;
+    }
+
     JsonParser p = {
         .json = json,
         .pos = 0,
-        .len = strlen(json)
+        .len = strlen(json),
+        .depth = 0
     };
     return parse_value(&p);
 }

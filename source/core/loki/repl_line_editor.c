@@ -34,6 +34,42 @@
 #endif
 
 /* ============================================================================
+ * Completion Prefix Extraction
+ * ============================================================================ */
+
+/* Extract the word ending at buf[pos] into out[out_size].
+ *
+ * Returns the word length on success, or -1 if the word (plus its terminator)
+ * does not fit in out_size. Callers must treat -1 as "no completion possible"
+ * rather than truncating: a word longer than REPL_MAX_INPUT_LENGTH would not
+ * survive repl_readline()'s truncation into ReplLineEditor.buf anyway.
+ *
+ * This matters because linenoise hands its completion callback a buffer of
+ * LINENOISE_MAX_LINE (4096), which is four times the size of the REPL's own
+ * REPL_MAX_INPUT_LENGTH (1024) buffers.
+ */
+int repl_extract_completion_prefix(const char *buf, int pos, char *out,
+                                   size_t out_size, int *word_start) {
+    if (!buf || !out || out_size == 0 || pos < 0) return -1;
+
+    int start = pos;
+    while (start > 0 && !isspace((unsigned char)buf[start - 1])) {
+        start--;
+    }
+
+    int word_len = pos - start;
+    if ((size_t)word_len >= out_size) return -1;
+
+    if (word_len > 0) {
+        memcpy(out, buf + start, (size_t)word_len);
+    }
+    out[word_len] = '\0';
+
+    if (word_start) *word_start = start;
+    return word_len;
+}
+
+/* ============================================================================
  * Line Editor State Management
  * ============================================================================ */
 
@@ -91,19 +127,13 @@ static void linenoise_completion_adapter(const char *buf, linenoise_completions_
     if (!g_completion_editor) return;
     ReplLineEditor *ed = g_completion_editor;
 
-    /* Extract word prefix from end of buffer */
-    int pos = strlen(buf);
-    int start = pos;
-    while (start > 0 && !isspace((unsigned char)buf[start - 1])) {
-        start--;
-    }
-
+    /* Extract word prefix from end of buffer. Bails out on a word too long to
+     * fit prefix[] - see repl_extract_completion_prefix(). */
     char prefix[REPL_MAX_INPUT_LENGTH];
-    int word_len = pos - start;
-    if (word_len > 0 && word_len < REPL_MAX_INPUT_LENGTH) {
-        memcpy(prefix, buf + start, word_len);
-    }
-    prefix[word_len] = '\0';
+    int start = 0;
+    int word_len = repl_extract_completion_prefix(buf, (int)strlen(buf), prefix,
+                                                  sizeof(prefix), &start);
+    if (word_len < 0) return;
 
     /* Get completions from callback or word list */
     char **completions = NULL;

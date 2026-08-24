@@ -500,7 +500,17 @@ static void handle_api_load(struct mg_connection *c, struct mg_http_message *hm,
     long size = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    char *content = malloc(size + 1);
+    /* ftell returns -1 on a non-seekable stream (fifo, /proc, device). Without
+     * this check malloc() would undersize the buffer and the fread() below would
+     * read until EOF into it. */
+    if (size < 0) {
+        fclose(f);
+        json_value_free(&req);
+        send_json_error(c, 400, "Not a regular file");
+        return;
+    }
+
+    char *content = malloc((size_t)size + 1);
     if (!content) {
         fclose(f);
         json_value_free(&req);
@@ -508,7 +518,7 @@ static void handle_api_load(struct mg_connection *c, struct mg_http_message *hm,
         return;
     }
 
-    size_t read = fread(content, 1, size, f);
+    size_t read = fread(content, 1, (size_t)size, f);
     content[read] = '\0';
     fclose(f);
 
@@ -607,9 +617,11 @@ static void web_host_process_message(WebHostData *data, struct mg_connection *c,
                 long size = ftell(f);
                 fseek(f, 0, SEEK_SET);
 
-                char *content = malloc(size + 1);
+                /* See handle_api_load: a negative ftell would undersize the
+                 * buffer and let fread overrun it. */
+                char *content = size < 0 ? NULL : malloc((size_t)size + 1);
                 if (content) {
-                    size_t read = fread(content, 1, size, f);
+                    size_t read = fread(content, 1, (size_t)size, f);
                     content[read] = '\0';
 
                     /* Build response */

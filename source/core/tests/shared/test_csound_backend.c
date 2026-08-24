@@ -19,6 +19,10 @@
  */
 
 #include "test_framework.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <time.h>
+#include <uv.h>
 #include "audio/audio.h"
 
 /* ============================================================================
@@ -403,6 +407,151 @@ TEST(csound_playback_state) {
  * Test Runner
  * ============================================================================ */
 
+
+/* ============================================================================
+ * Realtime Render Contention
+ *
+ * shared_csound_render() runs on the miniaudio device thread. The engine mutex
+ * is also taken by control-thread compiles, which are slow: a 600-instrument
+ * orchestra parses in roughly 30ms against a 23.2ms audio period. Blocking on
+ * that mutex in the audio callback misses the deadline and underruns the
+ * device, so the render path try-locks and emits silence instead.
+ *
+ * These tests need a working playback device to put the engine in its enabled,
+ * actively-rendering state. Where none is available (headless CI) they report
+ * that and return rather than failing.
+ * ============================================================================ */
+
+/* Build a large orchestra: one long parse while holding the engine mutex. */
+static char *build_big_orc(int generation, size_t *out_len) {
+    size_t cap = 256u * 1024u;
+    char *orc = malloc(cap);
+    if (!orc) return NULL;
+
+    size_t off = 0;
+    for (int i = 0; i < 600; i++) {
+        off += (size_t)snprintf(orc + off, cap - off,
+            "instr %d\n"
+            "k1 line 1, p3, 0\n"
+            "a1 oscil 0.05*k1, %d\n"
+            "a2 oscil 0.05*k1, %d\n"
+            "out (a1+a2)*0.5\n"
+            "endin\n",
+            1000 + generation * 1000 + i, 100 + i, 300 + i);
+    }
+    if (out_len) *out_len = off;
+    return orc;
+}
+
+/* Bring the engine up to the enabled, rendering state.
+ * Returns 1 if it is live, 0 if no audio device is available. */
+static int csound_engine_start(void) {
+    if (shared_csound_init() != 0) return 0;
+    if (shared_csound_compile_orc(
+            "instr 1\na1 oscil 0.2, 440\nout a1\nendin\n") != 0) return 0;
+    shared_csound_enable();
+    return shared_csound_is_enabled() ? 1 : 0;
+}
+
+TEST(csound_render_skip_count_safe_before_init) {
+    shared_csound_cleanup();
+    /* Must be callable in any state without crashing. */
+    long skips = shared_csound_render_skip_count();
+    ASSERT_TRUE(skips >= 0);
+}
+
+TEST(csound_render_skips_rather_than_blocking_on_compile) {
+    if (!csound_engine_start()) {
+        printf("    (no audio device: skipping contention check)\n");
+        shared_csound_cleanup();
+        return;
+    }
+
+    /* The device thread is now calling shared_csound_render continuously.
+     * Hold the engine mutex with slow compiles and confirm the render path
+     * takes the try-lock miss branch instead of stalling. */
+    long before = shared_csound_render_skip_count();
+
+    for (int gen = 0; gen < 3; gen++) {
+        size_t len = 0;
+        char *orc = build_big_orc(gen, &len);
+        ASSERT_NOT_NULL(orc);
+        shared_csound_compile_orc(orc);
+        free(orc);
+    }
+
+    long after = shared_csound_render_skip_count();
+
+    /* Each compile outlasts an audio period, so the device thread must have hit
+     * the busy mutex at least once. Under the previous cs_mutex_lock() it would
+     * have blocked here instead of counting a skip. */
+    ASSERT_TRUE(after > before);
+
+    /* And the engine recovers: still enabled, still rendering. */
+    ASSERT_EQ(shared_csound_is_enabled(), 1);
+
+    shared_csound_cleanup();
+}
+
+/* Background compiler: holds the engine mutex in long bursts. */
+static volatile int g_compiler_done = 0;
+
+static void compile_thread_fn(void *arg) {
+    (void)arg;
+    for (int gen = 0; gen < 3; gen++) {
+        size_t len = 0;
+        char *orc = build_big_orc(100 + gen, &len);
+        if (orc) {
+            shared_csound_compile_orc(orc);
+            free(orc);
+        }
+    }
+    g_compiler_done = 1;
+}
+
+TEST(csound_render_returns_promptly_while_compiling) {
+    if (!csound_engine_start()) {
+        printf("    (no audio device: skipping latency check)\n");
+        shared_csound_cleanup();
+        return;
+    }
+
+    /* Compile on another thread so the render calls below genuinely race a held
+     * mutex. Doing the compile inline would never contend with itself, and the
+     * test would pass even with a blocking lock. */
+    g_compiler_done = 0;
+    uv_thread_t compiler;
+    ASSERT_EQ(uv_thread_create(&compiler, compile_thread_fn, NULL), 0);
+
+    float buffer[1024];
+    double worst_ms = 0.0;
+    long samples = 0;
+
+    while (!g_compiler_done) {
+        struct timespec t0, t1;
+        clock_gettime(CLOCK_MONOTONIC, &t0);
+        shared_csound_render(buffer, 512);
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+
+        double ms = (t1.tv_sec - t0.tv_sec) * 1000.0 +
+                    (t1.tv_nsec - t0.tv_nsec) / 1e6;
+        if (ms > worst_ms) worst_ms = ms;
+        samples++;
+    }
+
+    uv_thread_join(&compiler);
+
+    /* Each compile holds the mutex for ~30ms. A blocking lock would show up here
+     * as a render call of that order; the try-lock returns in microseconds. The
+     * bound is loose so this measures blocking, not machine speed. */
+    printf("    (%ld render calls, worst %.2f ms)\n", samples, worst_ms);
+    ASSERT_TRUE(samples > 0);
+    ASSERT_TRUE(worst_ms < 15.0);
+
+    shared_csound_cleanup();
+}
+
+
 BEGIN_TEST_SUITE("Csound Backend Tests")
 
     /* Availability */
@@ -452,4 +601,8 @@ BEGIN_TEST_SUITE("Csound Backend Tests")
     /* Playback control */
     RUN_TEST(csound_playback_state);
 
+    /* Realtime render contention */
+    RUN_TEST(csound_render_skip_count_safe_before_init);
+    RUN_TEST(csound_render_skips_rather_than_blocking_on_compile);
+    RUN_TEST(csound_render_returns_promptly_while_compiling);
 END_TEST_SUITE()

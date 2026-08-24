@@ -31,6 +31,8 @@ typedef CRITICAL_SECTION cs_mutex_t;
 static inline int cs_mutex_init(cs_mutex_t* m) { InitializeCriticalSection(m); return 0; }
 static inline void cs_mutex_destroy(cs_mutex_t* m) { DeleteCriticalSection(m); }
 static inline void cs_mutex_lock(cs_mutex_t* m) { EnterCriticalSection(m); }
+/* Returns 0 if the lock was acquired, non-zero if it is held elsewhere. */
+static inline int cs_mutex_trylock(cs_mutex_t* m) { return TryEnterCriticalSection(m) ? 0 : -1; }
 static inline void cs_mutex_unlock(cs_mutex_t* m) { LeaveCriticalSection(m); }
 #else
 #include <pthread.h>
@@ -38,6 +40,8 @@ typedef pthread_mutex_t cs_mutex_t;
 static inline int cs_mutex_init(cs_mutex_t* m) { return pthread_mutex_init(m, NULL); }
 static inline void cs_mutex_destroy(cs_mutex_t* m) { pthread_mutex_destroy(m); }
 static inline void cs_mutex_lock(cs_mutex_t* m) { pthread_mutex_lock(m); }
+/* Returns 0 if the lock was acquired, non-zero if it is held elsewhere. */
+static inline int cs_mutex_trylock(cs_mutex_t* m) { return pthread_mutex_trylock(m); }
 static inline void cs_mutex_unlock(cs_mutex_t* m) { pthread_mutex_unlock(m); }
 #endif
 
@@ -88,8 +92,16 @@ typedef struct {
     /* Error handling */
     char error_msg[CS_ERROR_BUF_SIZE];
 
-    /* Thread safety */
+    /* Thread safety.
+     *
+     * The mutex guards the CSOUND instance. It is held across long control-side
+     * operations (csoundCompileCsd, csoundStart, csoundCompileOrc), so the
+     * realtime render path must never block on it - see shared_csound_render(). */
     cs_mutex_t mutex;
+
+    /* Buffers the render path filled with silence because the mutex was busy.
+     * Written by the audio thread, read by diagnostics on other threads. */
+    volatile sig_atomic_t render_skips;
 
     /* Audio buffer for rendering (Csound's output buffer) */
     MYFLT* spin;        /* Input buffer (unused, we're synthesis-only) */
@@ -304,6 +316,7 @@ int shared_csound_load(const char* path) {
     g_cs.spout_pos = g_cs.spout_samples;  /* Force first ksmps cycle */
     g_cs.zerodBFS = csoundGet0dBFS(g_cs.csound);
     g_cs.started = 1;
+    g_cs.render_skips = 0;
 
     g_cs.instruments_loaded = 1;
 
@@ -707,7 +720,20 @@ void shared_csound_render(float* output, int frames) {
         return;
     }
 
-    cs_mutex_lock(&g_cs.mutex);
+    /* Never block here. This runs on the miniaudio device thread, and the mutex
+     * can be held for hundreds of milliseconds by a control-thread compile
+     * (shared_csound_load / shared_csound_compile_orc). Waiting would miss the
+     * callback deadline and underrun the device - a priority inversion where a
+     * non-realtime thread stalls a realtime one.
+     *
+     * Emitting one period of silence instead is a bounded, self-correcting
+     * glitch: the next callback picks up wherever the engine has got to. It also
+     * lets the compile finish sooner, since it no longer contends with rendering. */
+    if (cs_mutex_trylock(&g_cs.mutex) != 0) {
+        memset(output, 0, frames * CS_CHANNELS * sizeof(float));
+        g_cs.render_skips++;
+        return;
+    }
 
     int nchnls = csoundGetNchnls(g_cs.csound);
     int ksmps = csoundGetKsmps(g_cs.csound);
@@ -754,6 +780,10 @@ void shared_csound_render(float* output, int frames) {
     cs_mutex_unlock(&g_cs.mutex);
 }
 
+long shared_csound_render_skip_count(void) {
+    return (long)g_cs.render_skips;
+}
+
 /* ============================================================================
  * Error Handling
  * ============================================================================ */
@@ -776,9 +806,18 @@ const char* shared_csound_get_error(void) {
 typedef struct {
     CSOUND* csound;
     int started;
-    int finished;
-    int active;             /* Non-zero if async playback is running */
-    cs_mutex_t mutex;
+
+    /* Cross-thread flags. `finished` is written by the audio callback, by
+     * shared_csound_play_stop(), and by playback_sigint_handler() - and a signal
+     * handler may only touch volatile sig_atomic_t, so a mutex could never have
+     * covered this. `active` is read alongside it from the same places.
+     *
+     * Everything else in this struct is published before ma_device_start() and
+     * torn down after ma_device_stop(), so the device lifecycle orders it and no
+     * lock is needed. */
+    volatile sig_atomic_t finished;
+    volatile sig_atomic_t active;
+
     MYFLT* spout;
     int spout_pos;
     int ksmps;
@@ -800,8 +839,6 @@ static void play_audio_callback(ma_device* device, void* output, const void* inp
         memset(out, 0, (size_t)frame_count * CS_CHANNELS * sizeof(float));
         return;
     }
-
-    cs_mutex_lock(&g_play.mutex);
 
     int out_idx = 0;
     int frames_remaining = (int)frame_count;
@@ -841,8 +878,6 @@ static void play_audio_callback(ma_device* device, void* output, const void* inp
         out_idx += to_copy;
         frames_remaining -= to_copy;
     }
-
-    cs_mutex_unlock(&g_play.mutex);
 }
 
 /* Internal: cleanup playback resources */
@@ -863,10 +898,6 @@ static void playback_cleanup(void) {
         g_play.csound = NULL;
     }
 
-    if (g_play.started) {
-        cs_mutex_destroy(&g_play.mutex);
-    }
-
     memset(&g_play, 0, sizeof(g_play));
 }
 
@@ -884,16 +915,10 @@ static int playback_start(const char* path, int verbose) {
 
     memset(&g_play, 0, sizeof(g_play));
 
-    if (cs_mutex_init(&g_play.mutex) != 0) {
-        set_error("Failed to create mutex");
-        return -1;
-    }
-
     /* Create Csound instance */
     g_play.csound = csoundCreate(NULL);
     if (!g_play.csound) {
         set_error("Failed to create Csound instance");
-        cs_mutex_destroy(&g_play.mutex);
         return -1;
     }
 
@@ -920,7 +945,6 @@ static int playback_start(const char* path, int verbose) {
         csoundDestroyMessageBuffer(g_play.csound);
         csoundDestroy(g_play.csound);
         g_play.csound = NULL;
-        cs_mutex_destroy(&g_play.mutex);
         return -1;
     }
 
@@ -931,7 +955,6 @@ static int playback_start(const char* path, int verbose) {
         csoundDestroyMessageBuffer(g_play.csound);
         csoundDestroy(g_play.csound);
         g_play.csound = NULL;
-        cs_mutex_destroy(&g_play.mutex);
         return -1;
     }
 
@@ -967,7 +990,6 @@ static int playback_start(const char* path, int verbose) {
         csoundDestroy(g_play.csound);
         g_play.csound = NULL;
         g_play.started = 0;
-        cs_mutex_destroy(&g_play.mutex);
         return -1;
     }
     g_play.device_initialized = 1;
@@ -1091,6 +1113,7 @@ void shared_csound_all_notes_off(void) {}
 int shared_csound_get_sample_rate(void) { return 0; }
 int shared_csound_get_channels(void) { return 0; }
 void shared_csound_render(float* o, int f) { (void)o; (void)f; }
+long shared_csound_render_skip_count(void) { return 0; }
 const char* shared_csound_get_error(void) { return "Csound backend not compiled"; }
 int shared_csound_play_file(const char* path, int verbose) { (void)path; (void)verbose; return -1; }
 int shared_csound_play_file_async(const char* path) { (void)path; return -1; }
