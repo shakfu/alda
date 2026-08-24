@@ -256,7 +256,8 @@ static int visit_part_decl(AldaContext* ctx, AldaNode* node) {
     char** names = node->data.part_decl.names;
     int count = (int)node->data.part_decl.name_count;
 
-    if (alda_set_current_parts(ctx, names, count) < 0) {
+    if (alda_set_current_parts_aliased(ctx, names, count,
+                                       node->data.part_decl.alias) < 0) {
         return -1;
     }
 
@@ -297,57 +298,56 @@ static int visit_event_seq(AldaContext* ctx, AldaNode* node) {
 }
 
 static int visit_note(AldaContext* ctx, AldaNode* node) {
-    AldaPartState* part = alda_current_part(ctx);
-    if (!part) {
+    if (!alda_current_part(ctx)) {
         fprintf(stderr, "Error: No current part for note\n");
         return -1;
     }
 
-    /* Calculate pitch (with key signature and transposition) */
-    int pitch = alda_calculate_pitch(
-        node->data.note.letter,
-        node->data.note.accidentals,
-        part->octave,
-        part->key_signature
-    );
-
-    if (pitch < 0) {
-        fprintf(stderr, "Error: Invalid note\n");
-        return -1;
-    }
-
-    /* Apply transposition */
-    pitch += part->transpose;
-    if (pitch < 0) pitch = 0;
-    if (pitch > 127) pitch = 127;
-
-    /* Calculate duration */
-    int duration_ticks = alda_ast_duration_to_ticks(ctx, part, node->data.note.duration);
-
-    /* Update part's default duration if note specified one.
-     * Note: duration node is ALDA_NODE_DURATION containing component nodes. */
-    if (node->data.note.duration &&
-        node->data.note.duration->type == ALDA_NODE_DURATION) {
-        AldaNode* first_comp = node->data.note.duration->data.duration.components;
-        if (first_comp && first_comp->type == ALDA_NODE_NOTE_LENGTH) {
-            part->default_duration = first_comp->data.note_length.denominator;
-            part->default_dots = first_comp->data.note_length.dots;
-        }
-    }
-
-    /* Get velocity */
-    int velocity = alda_effective_velocity(ctx, part);
-
-    /* Check if this note is slurred (should skip quantization) */
     int slurred = node->data.note.slurred;
 
     /* Set source line for event tracking */
     ALDA_SET_SOURCE_LINE(ctx, node->pos.line);
 
-    /* Schedule note for all active parts */
+    /* Everything below is resolved per part. When a group is active - say
+     * "guitar/sax:" - its members can differ in octave, key signature,
+     * transposition, dynamics, and default duration, so computing the pitch
+     * once from the first part and scheduling it on all of them plays the
+     * wrong notes for every other member. */
     for (int i = 0; i < ctx->current_part_count; i++) {
         int idx = ctx->current_part_indices[i];
         AldaPartState* p = &ctx->parts[idx];
+
+        int pitch = alda_calculate_pitch(
+            node->data.note.letter,
+            node->data.note.accidentals,
+            p->octave,
+            p->key_signature
+        );
+
+        if (pitch < 0) {
+            fprintf(stderr, "Error: Invalid note\n");
+            return -1;
+        }
+
+        /* Apply transposition */
+        pitch += p->transpose;
+        if (pitch < 0) pitch = 0;
+        if (pitch > 127) pitch = 127;
+
+        int duration_ticks = alda_ast_duration_to_ticks(ctx, p, node->data.note.duration);
+
+        /* Update this part's default duration if the note specified one.
+         * Note: duration node is ALDA_NODE_DURATION containing component nodes. */
+        if (node->data.note.duration &&
+            node->data.note.duration->type == ALDA_NODE_DURATION) {
+            AldaNode* first_comp = node->data.note.duration->data.duration.components;
+            if (first_comp && first_comp->type == ALDA_NODE_NOTE_LENGTH) {
+                p->default_duration = first_comp->data.note_length.denominator;
+                p->default_dots = first_comp->data.note_length.dots;
+            }
+        }
+
+        int velocity = alda_effective_velocity(ctx, p);
 
         int* tick = (p->current_voice >= 0 && p->in_voice_group)
                     ? &p->voices[p->current_voice].current_tick
@@ -363,19 +363,19 @@ static int visit_note(AldaContext* ctx, AldaNode* node) {
 }
 
 static int visit_rest(AldaContext* ctx, AldaNode* node) {
-    AldaPartState* part = alda_current_part(ctx);
-    if (!part) {
+    if (!alda_current_part(ctx)) {
         fprintf(stderr, "Error: No current part for rest\n");
         return -1;
     }
 
-    /* Calculate duration */
-    int duration_ticks = alda_ast_duration_to_ticks(ctx, part, node->data.rest.duration);
-
-    /* Advance tick position for all active parts (no note scheduled) */
+    /* Advance the tick position of each active part. The duration is resolved
+     * per part because an unqualified rest inherits that part's own default
+     * duration, which group members need not share. */
     for (int i = 0; i < ctx->current_part_count; i++) {
         int idx = ctx->current_part_indices[i];
         AldaPartState* p = &ctx->parts[idx];
+
+        int duration_ticks = alda_ast_duration_to_ticks(ctx, p, node->data.rest.duration);
 
         int* tick = (p->current_voice >= 0 && p->in_voice_group)
                     ? &p->voices[p->current_voice].current_tick
@@ -388,95 +388,79 @@ static int visit_rest(AldaContext* ctx, AldaNode* node) {
 }
 
 static int visit_chord(AldaContext* ctx, AldaNode* node) {
-    AldaPartState* part = alda_current_part(ctx);
-    if (!part) {
+    if (!alda_current_part(ctx)) {
         fprintf(stderr, "Error: No current part for chord\n");
         return -1;
     }
 
-    /* First pass: check if first note has an explicit duration, and update default.
-     * Note: duration node is ALDA_NODE_DURATION containing component nodes. */
-    AldaNode* first_note = node->data.chord.notes;
-    if (first_note && first_note->type == ALDA_NODE_NOTE &&
-        first_note->data.note.duration &&
-        first_note->data.note.duration->type == ALDA_NODE_DURATION) {
-        /* Get the first component of the duration */
-        AldaNode* first_comp = first_note->data.note.duration->data.duration.components;
-        if (first_comp && first_comp->type == ALDA_NODE_NOTE_LENGTH) {
-            /* Update default duration from first note in chord */
-            part->default_duration = first_comp->data.note_length.denominator;
-            part->default_dots = first_comp->data.note_length.dots;
-        }
-    }
-
-    /* Collect all notes in the chord, handling octave changes */
-    int pitches[16];
-    int durations[16];
-    int count = 0;
-    int max_duration = 0;
-
-    AldaNode* note = node->data.chord.notes;
-    while (note && count < 16) {
-        if (note->type == ALDA_NODE_OCTAVE_UP) {
-            /* Apply octave change for subsequent notes in chord */
-            if (part->octave < 9) {
-                part->octave++;
-            }
-        } else if (note->type == ALDA_NODE_OCTAVE_DOWN) {
-            if (part->octave > 0) {
-                part->octave--;
-            }
-        } else if (note->type == ALDA_NODE_NOTE) {
-            int p = alda_calculate_pitch(
-                note->data.note.letter,
-                note->data.note.accidentals,
-                part->octave,
-                part->key_signature
-            );
-
-            /* Apply transposition */
-            p += part->transpose;
-            if (p < 0) p = 0;
-            if (p > 127) p = 127;
-
-            pitches[count] = p;
-
-            durations[count] = alda_ast_duration_to_ticks(ctx, part, note->data.note.duration);
-
-            if (durations[count] > max_duration) {
-                max_duration = durations[count];
-            }
-
-            count++;
-        }
-        note = note->next;
-    }
-
-    if (count == 0) {
-        return 0;  /* Empty chord */
-    }
-
-    /* Get velocity */
-    int velocity = alda_effective_velocity(ctx, part);
-
     /* Set source line for event tracking */
     ALDA_SET_SOURCE_LINE(ctx, node->pos.line);
 
-    /* Schedule all chord notes for all active parts */
+    /* Resolved per part, for the same reason as visit_note(): octave, key
+     * signature, transposition, dynamics and default duration all belong to the
+     * individual part, and the octave shifts written inside a chord advance
+     * that part's own octave. */
     for (int i = 0; i < ctx->current_part_count; i++) {
         int idx = ctx->current_part_indices[i];
         AldaPartState* p = &ctx->parts[idx];
+
+        /* If the first note carries a duration it becomes this part's default. */
+        AldaNode* first_note = node->data.chord.notes;
+        if (first_note && first_note->type == ALDA_NODE_NOTE &&
+            first_note->data.note.duration &&
+            first_note->data.note.duration->type == ALDA_NODE_DURATION) {
+            AldaNode* first_comp = first_note->data.note.duration->data.duration.components;
+            if (first_comp && first_comp->type == ALDA_NODE_NOTE_LENGTH) {
+                p->default_duration = first_comp->data.note_length.denominator;
+                p->default_dots = first_comp->data.note_length.dots;
+            }
+        }
+
+        /* Collect the chord's pitches, honouring octave changes between them. */
+        int pitches[16];
+        int count = 0;
+        int max_duration = 0;
+
+        for (AldaNode* note = node->data.chord.notes; note && count < 16;
+             note = note->next) {
+            if (note->type == ALDA_NODE_OCTAVE_UP) {
+                if (p->octave < 9) p->octave++;
+            } else if (note->type == ALDA_NODE_OCTAVE_DOWN) {
+                if (p->octave > 0) p->octave--;
+            } else if (note->type == ALDA_NODE_NOTE) {
+                int pitch = alda_calculate_pitch(
+                    note->data.note.letter,
+                    note->data.note.accidentals,
+                    p->octave,
+                    p->key_signature
+                );
+
+                pitch += p->transpose;
+                if (pitch < 0) pitch = 0;
+                if (pitch > 127) pitch = 127;
+
+                pitches[count] = pitch;
+
+                int d = alda_ast_duration_to_ticks(ctx, p, note->data.note.duration);
+                if (d > max_duration) max_duration = d;
+
+                count++;
+            }
+        }
+
+        if (count == 0) continue;  /* Empty chord */
+
+        int velocity = alda_effective_velocity(ctx, p);
 
         int* tick = (p->current_voice >= 0 && p->in_voice_group)
                     ? &p->voices[p->current_voice].current_tick
                     : &p->current_tick;
 
         for (int n = 0; n < count; n++) {
-            /* All chord notes use the same duration (max of all notes) */
+            /* All chord notes share the longest duration and start together. */
             alda_schedule_note(ctx, p, *tick, pitches[n], velocity, max_duration);
         }
 
-        /* Advance by max duration (all notes start at same time) */
         *tick += max_duration;
     }
 
@@ -529,6 +513,14 @@ int alda_eval_attribute(AldaContext* ctx, AldaPartState* part, AldaNode* lisp_li
 static int visit_lisp_list(AldaContext* ctx, AldaNode* node) {
     /* Set source line for event tracking (tempo, pan, program changes) */
     ALDA_SET_SOURCE_LINE(ctx, node->pos.line);
+
+    /* With no part selected the attribute is still evaluated once, with a NULL
+     * part, so that a global directive written before the first part
+     * declaration - the usual place for (tempo! 120) or (key-sig! ...) - is not
+     * silently discarded. */
+    if (ctx->current_part_count == 0) {
+        return alda_eval_attribute(ctx, NULL, node);
+    }
 
     /* Evaluate attribute for all active parts */
     for (int i = 0; i < ctx->current_part_count; i++) {
@@ -904,16 +896,45 @@ static int calculate_cram_duration(AldaContext* ctx, AldaPartState* part,
 static int process_cram_with_duration(AldaContext* ctx, AldaNode* node, int cram_duration_ticks);
 
 static int visit_cram(AldaContext* ctx, AldaNode* node) {
-    AldaPartState* part = alda_current_part(ctx);
-    if (!part) {
+    if (!alda_current_part(ctx)) {
         fprintf(stderr, "Error: No current part for cram\n");
         return -1;
     }
 
-    /* Get the cram's total duration in ticks */
-    int cram_duration_ticks = alda_ast_duration_to_ticks(ctx, part, node->data.cram.duration);
+    /* Run the cram once per active part, with that part temporarily the only
+     * one selected.
+     *
+     * process_cram_with_duration() reads the current part for octave, key
+     * signature, dynamics and default duration, and dispatches nested events
+     * through visit_node(). Narrowing the selection makes all of that resolve
+     * against one part at a time without duplicating the body, and keeps an
+     * octave change written inside the cram local to the part it belongs to. */
+    int saved_count = ctx->current_part_count;
+    int saved_indices[ALDA_MAX_PARTS];
+    for (int i = 0; i < saved_count; i++) {
+        saved_indices[i] = ctx->current_part_indices[i];
+    }
 
-    return process_cram_with_duration(ctx, node, cram_duration_ticks);
+    int result = 0;
+    for (int i = 0; i < saved_count; i++) {
+        ctx->current_part_count = 1;
+        ctx->current_part_indices[0] = saved_indices[i];
+
+        AldaPartState* part = &ctx->parts[saved_indices[i]];
+        int cram_duration_ticks =
+            alda_ast_duration_to_ticks(ctx, part, node->data.cram.duration);
+
+        result = process_cram_with_duration(ctx, node, cram_duration_ticks);
+        if (result < 0) break;
+    }
+
+    /* Restore the original selection */
+    ctx->current_part_count = saved_count;
+    for (int i = 0; i < saved_count; i++) {
+        ctx->current_part_indices[i] = saved_indices[i];
+    }
+
+    return result;
 }
 
 /* Process a cram expression with a specified duration (used for nested crams) */

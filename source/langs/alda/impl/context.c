@@ -55,6 +55,11 @@ void alda_context_init(AldaContext* ctx) {
     ctx->event_count = 0;
     ctx->event_capacity = 0;
 
+    for (int i = 0; i < 7; i++) {
+        ctx->global_key_signature[i] = 0;
+    }
+    ctx->has_global_key_signature = 0;
+
     /* Runtime flags */
     ctx->no_sleep_mode = 0;
     ctx->verbose_mode = 0;
@@ -253,6 +258,14 @@ AldaPartState* alda_get_or_create_part(AldaContext* ctx, const char* name) {
     /* Create new part */
     AldaPartState* part = &ctx->parts[ctx->part_count];
     alda_part_init(part, name, channel, program);
+
+    /* A part declared after (key-sig! ...) still inherits it. */
+    if (ctx->has_global_key_signature) {
+        for (int i = 0; i < 7; i++) {
+            part->key_signature[i] = ctx->global_key_signature[i];
+        }
+    }
+
     ctx->part_count++;
 
     if (ctx->verbose_mode) {
@@ -305,6 +318,14 @@ static AldaPartState* alda_create_new_part(AldaContext* ctx, const char* name) {
     /* Create new part */
     AldaPartState* part = &ctx->parts[ctx->part_count];
     alda_part_init(part, name, channel, program);
+
+    /* A part declared after (key-sig! ...) still inherits it. */
+    if (ctx->has_global_key_signature) {
+        for (int i = 0; i < 7; i++) {
+            part->key_signature[i] = ctx->global_key_signature[i];
+        }
+    }
+
     ctx->part_count++;
 
     if (ctx->verbose_mode) {
@@ -315,7 +336,62 @@ static AldaPartState* alda_create_new_part(AldaContext* ctx, const char* name) {
     return part;
 }
 
-int alda_set_current_parts(AldaContext* ctx, char** names, int count) {
+/* Resolve one name from a part declaration to an existing part, or NULL when a
+ * new one should be created.
+ *
+ * An alias names a specific instance, so an aliased declaration matches only a
+ * part already carrying that alias: "violin/viola/cello \"strings\"" is a
+ * different set of parts from a plain "violin:" earlier in the score. An
+ * un-aliased declaration prefers the alias-less part of that instrument, and
+ * otherwise treats the name as a reference to an existing alias - which is what
+ * lets "guitar/sax:" address parts declared as
+ *
+ *     electric-guitar-distorted "guitar": o2
+ *     tenor-saxophone "sax": o3
+ *
+ * and keep their accumulated octaves rather than resetting them. */
+static AldaPartState* resolve_declared_part(AldaContext* ctx, const char* name,
+                                            const char* alias) {
+    if (!ctx || !name) return NULL;
+
+    if (alias && alias[0] != '\0') {
+        for (int i = 0; i < ctx->part_count; i++) {
+            if (strcmp(ctx->parts[i].name, name) == 0 &&
+                strcmp(ctx->parts[i].alias, alias) == 0) {
+                return &ctx->parts[i];
+            }
+        }
+        return NULL;  /* Distinct instance - caller creates it */
+    }
+
+    /* Un-aliased: the instrument's own part, if it has no alias of its own. */
+    for (int i = 0; i < ctx->part_count; i++) {
+        if (ctx->parts[i].alias[0] == '\0' &&
+            strcmp(ctx->parts[i].name, name) == 0) {
+            return &ctx->parts[i];
+        }
+    }
+
+    /* Otherwise the name may itself be an alias. Match on alias only: falling
+     * back to the instrument name would make a bare "violin:" reuse a part
+     * declared as violin "a", when Alda treats those as separate instances. */
+    for (int i = 0; i < ctx->part_count; i++) {
+        if (ctx->parts[i].alias[0] != '\0' &&
+            strcmp(ctx->parts[i].alias, name) == 0) {
+            return &ctx->parts[i];
+        }
+    }
+
+    /* The "<group-alias>.<instrument>" dot-accessor form. */
+    if (strchr(name, '.')) {
+        return alda_find_part(ctx, name);
+    }
+
+    return NULL;
+}
+
+int alda_set_current_parts_aliased(AldaContext* ctx, char** names, int count,
+                                   const char* alias) {
     if (!ctx) return -1;
 
     /* Clear current selection */
@@ -325,19 +401,10 @@ int alda_set_current_parts(AldaContext* ctx, char** names, int count) {
         return 0;
     }
 
-    /* For multi-instrument groups (count > 1), always create new parts.
-     * For single instruments, reuse existing or create new. */
-    int is_group = (count > 1);
-
     for (int i = 0; i < count && i < ALDA_MAX_PARTS; i++) {
-        AldaPartState* part;
-
-        if (is_group) {
-            /* Groups always create new parts for each instrument */
+        AldaPartState* part = resolve_declared_part(ctx, names[i], alias);
+        if (!part) {
             part = alda_create_new_part(ctx, names[i]);
-        } else {
-            /* Single instrument: reuse existing or create new */
-            part = alda_get_or_create_part(ctx, names[i]);
         }
 
         if (!part) {
@@ -351,6 +418,10 @@ int alda_set_current_parts(AldaContext* ctx, char** names, int count) {
     }
 
     return 0;
+}
+
+int alda_set_current_parts(AldaContext* ctx, char** names, int count) {
+    return alda_set_current_parts_aliased(ctx, names, count, NULL);
 }
 
 AldaPartState* alda_current_part(AldaContext* ctx) {

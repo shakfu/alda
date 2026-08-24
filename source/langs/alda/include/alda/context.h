@@ -183,6 +183,12 @@ typedef struct AldaContext {
     int global_quant;    /* 0-100, default 90 */
     int global_pan;      /* 0-127, default 64 */
 
+    /* Global key signature, set by (key-sig! ...). Applies to every part,
+     * including ones declared after the directive - which is the usual place
+     * for it, at the top of a score before any part exists. */
+    int global_key_signature[7];
+    int has_global_key_signature;
+
     /* Markers (deferred feature) */
     AldaMarker markers[ALDA_MAX_MARKERS];
     int marker_count;
@@ -267,6 +273,23 @@ AldaPartState* alda_find_part(AldaContext* ctx, const char* name);
  * @return 0 on success, -1 on error.
  */
 int alda_set_current_parts(AldaContext* ctx, char** names, int count);
+
+/**
+ * @brief Select the parts named by a declaration, honouring its alias.
+ *
+ * An alias names a specific instance. "violin/viola \"strings\"" therefore
+ * creates parts distinct from a plain "violin:" elsewhere in the score, while
+ * an un-aliased declaration resolves to the existing alias-less part of that
+ * instrument, or to a part carrying the given name as its alias.
+ *
+ * @param ctx Context.
+ * @param names Instrument (or alias) names in the declaration.
+ * @param count Number of names.
+ * @param alias Declaration alias, or NULL when there is none.
+ * @return 0 on success, -1 on failure.
+ */
+int alda_set_current_parts_aliased(AldaContext* ctx, char** names, int count,
+                                   const char* alias);
 
 /**
  * @brief Get the current active part (first in list).

@@ -103,6 +103,10 @@ static const KeySigEntry KEY_SIGNATURES[] = {
     {"c",  "minor", {0, 0, -1, 0, 0, -1, -1}},    /* C minor: Bb, Eb, Ab */
     {"f",  "minor", {0, -1, -1, 0, 0, -1, -1}},   /* F minor: Bb, Eb, Ab, Db */
     {"bb", "minor", {0, -1, -1, 0, -1, -1, -1}},  /* Bb minor: Bb, Eb, Ab, Db, Gb */
+    {"eb", "minor", {-1, -1, -1, 0, -1, -1, -1}}, /* Eb minor: Bb, Eb, Ab, Db, Gb, Cb */
+    {"ab", "minor", {-1, -1, -1, -1, -1, -1, -1}},/* Ab minor: all flats */
+    {"d#", "minor", {1, 1, 1, 1, 1, 1, 0}},       /* D# minor: F#, C#, G#, D#, A#, E# */
+    {"a#", "minor", {1, 1, 1, 1, 1, 1, 1}},       /* A# minor: all sharps */
 
     /* Modes - calculated from relative major */
     {"d",  "dorian",     {0, 0, 0, 0, 0, 0, 0}},  /* D dorian: same as C major */
@@ -140,6 +144,38 @@ static int lookup_key_signature(const char* tonic, const char* mode, int* out_si
     return -1;  /* Not found */
 }
 
+/* Map note letters to key-signature index: C=0, D=1, E=2, F=3, G=4, A=5, B=6 */
+static const int LETTER_TO_INDEX[] = {
+    5,  /* a -> 5 */
+    6,  /* b -> 6 */
+    0,  /* c -> 0 */
+    1,  /* d -> 1 */
+    2,  /* e -> 2 */
+    3,  /* f -> 3 */
+    4   /* g -> 4 */
+};
+
+/* Scale/mode names accepted in the '(<tonic> [accidental] <mode>) form. */
+static int is_mode_word(const char* word) {
+    static const char* MODES[] = {
+        "major", "ionian", "minor", "aeolian", "dorian", "phrygian",
+        "lydian", "mixolydian", "locrian", NULL
+    };
+    if (!word) return 0;
+    for (int i = 0; MODES[i]; i++) {
+        if (strcasecmp_local(MODES[i], word) == 0) return 1;
+    }
+    return 0;
+}
+
+/* "flat"/"sharp" -> -1/+1, else 0 with no match. */
+static int accidental_word(const char* word, int* delta) {
+    if (!word) return 0;
+    if (strcasecmp_local(word, "flat") == 0)  { *delta = -1; return 1; }
+    if (strcasecmp_local(word, "sharp") == 0) { *delta =  1; return 1; }
+    return 0;
+}
+
 /* Parse key signature from string format like "f+ c+" or "b- e-" */
 static int parse_key_sig_string(const char* str, int* out_sig) {
     if (!str || !out_sig) return -1;
@@ -148,17 +184,6 @@ static int parse_key_sig_string(const char* str, int* out_sig) {
     for (int i = 0; i < 7; i++) {
         out_sig[i] = 0;
     }
-
-    /* Map note letters to index: C=0, D=1, E=2, F=3, G=4, A=5, B=6 */
-    static const int LETTER_TO_INDEX[] = {
-        5,  /* a -> 5 */
-        6,  /* b -> 6 */
-        0,  /* c -> 0 */
-        1,  /* d -> 1 */
-        2,  /* e -> 2 */
-        3,  /* f -> 3 */
-        4   /* g -> 4 */
-    };
 
     const char* p = str;
     while (*p) {
@@ -188,26 +213,114 @@ static int parse_key_sig_string(const char* str, int* out_sig) {
     return 0;
 }
 
+/* Per-note form: a note letter followed by its accidentals, repeated. The
+ * accidentals may be parenthesised - '(e (flat) b (flat)) - or written bare,
+ * '(e flat b flat). Both mean the same as the string form "e- b-". */
+static int parse_key_sig_pairs(AldaNode* elements, int* out_sig) {
+    for (int i = 0; i < 7; i++) {
+        out_sig[i] = 0;
+    }
+
+    int matched = 0;
+    for (AldaNode* el = elements; el; el = el->next) {
+        if (el->type != ALDA_NODE_LISP_SYMBOL) continue;
+
+        const char* name = el->data.lisp_symbol.name;
+        if (!name || name[0] == '\0' || name[1] != '\0') continue;
+
+        char letter = (char)tolower((unsigned char)name[0]);
+        if (letter < 'a' || letter > 'g') continue;
+
+        int acc = 0;
+
+        /* Parenthesised accidentals. */
+        if (el->next && el->next->type == ALDA_NODE_LISP_LIST) {
+            for (AldaNode* a = el->next->data.lisp_list.elements; a; a = a->next) {
+                int delta = 0;
+                if (a->type == ALDA_NODE_LISP_SYMBOL &&
+                    accidental_word(a->data.lisp_symbol.name, &delta)) {
+                    acc += delta;
+                }
+            }
+            el = el->next;  /* Consume the accidental list */
+        } else {
+            /* Bare accidental words following the letter. */
+            while (el->next && el->next->type == ALDA_NODE_LISP_SYMBOL) {
+                int delta = 0;
+                if (!accidental_word(el->next->data.lisp_symbol.name, &delta)) break;
+                acc += delta;
+                el = el->next;
+            }
+        }
+
+        out_sig[LETTER_TO_INDEX[letter - 'a']] = acc;
+        matched = 1;
+    }
+
+    return matched ? 0 : -1;
+}
+
 /* Parse key signature from a lisp list argument (second element of key-sig sexp) */
 static int parse_key_sig_arg(AldaNode* arg, int* out_sig) {
     if (!arg || !out_sig) return -1;
 
-    /* Handle quoted list: '(g major) -> LISP_LIST with symbols */
+    /* Handle quoted list: '(g major), '(a flat major), '(e (flat) b (flat)).
+     * The parser folds the quote away, so this arrives as a plain LISP_LIST. */
     if (arg->type == ALDA_NODE_LISP_LIST) {
         AldaNode* first = arg->data.lisp_list.elements;
         if (!first || first->type != ALDA_NODE_LISP_SYMBOL) {
             return -1;
         }
 
-        const char* tonic = first->data.lisp_symbol.name;
-        const char* mode = NULL;
-
-        /* Check for mode (second element) */
-        if (first->next && first->next->type == ALDA_NODE_LISP_SYMBOL) {
-            mode = first->next->data.lisp_symbol.name;
+        /* Two shapes share this syntax and both may begin "<letter> flat ...":
+         *
+         *     '(e flat minor)     a key name - E-flat minor
+         *     '(e flat b flat)    per-note accidentals - E-flat and B-flat
+         *
+         * The trailing element decides. A scale or mode name means the whole
+         * list names a key; anything else is the per-note form, whose
+         * accidentals may equally be parenthesised as '(e (flat) b (flat)). */
+        AldaNode* last = first;
+        int has_nested_list = 0;
+        for (AldaNode* el = first; el; el = el->next) {
+            if (el->type == ALDA_NODE_LISP_LIST) has_nested_list = 1;
+            last = el;
         }
 
-        return lookup_key_signature(tonic, mode, out_sig);
+        int names_a_key = (!has_nested_list &&
+                           last->type == ALDA_NODE_LISP_SYMBOL &&
+                           is_mode_word(last->data.lisp_symbol.name));
+
+        if (!names_a_key) {
+            return parse_key_sig_pairs(first, out_sig);
+        }
+
+        /* Key name: tonic, optional accidental words, then the mode. The
+         * lookup table spells the tonic with the accidental attached ("ab",
+         * "f#"), so fold the words into it. */
+        const char* tonic = first->data.lisp_symbol.name;
+        const char* mode = NULL;
+        int acc = 0;
+
+        AldaNode* el = first->next;
+        for (; el && el->type == ALDA_NODE_LISP_SYMBOL; el = el->next) {
+            int delta = 0;
+            if (!accidental_word(el->data.lisp_symbol.name, &delta)) break;
+            acc += delta;
+        }
+        if (el && el->type == ALDA_NODE_LISP_SYMBOL) {
+            mode = el->data.lisp_symbol.name;
+        }
+
+        char tonic_buf[8];
+        if (acc == 0) {
+            snprintf(tonic_buf, sizeof(tonic_buf), "%s", tonic ? tonic : "");
+        } else {
+            snprintf(tonic_buf, sizeof(tonic_buf), "%s%c",
+                     tonic ? tonic : "", acc < 0 ? 'b' : '#');
+        }
+
+        return lookup_key_signature(tonic_buf, mode, out_sig);
     }
 
     /* Handle string format: "f+ c+" */
@@ -421,8 +534,6 @@ int alda_eval_attribute(AldaContext* ctx, AldaPartState* part, AldaNode* lisp_li
         strcasecmp_local(name, "key-signature") == 0 ||
         strcasecmp_local(name, "key-sig!") == 0 ||
         strcasecmp_local(name, "key-signature!") == 0) {
-        if (!part) return 0;  /* Need a part to set key signature */
-
         /* Get the argument (second element of the lisp list) */
         AldaNode* first = lisp_list->data.lisp_list.elements;
         if (!first) return 0;
@@ -431,8 +542,27 @@ int alda_eval_attribute(AldaContext* ctx, AldaPartState* part, AldaNode* lisp_li
         if (!arg) return 0;
 
         int new_sig[7];
-        if (parse_key_sig_arg(arg, new_sig) == 0) {
-            /* Apply key signature to part */
+        if (parse_key_sig_arg(arg, new_sig) != 0) {
+            return 0;  /* Unrecognised key - leave the current one alone */
+        }
+
+        /* Global if the name ends with '!', and also when there is no current
+         * part - a bare (key-sig! ...) at the top of a score is evaluated
+         * before any part has been declared. */
+        if (name[strlen(name) - 1] == '!' || !part) {
+            for (int i = 0; i < 7; i++) {
+                ctx->global_key_signature[i] = new_sig[i];
+            }
+            ctx->has_global_key_signature = 1;
+
+            /* Apply to every part declared so far; later ones inherit it in
+             * alda_create_new_part(). */
+            for (int p_i = 0; p_i < ctx->part_count; p_i++) {
+                for (int i = 0; i < 7; i++) {
+                    ctx->parts[p_i].key_signature[i] = new_sig[i];
+                }
+            }
+        } else {
             for (int i = 0; i < 7; i++) {
                 part->key_signature[i] = new_sig[i];
             }

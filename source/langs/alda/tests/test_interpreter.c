@@ -958,6 +958,179 @@ TEST(apply_quant) {
  * Test Suite Main
  * ============================================================================ */
 
+
+/* ============================================================================
+ * Interpreter Divergences Found Against aldakit
+ *
+ * Each of these produced the wrong notes until fixed. Found by comparing
+ * scheduled events with the aldakit implementation over both projects' example
+ * corpora; see test_examples.c for the corpus-level backstop.
+ * ============================================================================ */
+
+/* Pitch of the first note-on for a given part index, or -1. */
+static int first_pitch_for_part(AldaContext* ctx, int part_index) {
+    for (int i = 0; i < ctx->event_count; i++) {
+        if (ctx->events[i].type == ALDA_EVT_NOTE_ON &&
+            ctx->events[i].part_index == part_index) {
+            return ctx->events[i].data1;
+        }
+    }
+    return -1;
+}
+
+TEST(interp_key_sig_quoted_list_with_accidental_word) {
+    /* '(a flat major) is Ab major: B, E, A and D are flattened. */
+    AldaContext ctx;
+    test_context_init(&ctx);
+    alda_interpret_string(&ctx, "piano: (key-sig '(a flat major)) a b c d e f g",
+                          "test");
+    int expect[] = {68, 70, 60, 61, 63, 65, 67};
+    int n = 0;
+    for (int i = 0; i < ctx.event_count && n < 7; i++) {
+        if (ctx.events[i].type == ALDA_EVT_NOTE_ON) {
+            ASSERT_EQ(ctx.events[i].data1, expect[n]);
+            n++;
+        }
+    }
+    ASSERT_EQ(n, 7);
+    alda_context_cleanup(&ctx);
+}
+
+TEST(interp_key_sig_key_name_with_accidental_word) {
+    /* '(e flat minor) names Eb minor - six flats - not "E is flat". The
+     * trailing mode word is what distinguishes it from the per-note form. */
+    AldaContext ctx;
+    test_context_init(&ctx);
+    alda_interpret_string(&ctx, "piano: (key-sig '(e flat minor)) c d e f g a b",
+                          "test");
+    int expect[] = {59, 61, 63, 65, 66, 68, 70};  /* Cb Db Eb F Gb Ab Bb */
+    int n = 0;
+    for (int i = 0; i < ctx.event_count && n < 7; i++) {
+        if (ctx.events[i].type == ALDA_EVT_NOTE_ON) {
+            ASSERT_EQ(ctx.events[i].data1, expect[n]);
+            n++;
+        }
+    }
+    ASSERT_EQ(n, 7);
+    alda_context_cleanup(&ctx);
+}
+
+TEST(interp_key_sig_bare_accidental_words) {
+    /* '(e flat b flat) has no trailing mode, so it is the per-note form and
+     * means the same as '(e (flat) b (flat)) and "e- b-". */
+    AldaContext ctx;
+    test_context_init(&ctx);
+    alda_interpret_string(&ctx, "piano: (key-sig '(e flat b flat)) e b", "test");
+    int expect[] = {63, 70};
+    int n = 0;
+    for (int i = 0; i < ctx.event_count && n < 2; i++) {
+        if (ctx.events[i].type == ALDA_EVT_NOTE_ON) {
+            ASSERT_EQ(ctx.events[i].data1, expect[n]);
+            n++;
+        }
+    }
+    ASSERT_EQ(n, 2);
+    alda_context_cleanup(&ctx);
+}
+
+TEST(interp_key_sig_per_note_accidental_form) {
+    /* '(e (flat) b (flat)) is equivalent to "e- b-". */
+    AldaContext ctx;
+    test_context_init(&ctx);
+    alda_interpret_string(&ctx, "piano: (key-sig '(e (flat) b (flat))) e b", "test");
+    int expect[] = {63, 70};
+    int n = 0;
+    for (int i = 0; i < ctx.event_count && n < 2; i++) {
+        if (ctx.events[i].type == ALDA_EVT_NOTE_ON) {
+            ASSERT_EQ(ctx.events[i].data1, expect[n]);
+            n++;
+        }
+    }
+    ASSERT_EQ(n, 2);
+    alda_context_cleanup(&ctx);
+}
+
+TEST(interp_key_sig_sharp_tonic_scans_as_one_symbol) {
+    /* "c#" must not be split by the comment scanner. C# minor has F#. */
+    AldaContext ctx;
+    test_context_init(&ctx);
+    alda_interpret_string(&ctx, "piano: (key-sig '(c# minor)) f", "test");
+    int n = 0;
+    for (int i = 0; i < ctx.event_count; i++) {
+        if (ctx.events[i].type == ALDA_EVT_NOTE_ON) {
+            ASSERT_EQ(ctx.events[i].data1, 66);  /* F# */
+            n++;
+        }
+    }
+    ASSERT_EQ(n, 1);
+    alda_context_cleanup(&ctx);
+}
+
+TEST(interp_global_key_sig_before_any_part) {
+    /* (key-sig! ...) at the top of a score, before any part exists, must not be
+     * discarded - and later parts inherit it. */
+    AldaContext ctx;
+    test_context_init(&ctx);
+    alda_interpret_string(&ctx,
+        "(key-sig! \"f+ c+\")\npiano: f\nviolin: f", "test");
+    ASSERT_EQ(first_pitch_for_part(&ctx, 0), 66);  /* F# */
+    ASSERT_EQ(first_pitch_for_part(&ctx, 1), 66);  /* F# */
+    alda_context_cleanup(&ctx);
+}
+
+TEST(interp_group_reuses_existing_parts) {
+    /* An un-aliased group addresses the existing parts and keeps their state,
+     * rather than creating fresh ones at the default octave. */
+    AldaContext ctx;
+    test_context_init(&ctx);
+    alda_interpret_string(&ctx,
+        "violin \"vln\": o2\nviola \"vla\": o6\nvln/vla: c", "test");
+    ASSERT_EQ(first_pitch_for_part(&ctx, 0), 36);  /* C2 */
+    ASSERT_EQ(first_pitch_for_part(&ctx, 1), 84);  /* C6 */
+    alda_context_cleanup(&ctx);
+}
+
+TEST(interp_aliased_group_creates_new_parts) {
+    /* An alias names a distinct instance: "violin/viola \"s\"" is separate from
+     * a plain "violin:" earlier in the score, so it starts at the default
+     * octave rather than inheriting o2. */
+    AldaContext ctx;
+    test_context_init(&ctx);
+    alda_interpret_string(&ctx, "violin: o2 c\nviolin/viola \"s\": c", "test");
+    ASSERT_EQ(first_pitch_for_part(&ctx, 0), 36);  /* the original violin, o2 */
+    ASSERT_EQ(first_pitch_for_part(&ctx, 1), 60);  /* new instance, default o4 */
+    alda_context_cleanup(&ctx);
+}
+
+TEST(interp_group_members_keep_own_octave) {
+    /* Notes are resolved per part: a group whose members sit at different
+     * octaves must not all play the first member's pitch. */
+    AldaContext ctx;
+    test_context_init(&ctx);
+    alda_interpret_string(&ctx, "piano: o2\nharp: o5\npiano/harp: c", "test");
+    ASSERT_EQ(first_pitch_for_part(&ctx, 0), 36);  /* C2 */
+    ASSERT_EQ(first_pitch_for_part(&ctx, 1), 72);  /* C5 */
+    alda_context_cleanup(&ctx);
+}
+
+TEST(interp_group_chord_keeps_own_octave) {
+    AldaContext ctx;
+    test_context_init(&ctx);
+    alda_interpret_string(&ctx, "piano: o2\nharp: o5\npiano/harp: c/e", "test");
+    ASSERT_EQ(first_pitch_for_part(&ctx, 0), 36);  /* C2 */
+    ASSERT_EQ(first_pitch_for_part(&ctx, 1), 72);  /* C5 */
+    alda_context_cleanup(&ctx);
+}
+
+TEST(interp_group_cram_keeps_own_octave) {
+    AldaContext ctx;
+    test_context_init(&ctx);
+    alda_interpret_string(&ctx, "piano: o2\nharp: o5\npiano/harp: {c d e}", "test");
+    ASSERT_EQ(first_pitch_for_part(&ctx, 0), 36);  /* C2 */
+    ASSERT_EQ(first_pitch_for_part(&ctx, 1), 72);  /* C5 */
+    alda_context_cleanup(&ctx);
+}
+
 BEGIN_TEST_SUITE("Alda Interpreter")
     /* Basic notes */
     RUN_TEST(interpret_single_note);
@@ -1042,4 +1215,16 @@ BEGIN_TEST_SUITE("Alda Interpreter")
     RUN_TEST(duration_to_ticks_dotted);
     RUN_TEST(ms_to_ticks);
     RUN_TEST(apply_quant);
+    /* Divergences found against aldakit */
+    RUN_TEST(interp_key_sig_quoted_list_with_accidental_word);
+    RUN_TEST(interp_key_sig_key_name_with_accidental_word);
+    RUN_TEST(interp_key_sig_bare_accidental_words);
+    RUN_TEST(interp_key_sig_per_note_accidental_form);
+    RUN_TEST(interp_key_sig_sharp_tonic_scans_as_one_symbol);
+    RUN_TEST(interp_global_key_sig_before_any_part);
+    RUN_TEST(interp_group_reuses_existing_parts);
+    RUN_TEST(interp_aliased_group_creates_new_parts);
+    RUN_TEST(interp_group_members_keep_own_octave);
+    RUN_TEST(interp_group_chord_keeps_own_octave);
+    RUN_TEST(interp_group_cram_keeps_own_octave);
 END_TEST_SUITE()

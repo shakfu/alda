@@ -118,6 +118,12 @@ static int is_symbol_char(char c) {
     switch (c) {
         case '!': case '?': case '+': case '-': case '*': case '/':
         case '_': case '<': case '>': case '=': case '.': case ':':
+        /* '#' continues a symbol so that sharp tonics inside an s-expression -
+         * (key-sig '(c# minor)) - scan as one symbol. A '#' at the start of a
+         * token is still a comment: skip_whitespace() consumes those before a
+         * token begins, and this function only ever extends one already in
+         * progress. */
+        case '#':
             return 1;
         default:
             return 0;
