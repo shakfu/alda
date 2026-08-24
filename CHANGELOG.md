@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.2.0]
+
 ### Fixed
 
 - **Alda Parser Rejected Valid Scores**: Differential-testing the parser against [aldakit](https://pypi.org/project/aldakit/), a separate Alda implementation, over both projects' example corpora found that psnd rejected 9 of 40 bundled scores - including 8 of its own. Five distinct gaps, each now covered by a regression test:
@@ -72,6 +74,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **`repl_extract_completion_prefix()`**: Bounds-checked word extraction shared by the completion paths, exposed so the boundary behaviour is testable (`repl.h`)
 
 ### Removed
+
+- **`#` As An Alda Sharp Accidental** (breaking): `#` was accepted as a synonym for `+`, which forced the scanner to guess whether a given `#` opened a comment or an accidental. Alda spells sharp as `+` and reserves `#` for comments, so the synonym is gone and `#` always starts a comment. A score written against psnd that spelled an accidental `c#` must now spell it `c+`; `c#` reads as `c` followed by a comment.
 
 - **Dead CMake Scripts**: Deleted `psnd_shared_library.cmake`, `psnd_loki_library.cmake`, `psnd_psnd_binary.cmake`, `psnd_tests.cmake`, `psnd_alda_library.cmake`, `psnd_joy_library.cmake`, and `psnd_bog_library.cmake`. None was referenced anywhere in the build, and they had already drifted - `psnd_loki_library.cmake` listed a `terminal.c` that was split into `terminal_posix.c` and `terminal_win.c` some time ago. Only `psnd_platform.cmake` and `psnd_languages.cmake` remain, and both are live (`scripts/cmake/`)
 - **Redundant Playback Mutex**: Removed `g_play.mutex`, which was taken only by the audio callback itself. The state actually shared across threads - `finished` and `active` - was read and written entirely outside it, and one of those writers is a signal handler, where a mutex cannot be taken at all. Everything else in `PlaybackState` is published before `ma_device_start()` and torn down after `ma_device_stop()`, so the device lifecycle orders it (`csound_backend.c`)
