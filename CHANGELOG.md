@@ -17,6 +17,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.2.1]
+
+### Fixed
+
+- **Windows Release Builds Failed On Two POSIX Dependencies**: All seven Windows legs of the release matrix failed to compile, on two tests that reached for POSIX interfaces MSVC does not provide. Both build cleanly on Linux and macOS, so neither showed up outside CI:
+  - `test_csound_backend.c` timed its render-latency loop with `clock_gettime(CLOCK_MONOTONIC, ...)`. It now uses `uv_hrtime()`, which is monotonic on all three platforms and needs nothing new - the same test already linked libuv and used `uv_thread_create()` a few lines above (`test_csound_backend.c`)
+  - `test_examples.c` walked the example corpus through `<dirent.h>`, which MSVC does not ship. Rather than exclude the test on Windows as `test_shared_suite.c` already was, directory iteration moved into `psnd_dirent.h`: a passthrough to `<dirent.h>` on POSIX, and a `FindFirstFileA` wrapper on Windows exposing `opendir`/`readdir`/`closedir` and `d_name`. Two near-identical copies of that shim were already inlined in the TOML theme and language loaders and now share the header (`psnd_dirent.h`, `test_examples.c`, `theme_toml.c`, `lang_toml.c`)
+
+- **MHS Embedded Header Truncated Under A Parallel Build**: The `tsf-csound` Linux leg failed with `unterminated #ifndef` in the generated `mhs_embedded_pkgs_zstd.h`, having compiled `vfs.c` against a half-written file. The generator was not at fault: the header was listed as a custom command output consumed by two independent targets in the same directory - `mhs-midi-pkg-zstd` through its source list, and `mhs-psnd-embedded-header` through `mhs_runtime`. CMake's Makefile generator copies such a rule into every consuming target, so `make -j` ran the generator twice at once. This is the hazard `add_custom_command` documents: do not list an output in more than one independent target, drive it from an `add_custom_target()` and depend on that instead. Each of the four embedded headers now has one owning target, and the standalone variants take an ordering dependency on it rather than naming the file. Being a scheduling race it had passed on other legs and on earlier runs, which is why it surfaced only once (`langs/mhs/CMakeLists.txt`)
+
 ## [0.2.0]
 
 ### Fixed
