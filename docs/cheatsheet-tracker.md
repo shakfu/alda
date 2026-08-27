@@ -292,8 +292,13 @@ Define phrases with `:phrase name expr`, then use `@name` in any cell.
 ## Quick Tips
 
 1. **Step entry**: Set step size with `+`/`-`, notes advance automatically
+
 2. **Record MIDI**: Enable with `Ctrl+R`, play notes on MIDI controller
+
 3. **Song mode**: Build sequence in arrange mode (`r`), then press `P` to switch
+
 4. **Quick save**: `Ctrl+S` or `:w`
+
 5. **Resize pattern**: `:rows 32` for 32-row pattern
+
 6. **Check settings**: `:set` shows current step, octave, etc.

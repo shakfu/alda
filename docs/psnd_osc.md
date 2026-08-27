@@ -11,9 +11,13 @@ OSC (Open Sound Control) is a protocol for communication between computers, soun
 OSC integration enables:
 
 1. **Remote Control** - Control psnd from external applications (TouchOSC, Max/MSP, SuperCollider, Lemur)
+
 2. **Hardware Controllers** - Receive input from OSC-enabled hardware (tablets, custom controllers)
+
 3. **Inter-Application Communication** - Integrate psnd into larger music production setups
+
 4. **Live Performance** - Trigger playback, change tempo, send notes from stage controllers
+
 5. **Monitoring/Logging** - Forward events to external visualizers or loggers
 
 ## Architecture
@@ -162,30 +166,40 @@ When `--osc-send` is specified, psnd broadcasts state changes:
 ```c
 /**
  * Initialize OSC server on specified port.
+
  * @param ctx SharedContext to store OSC state
+
  * @param port Port number (use 0 for default 7770)
+
  * @return 0 on success, -1 on error
  */
 int shared_osc_init(SharedContext *ctx, int port);
 
 /**
  * Set broadcast target for outgoing messages.
+
  * @param ctx SharedContext
+
  * @param host Target hostname or IP
+
  * @param port Target port
+
  * @return 0 on success, -1 on error
  */
 int shared_osc_set_broadcast(SharedContext *ctx, const char *host, const char *port);
 
 /**
  * Start OSC server thread.
+
  * @param ctx SharedContext
+
  * @return 0 on success, -1 on error
  */
 int shared_osc_start(SharedContext *ctx);
 
 /**
  * Stop OSC server and clean up.
+
  * @param ctx SharedContext
  */
 void shared_osc_cleanup(SharedContext *ctx);
@@ -196,10 +210,15 @@ void shared_osc_cleanup(SharedContext *ctx);
 ```c
 /**
  * Send OSC message to broadcast target.
+
  * @param ctx SharedContext
+
  * @param path OSC address path
+
  * @param types Type string (e.g., "ifs" for int, float, string)
+
  * @param ... Arguments matching types
+
  * @return 0 on success, -1 on error
  */
 int shared_osc_send(SharedContext *ctx, const char *path, const char *types, ...);
@@ -215,11 +234,17 @@ void shared_osc_send_note(SharedContext *ctx, int channel, int pitch, int veloci
 ```c
 /**
  * OSC message handler callback type.
+
  * @param path OSC address path
+
  * @param types Type string of arguments
+
  * @param argv Array of argument pointers
+
  * @param argc Argument count
+
  * @param user_data User data pointer
+
  * @return 0 if handled, 1 to pass to next handler
  */
 typedef int (*osc_handler_t)(const char *path, const char *types,
@@ -227,10 +252,15 @@ typedef int (*osc_handler_t)(const char *path, const char *types,
 
 /**
  * Register custom OSC handler.
+
  * @param ctx SharedContext
+
  * @param path OSC path pattern (supports wildcards)
+
  * @param types Expected type string (NULL for any)
+
  * @param handler Callback function
+
  * @param user_data User data for callback
  */
 void shared_osc_add_handler(SharedContext *ctx, const char *path,
@@ -430,7 +460,9 @@ void test_osc_send(void) {
 Create a TouchOSC layout with:
 
 - Play/Stop buttons sending `/psnd/play` and `/psnd/stop`
+
 - Tempo fader sending `/psnd/tempo f {value}`
+
 - Piano keys sending `/psnd/note iii {pitch} 100 500`
 
 ### 2. SuperCollider Integration
@@ -473,38 +505,53 @@ psnd --osc --osc-send visualizer.local:9000 set.alda
 ### Phase 1: Core Infrastructure
 
 - Add liblo to build system
+
 - Create `shared/osc/` module
+
 - Implement `shared_osc_init()`, `shared_osc_cleanup()`
+
 - Add CLI flags `--osc`, `--osc-port`
 
 ### Phase 2: Basic Handlers
 
 - Implement `/psnd/play`, `/psnd/stop`, `/psnd/eval`
+
 - Implement `/psnd/tempo`
+
 - Implement `/psnd/note`, `/psnd/noteon`, `/psnd/noteoff`
 
 ### Phase 3: Lua API
 
 - Expose `loki.osc` module
+
 - Implement `loki.osc.on()` for custom handlers
+
 - Implement `loki.osc.send()`
 
 ### Phase 4: Broadcasting
 
 - Implement `--osc-send` flag
+
 - Add state change notifications
+
 - MIDI event forwarding
 
 ### Phase 5: Advanced Features
 
 - Query/reply mechanism
+
 - Rate limiting
+
 - Network interface selection
+
 - Multicast support
 
 ## References
 
 - [liblo Documentation](http://liblo.sourceforge.net/docs/)
+
 - [OSC Specification](http://opensoundcontrol.org/spec-1_0)
+
 - [TouchOSC](https://hexler.net/touchosc)
+
 - [OSC in SuperCollider](https://doc.sccode.org/Guides/OSC_communication.html)

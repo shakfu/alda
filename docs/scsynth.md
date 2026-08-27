@@ -1,21 +1,17 @@
 # scsynth Integration Options for psnd
 
-This document evaluates the approaches for integrating SuperCollider's
-synthesis server (`scsynth`) as a psnd audio backend. It covers architecture,
-trade-offs, and implementation details for each option.
+This document evaluates the approaches for integrating SuperCollider's synthesis server (`scsynth`) as a psnd audio backend. It covers architecture, trade-offs, and implementation details for each option.
 
 ## Background
 
 ### What is scsynth?
 
-scsynth is the real-time audio synthesis server from SuperCollider. It is a
-headless process controlled entirely via OSC (Open Sound Control) messages
-over UDP or TCP. It loads UGen plugins (`.scx` shared libraries) that provide
-DSP building blocks, and executes SynthDefs (pre-compiled synthesis graphs)
-to produce audio.
+scsynth is the real-time audio synthesis server from SuperCollider. It is a headless process controlled entirely via OSC (Open Sound Control) messages over UDP or TCP. It loads UGen plugins (`.scx` shared libraries) that provide DSP building blocks, and executes SynthDefs (pre-compiled synthesis graphs) to produce audio.
 
 - Default OSC port: 57110
+
 - Protocol: OSC 1.0 over UDP or TCP
+
 - Audio: CoreAudio (macOS), JACK/ALSA (Linux), PortAudio (Windows)
 
 ### How psnd backends work today
@@ -26,9 +22,7 @@ psnd routes note events through a priority chain in `context.c`:
 Minihost (VST3/AU) > Csound > Built-in Synth (TSF/FluidSynth) > MIDI
 ```
 
-Each backend is a global singleton with ref-counted enable/disable. The
-routing uses early-return: only the highest-priority enabled backend receives
-each event. Panic broadcasts to all backends.
+Each backend is a global singleton with ref-counted enable/disable. The routing uses early-return: only the highest-priority enabled backend receives each event. Panic broadcasts to all backends.
 
 Key dispatch surface (from `context.h`):
 
@@ -42,18 +36,13 @@ void shared_send_cc(SharedContext* ctx, int channel, int cc, int value);
 void shared_send_panic(SharedContext* ctx);
 ```
 
-Backends implement a standard interface: `init`, `cleanup`, `enable`,
-`disable`, `is_enabled`, `send_note_on`, `send_note_off`, `send_program`,
-`send_cc`, `all_notes_off`. Some also support `send_pitch_bend`,
-`send_note_on_freq`, and audio rendering callbacks.
+Backends implement a standard interface: `init`, `cleanup`, `enable`, `disable`, `is_enabled`, `send_note_on`, `send_note_off`, `send_program`, `send_cc`, `all_notes_off`. Some also support `send_pitch_bend`, `send_note_on_freq`, and audio rendering callbacks.
 
 ---
 
 ## Option A: OSC Client (Out-of-Process)
 
-Connect to an externally-running scsynth instance via OSC over UDP. psnd
-acts as a pure client, similar to how `sclang`, `Overtone`, `TidalCycles`, and
-`FoxDot` interact with scsynth.
+Connect to an externally-running scsynth instance via OSC over UDP. psnd acts as a pure client, similar to how `sclang`, `Overtone`, `TidalCycles`, and `FoxDot` interact with scsynth.
 
 ### Architecture
 
@@ -126,8 +115,7 @@ typedef struct {
 } ScSynthBackend;
 ```
 
-Node ID allocation: start at 1000, increment per note. Wraps at INT_MAX.
-scsynth handles ID collisions gracefully (old nodes are freed).
+Node ID allocation: start at 1000, increment per note. Wraps at INT_MAX. scsynth handles ID collisions gracefully (old nodes are freed).
 
 ### Connection Lifecycle
 
@@ -163,50 +151,62 @@ scsynth handles ID collisions gracefully (old nodes are freed).
 ### Implementation Estimate
 
 - New file: `scsynth_backend.c` (~400-600 lines)
+
 - Header additions to `audio.h` (~40 lines)
+
 - Routing additions to `context.c` (~30 lines)
+
 - REPL command additions to `repl_commands.c` (~80 lines)
+
 - SharedContext: add `int scsynth_enabled` flag
 
 ### Dependencies
 
 - `liblo` (already in psnd for OSC support, guarded by `PSND_OSC`)
+
 - No new compile-time or runtime dependencies
 
 ### Build Integration
 
-Conditional on existing `PSND_OSC` flag, or a new `BUILD_SCSYNTH_BACKEND`
-flag. Since it only requires `liblo` (already present), it could be always-on
-when OSC is enabled.
+Conditional on existing `PSND_OSC` flag, or a new `BUILD_SCSYNTH_BACKEND` flag. Since it only requires `liblo` (already present), it could be always-on when OSC is enabled.
 
 ### Advantages
 
 - Minimal implementation (~500 lines of C)
+
 - Zero new dependencies (uses existing `liblo`)
+
 - User gets full SuperCollider ecosystem (sclang, SC IDE, `sc3-plugins`)
+
 - scsynth manages its own audio driver (no `miniaudio` integration needed)
+
 - Any existing SynthDef works (vast community library)
+
 - Multiple psnd instances can share one scsynth
+
 - Clean process separation (scsynth crash does not crash psnd)
+
 - Microtuning support via direct frequency parameter
 
 ### Disadvantages
 
 - User must start scsynth separately (or have SC IDE running)
+
 - Network latency (UDP on localhost: ~0.1ms, negligible in practice)
+
 - No audio routing back through psnd (cannot mix with other backends)
+
 - Cannot apply psnd-side post-processing
+
 - Depends on scsynth having suitable SynthDefs loaded
+
 - No offline/NRT rendering through this path
 
 ### SynthDef Strategy
 
-scsynth always has a built-in `default` SynthDef (VarSaw + Linen envelope,
-params: `out`, `freq`, `amp`, `pan`, `gate`). Sound comes out with zero
-configuration.
+scsynth always has a built-in `default` SynthDef (VarSaw + Linen envelope, params: `out`, `freq`, `amp`, `pan`, `gate`). Sound comes out with zero configuration.
 
-For richer sounds, psnd can optionally ship a `.scd` file containing
-recommended SynthDef definitions. Users evaluate it in sclang:
+For richer sounds, psnd can optionally ship a `.scd` file containing recommended SynthDef definitions. Users evaluate it in sclang:
 
 ```
 // In sclang:
@@ -226,8 +226,7 @@ shared_osc_send_to(host, port, "/d_loadDir", "s", synthdef_dir);
 
 ## Option B: Embedded via libscsynth (In-Process)
 
-Link against `libscsynth.a` and run the synthesis engine inside the psnd
-process, similar to how the Csound backend embeds libcsound.
+Link against `libscsynth.a` and run the synthesis engine inside the psnd process, similar to how the Csound backend embeds libcsound.
 
 ### Architecture
 
@@ -274,10 +273,7 @@ int  World_CopySndBuf(World* world, uint32 index, SndBuf* outBuf,
                       bool onlyIfChanged, bool* didChange);
 ```
 
-The `World_SendPacket` function accepts raw OSC byte buffers. This means
-the event translation layer is identical to Option A -- construct OSC
-messages with liblo (or oscpack, or raw byte packing), then inject them
-via `World_SendPacket` instead of sending over UDP.
+The `World_SendPacket` function accepts raw OSC byte buffers. This means the event translation layer is identical to Option A -- construct OSC messages with liblo (or oscpack, or raw byte packing), then inject them via `World_SendPacket` instead of sending over UDP.
 
 ### WorldOptions Configuration
 
@@ -330,88 +326,102 @@ void shared_scsynth_send_note_on(int channel, int pitch, int velocity) {
 }
 ```
 
-This bypasses the network stack entirely. Events go directly into the
-server's command FIFO.
+This bypasses the network stack entirely. Events go directly into the server's command FIFO.
 
 ### Audio Output
 
-scsynth manages its own audio device internally (CoreAudio on macOS, JACK
-on Linux). When embedded, it still opens its own audio device -- it does
-**not** route audio through psnd's miniaudio pipeline. This is different
-from the Csound backend, which uses host-implemented audio I/O.
+scsynth manages its own audio device internally (CoreAudio on macOS, JACK on Linux). When embedded, it still opens its own audio device -- it does **not** route audio through psnd's miniaudio pipeline. This is different from the Csound backend, which uses host-implemented audio I/O.
 
-It is theoretically possible to use scsynth's NRT (non-real-time) mode
-to render to buffers and pull samples into psnd's audio callback, but
-this is not how libscsynth is designed to be used and would require
-significant custom work.
+It is theoretically possible to use scsynth's NRT (non-real-time) mode to render to buffers and pull samples into psnd's audio callback, but this is not how libscsynth is designed to be used and would require significant custom work.
 
 ### Plugin and SynthDef Paths
 
 The embedded World needs to know where to find:
 
 1. **UGen plugins** (`.scx` files): Set via `options.mUGensPluginPath`
-2. **SynthDefs** (`.scsyndef` files): Loaded from the SC synthdef directory
-   or via `/d_load` / `/d_recv` packets
 
-These paths must be configured at init time or resolved from the user's
-SuperCollider installation.
+2. **SynthDefs** (`.scsyndef` files): Loaded from the SC synthdef directory or via `/d_load` / `/d_recv` packets
+
+These paths must be configured at init time or resolved from the user's SuperCollider installation.
 
 ### Implementation Estimate
 
 - New file: `scsynth_backend.c` (~800-1200 lines)
+
 - Header additions to `audio.h` (~50 lines)
+
 - Routing additions to `context.c` (~30 lines)
+
 - REPL command additions (~100 lines)
+
 - CMake: find libscsynth, SC headers, link C++ runtime
+
 - OSC message builder (shared with Option A, ~200 lines)
 
 ### Dependencies
 
 **Compile-time:**
 - `libscsynth.a` (1.1 MB) -- static library from SC build
+
 - SC headers: `SC_WorldOptions.h`, `SC_Reply.h`, `SC_Types.h`, `SC_Export.h`
+
 - C++ standard library (libscsynth is C++ internally)
 
 **Runtime:**
 - UGen plugin directory (26 core `.scx` files, ~1.8 MB)
+
 - libsndfile (dynamic dependency of scsynth)
+
 - CoreAudio/CoreServices/Foundation frameworks (macOS)
+
 - Optionally: sc3-plugins (~100+ additional `.scx` files)
 
 **Build system impact:**
 - Must link C++ runtime (`-lc++` on macOS, `-lstdc++` on Linux)
+
 - Must find or bundle SC headers
+
 - psnd binary grows by ~1.1 MB (libscsynth) + plugin directory on disk
+
 - New CMake flag: `-DBUILD_SCSYNTH_BACKEND=ON`
+
 - Requires SC source tree or installed headers at build time
 
 ### Advantages
 
 - No external process to manage (user types `:sc` and it works)
+
 - `World_SendPacket` bypasses network stack (lower latency than UDP)
+
 - Can open UDP port so sclang can also connect to the same server
+
 - Self-contained distribution possible (bundle scsynth + plugins + defs)
+
 - Process lifecycle is fully controlled by psnd
 
 ### Disadvantages
 
-- Significant new dependencies (libscsynth, C++ runtime, libsndfile,
-  platform audio frameworks)
+- Significant new dependencies (libscsynth, C++ runtime, libsndfile, platform audio frameworks)
+
 - Binary size increase (~1.1 MB static lib + ~1.8 MB core plugins minimum)
+
 - scsynth owns its audio device (cannot route through psnd's miniaudio)
+
 - WorldOptions is a C++ struct -- requires C++ compilation unit or wrapper
-- libscsynth API stability caveat: "API might change across minor versions"
-  (noted in SC_WorldOptions.h)
+
+- libscsynth API stability caveat: "API might change across minor versions" (noted in SC_WorldOptions.h)
+
 - scsynth crash takes down entire psnd process
+
 - Complex build system integration (find SC headers, plugins, link flags)
+
 - Plugin path resolution varies by platform and installation method
 
 ---
 
 ## Option C: Managed Process (Spawn + OSC)
 
-psnd spawns scsynth as a child process and communicates via OSC. A middle
-ground between A (pure client) and B (full embedding).
+psnd spawns scsynth as a child process and communicates via OSC. A middle ground between A (pure client) and B (full embedding).
 
 ### Architecture
 
@@ -451,9 +461,13 @@ Resolve the scsynth binary path using a search order:
 
 ```
 1. User-specified path:   :sc-boot /path/to/scsynth
+
 2. Environment variable:  $SCSYNTH_PATH
+
 3. Config file:           ~/.psnd/config  ->  scsynth_path = ...
+
 4. PATH lookup:           which scsynth
+
 5. Known locations:
    macOS:  /Applications/SuperCollider.app/Contents/Resources/scsynth
            ~/src/supercollider/build/server/scsynth/scsynth
@@ -471,47 +485,57 @@ Resolve the scsynth binary path using a search order:
 :sc                         Connect to already-running scsynth (same as A)
 ```
 
-All other commands (`:sc-synth`, `:sc-status`, etc.) are identical to
-Option A since the communication layer is the same.
+All other commands (`:sc-synth`, `:sc-status`, etc.) are identical to Option A since the communication layer is the same.
 
 ### Implementation Estimate
 
 - Everything from Option A (~500 lines)
+
 - Process management: ~200-300 additional lines
+
 - scsynth path discovery: ~100 lines
+
 - Total: ~800-900 lines
 
 ### Dependencies
 
 - liblo (existing, for OSC)
+
 - `posix_spawn` or `fork`/`exec` (POSIX), `CreateProcess` (Windows)
+
 - scsynth binary must be installed somewhere on the system
 
 ### Advantages
 
 - Better UX than pure client: `:sc-boot` is one command
+
 - All advantages of Option A (full SC ecosystem, process isolation)
+
 - scsynth crash does not crash psnd
+
 - No compile-time SC dependency
+
 - Can detect and reuse already-running scsynth instances
 
 ### Disadvantages
 
-- Process management complexity (spawn, health check, cleanup, orphan
-  prevention)
+- Process management complexity (spawn, health check, cleanup, orphan prevention)
+
 - Must handle scsynth not being installed (graceful error)
+
 - Platform-specific process spawning code
+
 - Port conflict handling (what if 57110 is taken?)
+
 - Startup latency (scsynth takes ~1-2 seconds to boot and load plugins)
+
 - Still requires SynthDefs to be available
 
 ---
 
 ## Option D: Hybrid (Embed + External Client)
 
-Combine Options B and A: attempt to embed libscsynth if available at
-compile time; fall back to OSC client for external scsynth otherwise. This
-is how the Csound backend works (embedded if compiled in, otherwise stubs).
+Combine Options B and A: attempt to embed libscsynth if available at compile time; fall back to OSC client for external scsynth otherwise. This is how the Csound backend works (embedded if compiled in, otherwise stubs).
 
 ### Architecture
 
@@ -527,8 +551,7 @@ is how the Csound backend works (embedded if compiled in, otherwise stubs).
 
 ### Implementation
 
-The OSC message construction is identical in both modes. The only
-difference is the transport:
+The OSC message construction is identical in both modes. The only difference is the transport:
 
 ```c
 static void sc_send_osc(const char* buf, int size) {
@@ -547,13 +570,17 @@ static void sc_send_osc(const char* buf, int size) {
 ### Advantages
 
 - Maximum flexibility: works with or without SC build dependency
+
 - Embedded mode for distribution; client mode for development
+
 - Shared code between modes
 
 ### Disadvantages
 
 - Two code paths to test and maintain
+
 - Embedded mode inherits all disadvantages of Option B
+
 - Build matrix complexity
 
 ---
@@ -583,33 +610,36 @@ static void sc_send_osc(const char* buf, int size) {
 
 ## SynthDef Considerations
 
-All options share the same SynthDef requirements. scsynth needs SynthDef
-programs to produce sound. Strategies for providing them:
+All options share the same SynthDef requirements. scsynth needs SynthDef programs to produce sound. Strategies for providing them:
 
 ### 1. Rely on scsynth's built-in `default` SynthDef
 
-Always available. Params: `out`, `freq`, `amp`, `pan`, `gate`. Uses a
-VarSaw oscillator with a Linen envelope. Thin but functional.
+Always available. Params: `out`, `freq`, `amp`, `pan`, `gate`. Uses a VarSaw oscillator with a Linen envelope. Thin but functional.
 
 ### 2. Ship pre-compiled `.scsyndef` files
 
-Place in `.psnd/synthdefs/` and load on connect via `/d_loadDir`. Users
-can add their own files to the same directory.
+Place in `.psnd/synthdefs/` and load on connect via `/d_loadDir`. Users can add their own files to the same directory.
 
 Candidate SynthDefs for a shipped set:
 - `psnd_sine` -- clean sine, good for testing
+
 - `psnd_saw` -- filtered sawtooth, general purpose
+
 - `psnd_pad` -- detuned oscillators with slow attack
+
 - `psnd_pluck` -- Karplus-Strong physical model
+
 - `psnd_fm` -- FM synthesis bell/keys
+
 - `psnd_bass` -- low-passed square wave
+
 - `psnd_perc` -- percussive envelope, noise + tone
+
 - `psnd_string` -- DWGPlucked (requires sc3-plugins)
 
 ### 3. Ship sclang source alongside compiled defs
 
-Include `.scd` source in `extras/synthdefs/` for users to modify and
-recompile. This is documentation, not a runtime dependency.
+Include `.scd` source in `extras/synthdefs/` for users to modify and recompile. This is documentation, not a runtime dependency.
 
 ### 4. Program change mapping
 
@@ -626,42 +656,25 @@ Configurable via `:sc-synth <program> <name>` or a config file.
 
 ### 5. Rely on user's SC environment
 
-If the user has sclang running, their SynthDefs are already loaded in
-scsynth. psnd just needs to know the SynthDef name to target. This is
-the zero-effort path for SC-experienced users.
+If the user has sclang running, their SynthDefs are already loaded in scsynth. psnd just needs to know the SynthDef name to target. This is the zero-effort path for SC-experienced users.
 
 ---
 
 ## Recommended Approach
 
-**Start with Option A (OSC Client), design for Option C (Managed Process)
-as a future enhancement.**
+**Start with Option A (OSC Client), design for Option C (Managed Process) as a future enhancement.**
 
 Rationale:
 
-1. **Option A is the minimum viable integration.** ~500 lines, zero new
-   dependencies, uses existing liblo. It validates the entire concept
-   before investing in process management or embedding.
+1. **Option A is the minimum viable integration.** ~500 lines, zero new dependencies, uses existing liblo. It validates the entire concept before investing in process management or embedding.
 
-2. **The OSC message layer is shared across all options.** Building Option A
-   first creates the translation layer (MIDI events to scsynth OSC
-   commands, active note tracking, SynthDef mapping) that every other
-   option reuses.
+2. **The OSC message layer is shared across all options.** Building Option A first creates the translation layer (MIDI events to scsynth OSC commands, active note tracking, SynthDef mapping) that every other option reuses.
 
-3. **Option C is a natural extension of A.** Adding `:sc-boot` to spawn
-   scsynth is additive -- the connection and event code is identical.
+3. **Option C is a natural extension of A.** Adding `:sc-boot` to spawn scsynth is additive -- the connection and event code is identical.
 
-4. **Option B (embedding) fights scsynth's architecture.** scsynth is
-   designed as a server. It manages its own audio device, its own thread
-   pool, its own memory allocator. Embedding it gains little over
-   connecting via localhost UDP, while adding substantial build complexity
-   and a C++ dependency. The Csound embedding model works because Csound
-   was designed for host-implemented audio I/O; scsynth was not.
+4. **Option B (embedding) fights scsynth's architecture.** scsynth is designed as a server. It manages its own audio device, its own thread pool, its own memory allocator. Embedding it gains little over connecting via localhost UDP, while adding substantial build complexity and a C++ dependency. The Csound embedding model works because Csound was designed for host-implemented audio I/O; scsynth was not.
 
-5. **Target audience matters.** Users who want scsynth likely already have
-   SuperCollider installed. Requiring them to start the server is a
-   familiar workflow (identical to Overtone, TidalCycles, FoxDot). The
-   friction is acceptable and expected.
+5. **Target audience matters.** Users who want scsynth likely already have SuperCollider installed. Requiring them to start the server is a familiar workflow (identical to Overtone, TidalCycles, FoxDot). The friction is acceptable and expected.
 
 ### Suggested priority chain position
 
@@ -669,45 +682,55 @@ Rationale:
 Minihost > Csound > Built-in Synth (TSF/Fluid) > scsynth > MIDI
 ```
 
-scsynth sits below the in-process synthesis engines (which have tighter
-audio integration) and above raw MIDI (which requires external hardware
-or software).
+scsynth sits below the in-process synthesis engines (which have tighter audio integration) and above raw MIDI (which requires external hardware or software).
 
 ### Implementation phases
 
 **Phase 1: OSC Client (Option A)**
 - `scsynth_backend.c` with connect/disconnect/send
+
 - Active note tracking with node ID allocation
+
 - Basic SynthDef name configuration
+
 - REPL commands: `:sc`, `:sc-synth`, `:sc-status`, `:sc-disconnect`
+
 - SharedContext flag: `scsynth_enabled`
+
 - Priority chain integration in `context.c`
 
 **Phase 2: SynthDef Management**
 - Ship 5-8 pre-compiled `.scsyndef` files
+
 - `/d_loadDir` on connect
+
 - Program-to-SynthDef mapping
+
 - `:sc-synth <program> <name>` command
 
 **Phase 3: Managed Process (Option C)**
 - `:sc-boot` command with scsynth discovery
+
 - Process spawn/kill lifecycle
+
 - Health monitoring via `/status` polling
+
 - Graceful degradation if scsynth is not installed
 
 ---
 
 ## References
 
-- SuperCollider Server Command Reference:
-  https://doc.sccode.org/Reference/Server-Command-Reference.html
-- SuperCollider Server Architecture:
-  https://doc.sccode.org/Reference/Server-Architecture.html
+- SuperCollider Server Command Reference: https://doc.sccode.org/Reference/Server-Command-Reference.html
+
+- SuperCollider Server Architecture: https://doc.sccode.org/Reference/Server-Architecture.html
+
 - liblo (OSC library): https://liblo.sourceforge.net/
+
 - sc3-plugins: https://github.com/supercollider/sc3-plugins
-- SynthDef file format:
-  https://doc.sccode.org/Reference/Synth-Definition-File-Format.html
-- Sonic Pi's scsynth integration (prior art):
-  https://github.com/sonic-pi-net/sonic-pi
-- Overtone (Clojure SC client, prior art):
-  https://github.com/overtone/overtone
+
+- SynthDef file format: https://doc.sccode.org/Reference/Synth-Definition-File-Format.html
+
+- Sonic Pi's scsynth integration (prior art): https://github.com/sonic-pi-net/sonic-pi
+
+- Overtone (Clojure SC client, prior art): https://github.com/overtone/overtone

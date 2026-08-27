@@ -20,18 +20,23 @@ Use the generator script to create all boilerplate:
 The script generates:
 
 - `source/langs/<name>/` - Register, REPL, dispatch, `impl/`, and `tests/` files
+
 - `source/langs/<name>/CMakeLists.txt` - Build and registration, auto-discovered
+
 - `source/langs/<name>/tests/` - Test scaffolding (also auto-discovered)
+
 - `source/langs/<name>/docs/README.md` - Documentation template
+
 - `.psnd/languages/<name>.lua` - Syntax highlighting
 
-No parent CMake file, `lang_config.h`, or `lang_dispatch.c` edit is needed: the
-build discovers the language directory and generates those declarations.
+No parent CMake file, `lang_config.h`, or `lang_dispatch.c` edit is needed: the build discovers the language directory and generates those declarations.
 
 After running the script:
 
 1. Implement your language in `source/langs/<name>/impl/`
+
 2. Update the CMake library file with your sources
+
 3. Run `make clean && make test` to verify
 
 The rest of this document explains the generated code structure in detail.
@@ -41,10 +46,15 @@ The rest of this document explains the generated code structure in detail.
 psnd uses a language bridge pattern that allows music languages to integrate with both the editor and standalone REPL without coupling core code to specific implementations. Each language:
 
 1. Lives in its own directory under `source/langs/<langname>/`
+
 2. Implements the `LokiLangOps` interface for editor integration
+
 3. Provides a standalone REPL with shared command handling
+
 4. Uses `SharedContext` for MIDI, audio, and Link integration
+
 5. Registers itself via `source/core/lang_config.h` (single file for all language configuration)
+
 6. Optionally provides Lua API bindings for scripting
 
 ## Directory Structure
@@ -112,8 +122,7 @@ int example_eval(ExampleContext *ctx, const char *code) {
 
 ### CMake Library
 
-Create `source/langs/example/CMakeLists.txt`. It is discovered automatically -
-no parent CMake file references it:
+Create `source/langs/example/CMakeLists.txt`. It is discovered automatically - no parent CMake file references it:
 
 ```cmake
 include_guard(GLOBAL)
@@ -141,6 +150,7 @@ Create `source/langs/example/repl.c`:
 ```c
 /**
  * @file repl.c
+
  * @brief Example language REPL with shared command handling.
  */
 
@@ -160,6 +170,7 @@ Create `source/langs/example/repl.c`:
 
 /* ============================================================================
  * REPL State
+
  * ============================================================================ */
 
 static ExampleContext *g_example_ctx = NULL;
@@ -167,6 +178,7 @@ static SharedContext *g_shared_ctx = NULL;
 
 /* ============================================================================
  * Usage and Help
+
  * ============================================================================ */
 
 static void print_usage(const char *prog) {
@@ -193,6 +205,7 @@ static void print_help(void) {
 
 /* ============================================================================
  * Command Processing
+
  * ============================================================================ */
 
 /* Stop callback for shared commands */
@@ -233,6 +246,7 @@ static int process_command(const char *input) {
 
 /* ============================================================================
  * REPL Loop
+
  * ============================================================================ */
 
 static void repl_loop(editor_ctx_t *syntax_ctx) {
@@ -293,6 +307,7 @@ static void repl_loop(editor_ctx_t *syntax_ctx) {
 
 /* ============================================================================
  * Main Entry Point
+
  * ============================================================================ */
 
 int example_repl_main(int argc, char **argv) {
@@ -401,6 +416,7 @@ Create `source/langs/example/dispatch.c`:
 ```c
 /**
  * @file dispatch.c
+
  * @brief CLI dispatch for Example language.
  */
 
@@ -422,6 +438,7 @@ Create `source/langs/example/register.h`:
 
 /**
  * Initialize Example language registration with the language bridge.
+
  * Called from loki_lang_init() when LANG_EXAMPLE is defined.
  */
 void example_loki_lang_init(void);
@@ -434,6 +451,7 @@ Create `source/langs/example/register.c`:
 ```c
 /**
  * @file register.c
+
  * @brief Example language integration with Loki editor.
  */
 
@@ -453,6 +471,7 @@ Create `source/langs/example/register.c`:
 
 /* ============================================================================
  * Per-Context State
+
  * ============================================================================ */
 
 struct LokiExampleState {
@@ -478,6 +497,7 @@ static void set_error(LokiExampleState *state, const char *msg) {
 
 /* ============================================================================
  * LokiLangOps Implementation
+
  * ============================================================================ */
 
 static int example_init(editor_ctx_t *ctx) {
@@ -592,6 +612,7 @@ static int example_is_playing(editor_ctx_t *ctx) {
 
 /* ============================================================================
  * Lua API (Optional)
+
  * ============================================================================ */
 
 static int lua_example_init(lua_State *L) {
@@ -646,6 +667,7 @@ static void example_register_lua_api(lua_State *L) {
 
 /* ============================================================================
  * Language Registration
+
  * ============================================================================ */
 
 static const LokiLangOps example_lang_ops = {
@@ -686,11 +708,7 @@ void example_loki_lang_init(void) {
 
 ## Step 5: Register the Language
 
-There is nothing to hand-edit here. `psnd_register_language()` in your language's
-`CMakeLists.txt` (Step 1) is the single registration point. At configure time
-`scripts/cmake/psnd_languages.cmake` walks `source/langs/*`, and for every
-directory containing a `CMakeLists.txt` it defines a `LANG_<NAME>` option
-(default `ON`), processes the directory, and collects what you registered.
+There is nothing to hand-edit here. `psnd_register_language()` in your language's `CMakeLists.txt` (Step 1) is the single registration point. At configure time `scripts/cmake/psnd_languages.cmake` walks `source/langs/*`, and for every directory containing a `CMakeLists.txt` it defines a `LANG_<NAME>` option (default `ON`), processes the directory, and collects what you registered.
 
 It then generates two headers into `${CMAKE_BINARY_DIR}/generated/`:
 
@@ -699,27 +717,21 @@ It then generates two headers into `${CMAKE_BINARY_DIR}/generated/`:
 | `lang_config_generated.h` | `IF_LANG_<NAME>` macros, `struct Loki<Name>State` forward decls, `LOKI_LANG_STATE_FIELDS_GENERATED`, `LOKI_LANG_INIT_ALL_GENERATED` |
 | `lang_dispatch_generated.h` | `<name>_dispatch_init()` decls and `LANG_DISPATCH_INIT_ALL_GENERATED` |
 
-`source/core/lang_config.h` and `source/core/lang_dispatch.c` are thin shims that
-include these and expand the generated macros. Both are marked DO NOT EDIT -
-earlier revisions of this guide had you edit them by hand, which is no longer
-correct and will be overwritten.
+`source/core/lang_config.h` and `source/core/lang_dispatch.c` are thin shims that include these and expand the generated macros. Both are marked DO NOT EDIT - earlier revisions of this guide had you edit them by hand, which is no longer correct and will be overwritten.
 
-What this requires of your code is only that the symbols the generator declares
-actually exist:
+What this requires of your code is only that the symbols the generator declares actually exist:
 
 - `void example_loki_lang_init(void);` - called by `LOKI_LANG_INIT_ALL()`
+
 - `void example_dispatch_init(void);` - called by `LANG_DISPATCH_INIT_ALL()`
+
 - `struct LokiExampleState` - the type named in `ctx->model.example_state`
 
-The `Loki<Name>State` spelling is derived by title-casing the `NAME` you passed to
-`psnd_register_language()`, so `NAME example` must pair with `LokiExampleState`.
+The `Loki<Name>State` spelling is derived by title-casing the `NAME` you passed to `psnd_register_language()`, so `NAME example` must pair with `LokiExampleState`.
 
 ## Step 6: Build Configuration
 
-Also nothing to do. The `LANG_EXAMPLE` option and the `LANG_EXAMPLE=1` compile
-definition are created by the discovery pass; `psnd_collect_lang_sources()` folds
-your `SOURCES`, `INCLUDE_DIRS`, `REPL_SOURCES`, `REGISTER_SOURCES`, and
-`LINK_LIBRARIES` into the `loki` library and the `psnd` binary.
+Also nothing to do. The `LANG_EXAMPLE` option and the `LANG_EXAMPLE=1` compile definition are created by the discovery pass; `psnd_collect_lang_sources()` folds your `SOURCES`, `INCLUDE_DIRS`, `REPL_SOURCES`, `REGISTER_SOURCES`, and `LINK_LIBRARIES` into the `loki` library and the `psnd` binary.
 
 To build without your language:
 
@@ -736,10 +748,7 @@ Confirm discovery worked by looking for these lines in the configure output:
 
 ## Step 7: Add CLI Dispatch
 
-`source/core/lang_dispatch.c` needs no per-language edit - it expands
-`LANG_DISPATCH_INIT_ALL_GENERATED()`, which calls the `example_dispatch_init()`
-you provide in `source/langs/example/dispatch.c`. Register your entry points
-there against the `LangDispatchEntry` table (`source/core/lang_dispatch.h:25-45`):
+`source/core/lang_dispatch.c` needs no per-language edit - it expands `LANG_DISPATCH_INIT_ALL_GENERATED()`, which calls the `example_dispatch_init()` you provide in `source/langs/example/dispatch.c`. Register your entry points there against the `LangDispatchEntry` table (`source/core/lang_dispatch.h:25-45`):
 
 ```c
 /* source/langs/example/dispatch.c */
@@ -755,14 +764,11 @@ void example_dispatch_init(void) {
 }
 ```
 
-The commands and extensions you pass to `psnd_register_language()` are what the
-build advertises; keep them in sync with this table.
+The commands and extensions you pass to `psnd_register_language()` are what the build advertises; keep them in sync with this table.
 
 ## Step 8: Add Tests
 
-Create `source/langs/example/tests/CMakeLists.txt`. Any language directory with a
-`tests/CMakeLists.txt` is added automatically when `BUILD_TESTING` is on
-(`source/langs/CMakeLists.txt:24-33`):
+Create `source/langs/example/tests/CMakeLists.txt`. Any language directory with a `tests/CMakeLists.txt` is added automatically when `BUILD_TESTING` is on (`source/langs/CMakeLists.txt:24-33`):
 
 ```cmake
 # Example language tests
@@ -798,18 +804,22 @@ int main(void) {
 }
 ```
 
-No parent test file needs updating - the `add_subdirectory` is driven by the
-discovery loop, not a hand-maintained list.
+No parent test file needs updating - the `add_subdirectory` is driven by the discovery loop, not a hand-maintained list.
 
 ## Step 9: Add Documentation
 
 Create `docs/example/README.md` with:
 
 - Quick Start guide
+
 - Core concepts
+
 - REPL commands
+
 - Editor integration
+
 - Lua API
+
 - Example programs
 
 See existing documentation in `docs/alda/`, `docs/joy/`, `docs/tr7/`, or `docs/bog/` for reference.

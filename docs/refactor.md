@@ -7,8 +7,11 @@ Extract a language-agnostic audio/MIDI backend layer from the current Alda-speci
 ## Current Architecture Problems
 
 1. **Alda-specific naming**: `AldaContext`, `alda_tsf_*`, `alda_csound_*` couples backends to one language
+
 2. **Joy has separate MIDI**: `joy_midi_backend.c` duplicates libremidi integration
+
 3. **Link requires editor context**: `loki_link_*` functions take `editor_ctx_t*` but use global state
+
 4. **No shared abstraction**: Each language must implement its own routing logic
 
 ## Proposed Architecture
@@ -113,8 +116,11 @@ mkdir -p src/shared/audio src/shared/midi src/shared/link
 Create header files:
 
 - `src/shared/context.h` - SharedContext struct
+
 - `src/shared/audio/audio.h` - Audio backend API
+
 - `src/shared/midi/midi.h` - MIDI I/O API
+
 - `src/shared/link/link.h` - Ableton Link API
 
 ### Step 2: Move and rename backend files
@@ -156,7 +162,9 @@ void shared_send_note_on(SharedContext* ctx, int ch, int pitch, int vel) {
 Modify `src/alda/` to use the shared layer:
 
 - `AldaContext` keeps parser/interpreter state
+
 - Add `SharedContext* shared` field to `AldaContext`
+
 - Replace `alda_midi_send_*` calls with `shared_send_*`
 
 ```c
@@ -169,7 +177,9 @@ shared_send_note_on(ctx->shared, channel, pitch, velocity);
 Modify `src/joy/midi_primitives.c`:
 
 - Remove direct libremidi calls
+
 - Add `SharedContext*` to `JoyContext`
+
 - Route through shared backend
 
 ```c
@@ -185,7 +195,9 @@ shared_send_note_on(ctx->shared, ctx->channel, pitch, velocity);
 Modify `src/loki/alda.c` and `src/loki/joy.c`:
 
 - Initialize shared `SharedContext` in editor context
+
 - Both languages share the same context when in editor
+
 - REPL mode creates standalone `SharedContext`
 
 ```c
@@ -228,6 +240,7 @@ target_link_libraries(libloki shared)
 Modify `src/repl.c` (joy_repl_main):
 
 - Create `SharedContext` instead of using `joy_midi_*` directly
+
 - Pass to Joy context for playback
 
 ## Files to Create
@@ -276,25 +289,39 @@ Modify `src/repl.c` (joy_repl_main):
 ## Verification
 
 1. **Build**: `make clean && make` - should compile without errors
+
 2. **Tests**: `make test` - all 25 tests pass
+
 3. **Alda REPL**: `psnd` then `piano: c d e f g` - plays via TSF/MIDI
+
 4. **Joy REPL**: `psnd joy` then `[c d e] play` - plays via same backends
+
 5. **Alda + TSF**: `psnd -sf gm.sf2 song.alda` - TinySoundFont works
+
 6. **Joy + TSF**: `psnd joy -sf gm.sf2` then `[c d e] play` - TSF works for Joy
+
 7. **Link**: Enable Link in Alda, verify Joy also uses Link tempo
+
 8. **Editor**: Open .joy file, Ctrl-E plays through shared backend
 
 ## Migration Strategy
 
 1. Create `src/audio/` with new files first (additive)
+
 2. Keep old code working while building new layer
+
 3. Update Alda to use new layer, verify tests pass
+
 4. Update Joy to use new layer, verify tests pass
+
 5. Remove old `joy_midi_backend.c`
+
 6. Clean up any remaining `alda_*` naming in audio layer
 
 ## Risk Assessment
 
 - **Medium risk**: Significant refactor touching many files
+
 - **Mitigation**: Incremental migration with tests at each step
+
 - **Rollback**: Git allows easy revert if issues arise

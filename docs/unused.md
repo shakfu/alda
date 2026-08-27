@@ -49,8 +49,11 @@ This document catalogs unused functions, variables, and parameters that generate
 ## Resolution Options
 
 1. **Keep as-is**: Code is used conditionally or planned for future use
+
 2. **Add `__attribute__((unused))`**: Silence warning while keeping code
+
 3. **Guard with `#ifdef`**: For conditionally compiled features
+
 4. **Remove**: If confirmed unused
 
 ## Third-Party Warnings (Not Addressable)
@@ -58,9 +61,13 @@ This document catalogs unused functions, variables, and parameters that generate
 These warnings come from vendored dependencies in `source/thirdparty/`:
 
 - **libuv**: VLA folded to constant array (3 warnings)
+
 - **TinySoundFont**: Null pointer subtraction (40+ warnings)
+
 - **miniaudio**: C23 extension attributes (3 warnings)
+
 - **libremidi**: Typedef redefinition (1 warning)
+
 - **midifile**: CMake deprecation warning
 
 ---

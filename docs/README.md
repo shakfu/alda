@@ -67,11 +67,17 @@ Best for: Generative music, pattern-based rhythms, live coding with named slots.
 All languages share:
 
 - **Non-blocking async playback** - REPLs remain responsive during playback
+
 - **Virtual MIDI ports** - Create named ports for routing to DAWs
+
 - **Built-in synthesis** - TinySoundFont for standalone playback
+
 - **Csound backend** - Advanced synthesis (optional build)
+
 - **Ableton Link** - Tempo sync with other applications
+
 - **Editor integration** - Syntax highlighting and live evaluation
+
 - **Lua scripting** - Automation and customization
 
 ## Directory Structure
@@ -98,9 +104,13 @@ docs/
 1. **Install**: Build psnd with `make` (or `make csound` for Csound support)
 
 2. **Choose a language**: Pick based on your preferred paradigm
+
    - Notation-based? Try **Alda**
+
    - Stack-based/functional? Try **Joy**
+
    - Lisp fan? Try **TR7 Scheme**
+
    - Logic programming/live coding? Try **Bog**
 
 3. **Start the REPL**:
@@ -155,5 +165,7 @@ See individual language guides for language-specific commands.
 ## Further Reading
 
 - [Project README](../README.md) - Full project overview
+
 - [CHANGELOG](../CHANGELOG.md) - Version history
+
 - [CLAUDE.md](../CLAUDE.md) - Development guidelines

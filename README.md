@@ -5,9 +5,13 @@
 Five languages are currently supported:
 
 - **[Alda](https://alda.io)** - Declarative music notation language
+
 - **[Joy](https://github.com/shakfu/midi-langs/tree/main/projects/joy-midi)** - Concatenative (stack-based) functional language for music
+
 - **[TR7](https://gitlab.com/jobol/tr7)** - R7RS-small Scheme with music extensions
+
 - **[Bog](https://github.com/shakfu/bog)** - C implementation of [dogalog](https://github.com/danja/dogalog), a prolog-based beats-oriented language for music
+
 - **[MHS](https://github.com/augustss/MicroHs)** - Micro Haskell with MIDI support for functional music programming
 
 All are practical for daily live-coding, REPL sketches, and headless playback. The Alda and Joy MIDI cores are from the [midi-langs](https://github.com/shakfu/midi-langs) project. Languages register themselves via a modular dispatch system, allowing additional DSLs to be integrated without modifying core dispatch logic. Audio output is handled by the built-in [TinySoundFont](https://github.com/schellingb/TinySoundFont) synthesizer or, optionally, a [Csound](https://csound.com/) backend for advanced synthesis. macOS, Linux, and Windows are supported.
@@ -15,23 +19,41 @@ All are practical for daily live-coding, REPL sketches, and headless playback. T
 ## Features
 
 - **Vim-style editor** with INSERT/NORMAL modes, live evaluation shortcuts, and opt-in Lua scripting (built on [loki](https://github.com/shakfu/loki), a fork of [kilo](https://github.com/antirez/kilo))
+
 - **Split window support** with vim-style `Ctrl-W` commands for horizontal/vertical splits, pane navigation, and per-pane independent view state
+
 - **TOML configuration** via `.psnd/config.toml` for themes, keybindings, audio settings, and editor options
+
 - **Tree-sitter syntax highlighting** in REPLs with 17 TOML themes (monokai, dracula, nord, gruvbox, solarized, catppuccin, tokyo-night, kanagawa, and more) plus custom theme support via `.psnd/themes/`
+
 - **MIDI tracker/step sequencer** with terminal UI, plugin-based cell notation, and pattern looping
+
 - **Native webview mode** for a self-contained GUI window without requiring a browser (optional)
+
 - **Web-based editor** accessible via browser using xterm.js terminal emulator (optional)
+
 - **Language-aware REPLs** for interactive composition (Alda, Joy, TR7 Scheme, Bog, MHS)
+
 - **Headless play mode** for batch jobs and automation
+
 - **Non-blocking async playback** through [libuv](https://github.com/libuv/libuv) - REPLs remain responsive during playback
+
 - **Integrated MIDI routing** powered by [libremidi](https://github.com/celtera/libremidi)
+
 - **MIDI file export** using [midifile](https://github.com/craigsapp/midifile)
+
 - **TinySoundFont synthesizer** built on [miniaudio](https://github.com/mackron/miniaudio)
+
 - **Optional [Csound](https://csound.com/) backend** for deeper sound design workflows
+
 - **[Ableton Link](https://github.com/Ableton/link) support** for networked tempo sync (playback matches Link session tempo)
+
 - **[OSC (Open Sound Control)](http://opensoundcontrol.org/) support** for remote control and inter-application communication (optional)
+
 - **Parameter binding** for MIDI CC and OSC control of named parameters from physical controllers
+
 - **[Scala .scl](https://www.huygens-fokker.org/scala/scl_format.html) import support** for microtuning
+
 - **Lua APIs** (opt-in) for editor automation, playback control, and extensibility
 
 ## Status
@@ -97,9 +119,7 @@ Build presets select the synthesizer backend and optional features:
 | `make psnd-minihost` | `make minihost` | TinySoundFont + audio plugin host |
 | `make psnd-minihost-csound` | | TinySoundFont + plugin host + Csound |
 
-All of the above include MHS (Micro Haskell) by default - see the variants
-below for smaller builds. `make psnd-tsf` is the smallest of the *backend*
-choices, not the smallest binary overall.
+All of the above include MHS (Micro Haskell) by default - see the variants below for smaller builds. `make psnd-tsf` is the smallest of the *backend* choices, not the smallest binary overall.
 
 Utility targets:
 
@@ -125,6 +145,7 @@ Utility targets:
 **Synth backends** (mutually exclusive at compile time):
 
 - **TinySoundFont** - Lightweight SoundFont synthesizer, fast compilation
+
 - **FluidSynth** - Higher quality synthesis, more SoundFont features
 
 CMake options (for custom builds):
@@ -410,9 +431,13 @@ Then open `http://localhost:8080` in your browser.
 **Features:**
 
 - Full terminal emulation via xterm.js
+
 - Mouse click-to-position support
+
 - Language switching with `:alda`, `:joy`, `:langs` commands
+
 - First-line directives (`#alda`, `#joy`) for automatic language detection
+
 - All editor keybindings work as in terminal mode
 
 **Build requirement:** Web mode requires building with `-DBUILD_WEB_HOST=ON`.
@@ -431,9 +456,13 @@ psnd --native -sf gm.sf2 song.joy        # Native window with soundfont
 **Features:**
 
 - Same UI as web mode (xterm.js terminal emulation)
+
 - Play/Stop/Eval buttons in toolbar
+
 - All editor keybindings work as in terminal mode
+
 - Works completely offline
+
 - Clean window close handling
 
 **Build requirement:** Native webview mode requires building with `-DBUILD_WEBVIEW_HOST=ON`.
@@ -441,6 +470,7 @@ psnd --native -sf gm.sf2 song.joy        # Native window with soundfont
 **Platform dependencies:**
 
 - **macOS**: WebKit framework (always available)
+
 - **Linux**: GTK3 and WebKitGTK (`libgtk-3-dev libwebkit2gtk-4.0-dev`)
 
 ### Piped Input
@@ -505,8 +535,11 @@ tempo = 120              # Default tempo
 Lua scripting is disabled by default for security. To enable it, set `editor.lua.enabled = true` in your config.toml. When enabled:
 
 - `.psnd/init.lua` is loaded at startup
+
 - `Ctrl-L` opens the Lua console
+
 - Custom commands and keybindings via Lua are available
+
 - Full `loki.*` Lua API is accessible
 
 When Lua is disabled, core functionality (Alda, Joy, Bog, themes, keybindings, audio) works normally.
@@ -694,8 +727,11 @@ event(Voice, Pitch, Velocity, Time)
 ```
 
 - **Voice**: Sound source (`kick`, `snare`, `hat`, `clap`, `noise`, `sine`, `square`, `triangle`)
+
 - **Pitch**: MIDI note number (0-127) or ignored for drums
+
 - **Velocity**: Intensity (0.0-1.0)
+
 - **Time**: Beat time (bound by timing predicates)
 
 ### Timing Predicates
@@ -775,14 +811,16 @@ psnd mhs -oMyProg.c file.hs # Output C code only
 The MHS REPL provides full feature parity with other psnd languages:
 
 - **Syntax highlighting** for Haskell keywords, types, and MIDI primitives
+
 - **Tab completion** for 80+ Haskell keywords and MIDI functions
+
 - **History persistence** (`~/.psnd/mhs_history`)
+
 - **All shared commands** (`:help`, `:stop`, `:panic`, `:list`, `:sf`, `:link`, etc.)
+
 - **Ableton Link integration** for tempo sync
 
-**Architecture:** MicroHs runs in a forked child process with a pseudo-terminal (PTY).
-The parent process handles psnd's syntax-highlighted input and forwards Haskell code
-to MicroHs via the PTY. MIDI is initialized in the child process after fork.
+**Architecture:** MicroHs runs in a forked child process with a pseudo-terminal (PTY). The parent process handles psnd's syntax-highlighted input and forwards Haskell code to MicroHs via the PTY. MIDI is initialized in the child process after fork.
 
 ### Available Modules
 
@@ -872,9 +910,13 @@ The tracker uses a simple note notation language:
 The tracker is built with a modular plugin system:
 
 - **`tracker_model`** - Data structures (songs, patterns, tracks, cells)
+
 - **`tracker_plugin`** - Plugin system for notation languages
+
 - **`tracker_engine`** - Playback engine with event scheduling
+
 - **`tracker_view`** - View layer (theme, undo, clipboard, JSON)
+
 - **`tracker_audio`** - Audio integration with SharedContext
 
 ### API Example
@@ -923,8 +965,11 @@ alda> piano: c d e f g    # Plays at Link session tempo
 When Link is enabled:
 
 - Status bar shows "ALDA LINK" instead of "ALDA NORMAL"
+
 - **Playback tempo automatically syncs** with the Link session for all languages (Alda, Joy, TR7)
+
 - REPLs print notifications when tempo, peers, or transport state changes
+
 - Other Link-enabled apps (Ableton Live, etc.) share the same tempo
 
 ### Lua API
@@ -1033,7 +1078,9 @@ n.sendMsg("/psnd/eval", "piano: c d e f g");  // Evaluate code
 Send messages to `udp 127.0.0.1 7770`:
 
 - `/psnd/note 0 60 100` - Play middle C
+
 - `/psnd/tempo 120` - Set tempo
+
 - `/psnd/panic` - Stop all notes
 
 ### Lua API
@@ -1067,9 +1114,13 @@ osc.stop()
 Type auto-detection for `osc.send()` and `osc.send_to()`:
 
 - Lua integers become OSC int32 (`i`)
+
 - Lua floats become OSC float (`f`)
+
 - Lua strings become OSC string (`s`)
+
 - Lua booleans become OSC true/false (`T`/`F`)
+
 - Lua nil becomes OSC nil (`N`)
 
 ### Design Document
@@ -1280,6 +1331,7 @@ Export Alda compositions to Standard MIDI Files (.mid) for use in DAWs and other
 ### Quick Start
 
 1. Play some Alda code to generate events (Ctrl-E or Ctrl-P)
+
 2. Run `:export song.mid` to export
 
 ### Lua API
@@ -1295,7 +1347,9 @@ end
 ### Notes
 
 - Single-channel compositions export as Type 0 MIDI (single track)
+
 - Multi-channel compositions export as Type 1 MIDI (multiple tracks)
+
 - All events (notes, program changes, tempo, pan) are preserved
 
 ## Csound Synthesis
@@ -1407,16 +1461,25 @@ psnd provides built-in syntax highlighting for music programming languages with 
 CSD files contain multiple sections with different syntax. psnd detects these sections and applies appropriate highlighting:
 
 - **`<CsInstruments>`** - Full Csound orchestra highlighting:
+
   - Control flow (`if`, `then`, `else`, `endif`, `while`, `do`, `od`, `goto`)
+
   - Structure (`instr`, `endin`, `opcode`, `endop`)
+
   - Header variables (`sr`, `kr`, `ksmps`, `nchnls`, `0dbfs`, `A4`)
+
   - Common opcodes (`oscili`, `vco2`, `moogladder`, `pluck`, `reverb`, etc.)
+
   - Comments (`;` single-line, `/* */` block)
+
   - Strings and numbers
 
 - **`<CsScore>`** - Score statement highlighting:
+
   - Statement letters (`i`, `f`, `e`, `s`, `t`, etc.)
+
   - Numeric parameters
+
   - Comments
 
 - **`<CsOptions>`** - Command-line flag highlighting
@@ -1530,18 +1593,27 @@ The `.psnd/scales/` directory includes example scales:
 **Recent additions:**
 
 - Windows/MSVC native support with full cross-platform compatibility
+
 - Playback visualization with source line highlighting during playback
+
 - Link transport sync mode for synchronized playback with Link peers
+
 - Tempo tap and metronome commands for beat reference
+
 - Web-based editor using xterm.js terminal emulation
+
 - Mouse click-to-position support in web mode
+
 - Language switching commands in web REPL
 
 **Planned:**
 
 - Multi-client support for web mode (currently single connection)
+
 - Session persistence across server restarts
+
 - Beat-aligned playback with Ableton Link
+
 - Integrate additional MIDI DSLs from [midi-langs](https://github.com/shakfu/midi-langs)
 
 Feedback and experiments are welcome - polyglot support will be guided by real-world usage.
@@ -1593,21 +1665,37 @@ See the `docs` folder for full technical documentation.
 ## Credits
 
 - [Alda](https://alda.io) - music programming language by Dave Yarwood
+
 - [Joy](https://github.com/shakfu/midi-langs/tree/main/projects/joy-midi) - concatenative music language from midi-langs
+
 - [TR7](https://gitlab.com/jobol/tr7) - R7RS-small Scheme interpreter
+
 - [dogalog](https://github.com/danja/dogalog) - Prolog-based live coding inspiration for Bog
+
 - [MicroHs](https://github.com/augustss/MicroHs) - Small Haskell implementation by Lennart Augustsson
+
 - [kilo](https://github.com/antirez/kilo) by Salvatore Sanfilippo (antirez) - original editor
+
 - [loki](https://github.com/shakfu/loki) - Lua-enhanced fork
+
 - [Csound](https://csound.com/) - sound synthesis system (optional)
+
 - [link](https://github.com/Ableton/link) - Ableton Link
+
 - [midifile](https://github.com/craigsapp/midifile) - C++ library for reading/writing Standard MIDI Files
+
 - [libremidi](https://github.com/celtera/libremidi) - Modern C++ MIDI 1 / MIDI 2 real-time & file I/O library
+
 - [TinySoundFont](https://github.com/schellingb/TinySoundFont) - SoundFont2 synthesizer library in a single C/C++ file
+
 - [miniaudio](https://github.com/mackron/miniaudio) - Audio playback and capture library written in C, in a single source file
+
 - [mongoose](https://github.com/cesanta/mongoose) - Embedded web server/networking library (optional, for web mode)
+
 - [xterm.js](https://xtermjs.org/) - Terminal emulator for the browser (optional, for web mode)
+
 - [webview](https://github.com/webview/webview) - Cross-platform webview library (optional, for native webview mode)
+
 - [liblo](http://liblo.sourceforge.net/) - Lightweight OSC implementation (optional, for OSC support)
 
 ## License

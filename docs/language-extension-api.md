@@ -7,6 +7,7 @@ This guide explains how to add syntax highlighting support for new programming l
 The language system uses a **hybrid architecture**:
 
 - **Static layer** (C): Minimal keyword definitions for tests and markdown code blocks
+
 - **Dynamic layer** (Lua): Full language definitions with lazy loading
 
 Languages are defined in Lua files under `.psnd/languages/` and loaded on-demand when a matching file is opened.
@@ -92,11 +93,13 @@ loki.register_language({
 The `keywords` and `types` arrays are highlighted in different colors:
 
 - **Keywords**: Control flow, declarations, operators (typically bold or primary color)
+
 - **Types**: Type names, constants, special values (typically secondary color)
 
 This distinction helps readability. For example, in Alda:
 
 - Keywords: instrument names (`piano`, `violin`), attributes (`tempo`, `volume`)
+
 - Types: note names (`c`, `d`, `e`), octave markers (`o4`, `o5`)
 
 ## Separators
@@ -138,8 +141,11 @@ block_comment_end = ""
 Languages are loaded on-demand for performance. The system:
 
 1. Scans `.psnd/languages/` at startup
+
 2. Extracts extensions from each file (without full loading)
+
 3. Builds an extension-to-file mapping
+
 4. Loads the full definition only when a matching file is opened
 
 ### Language Module API
@@ -226,13 +232,17 @@ Some languages need custom highlighting beyond keyword matching. These are imple
 ### Markdown (`HL_TYPE_MARKDOWN`)
 
 - Header highlighting (`#`, `##`, `###`)
+
 - Code block detection with nested language highlighting
+
 - Link and emphasis detection
 
 ### Csound (`HL_TYPE_CSOUND`)
 
 - Multi-section format (`<CsOptions>`, `<CsInstruments>`, `<CsScore>`)
+
 - Section-specific syntax rules
+
 - Orchestra vs. score highlighting
 
 To use these, the language must be registered in the static C database with the appropriate type flag. Contact the maintainers to add new special types.
@@ -240,8 +250,11 @@ To use these, the language must be registered in the static C database with the 
 ## Testing Your Language
 
 1. Create your language file in `.psnd/languages/`
+
 2. Open a file with the matching extension
+
 3. Check syntax highlighting works correctly
+
 4. Use `:lua languages.reload("YourLang")` to hot-reload changes
 
 ### Debugging
@@ -256,16 +269,23 @@ To use these, the language must be registered in the static C database with the 
 ## Best Practices
 
 1. **Group related keywords**: Organize keywords logically (control flow, declarations, operators)
+
 2. **Use types for constants**: Built-in values, type names go in `types`
+
 3. **Test with real files**: Verify highlighting on actual code samples
+
 4. **Keep it minimal**: Only include commonly-used keywords
+
 5. **Document your language**: Add comments explaining the keyword choices
 
 ## Limitations
 
 - No semantic highlighting (requires language server)
+
 - No context-aware highlighting (all keywords match everywhere)
+
 - String detection is basic (no escape sequence handling)
+
 - No regex-based patterns (keyword matching only)
 
 For advanced features, consider integrating with Tree-sitter or LSP (future roadmap items).
@@ -275,7 +295,9 @@ For advanced features, consider integrating with Tree-sitter or LSP (future road
 To contribute a language definition:
 
 1. Create `.psnd/languages/<lang>.lua`
+
 2. Test thoroughly with sample files
+
 3. Submit a pull request
 
 See existing language files for reference implementations.

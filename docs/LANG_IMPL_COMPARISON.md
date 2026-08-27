@@ -31,13 +31,14 @@ This document compares the feature completeness of each language implementation 
 | Async playback | Yes | Yes | Yes | Yes | Partial |
 | SharedContext usage | Yes | Yes | Yes | Yes | Yes |
 
-\* MHS uses stdin pipe interposition - psnd's REPL runs in main thread, MicroHs in background thread.
-\** Piped input passes directly to MicroHs (no psnd command processing).
+\* MHS uses stdin pipe interposition - psnd's REPL runs in main thread, MicroHs in background thread. \** Piped input passes directly to MicroHs (no psnd command processing).
 
 ## Legend
 
 - **Yes**: Feature is fully implemented
+
 - **No**: Feature is missing
+
 - **Partial**: Feature exists but with limitations
 
 ## Architecture Notes
@@ -45,36 +46,51 @@ This document compares the feature completeness of each language implementation 
 ### Alda
 
 - Full-featured reference implementation
+
 - Custom parser, interpreter, and async scheduler
+
 - All REPL and editor features implemented
 
 ### Joy
 
 - Stack-based concatenative language
+
 - Full REPL with `repl_readline()` and shared commands
+
 - Complete editor integration with Lua API
 
 ### TR7
 
 - R7RS-small Scheme interpreter
+
 - Full REPL features but no editor Lua API
+
 - Music primitives added as Scheme procedures
 
 ### Bog
 
 - Prolog-based pattern language
+
 - Full REPL with slot management (`:def`, `:undef`, `:slots`)
+
 - Syntax highlighting for predicates, voices, scales, and chords
 
 ### MHS (Micro Haskell)
 
 - Wraps MicroHs interpreter with stdin pipe interposition
+
 - Has editor integration (Lua API)
+
 - Syntax highlighting for Haskell keywords, types, and MIDI primitives
+
 - CLI flags for MIDI setup (`--virtual`, `-sf`, `-p`, `-l`, `-v`)
+
 - Routes MIDI through SharedContext for TSF/Csound/Link support
+
 - Interactive REPL uses psnd's readline with syntax highlighting, completion, history
+
 - MicroHs runs in background thread, receives input via pipe
+
 - Full shared command support (`:help`, `:stop`, `:panic`, etc.)
 
 ## Implementation Details
@@ -185,26 +201,36 @@ typedef struct {
 } MhsReplArgs;
 ```
 
-MHS separates psnd flags from MicroHs flags, initializes SharedContext
-and MIDI based on the psnd flags, then passes remaining flags to MicroHs.
+MHS separates psnd flags from MicroHs flags, initializes SharedContext and MIDI based on the psnd flags, then passes remaining flags to MicroHs.
 
 ## MHS Implementation Status
 
 All major features have been implemented:
 
 1. **Completed**
+
    - ~~Add syntax highlighting (`lang_haskell.h`)~~ **DONE**
+
    - ~~Add CLI flags (`--virtual`, `-sf`, `-p`, `-l`, `-v`)~~ **DONE**
+
    - ~~SharedContext integration for TSF/Csound/Link~~ **DONE**
+
    - ~~Implement custom REPL loop with `repl_readline()`~~ **DONE** (PTY-based interposition)
+
    - ~~Add shared command processing~~ **DONE**
+
    - ~~Add tab completion for Haskell keywords~~ **DONE** (80+ keywords)
+
    - ~~Add history persistence~~ **DONE** (`~/.psnd/mhs_history`)
+
    - ~~Integrate Ableton Link callbacks~~ **DONE**
+
    - ~~Add language-specific help text~~ **DONE**
 
 2. **Remaining Limitations**
+
    - Piped input (non-TTY) passes directly to MicroHs without psnd command processing
+
    - MicroHs commands (`:type`, `:kind`, `:browse`) work but aren't intercepted by psnd
 
 ## MHS REPL Architecture
@@ -236,7 +262,9 @@ MicroHs's REPL is fundamentally different from Joy/TR7/Bog:
 ```
 
 1. `GETRAW` (C function) reads single characters in raw terminal mode
+
 2. `SimpleReadline.hs` accumulates characters, handles backspace/arrow keys
+
 3. `Interactive.hs` receives complete lines and evaluates them
 
 ### Options Analyzed
@@ -264,8 +292,11 @@ while ((line = repl_readline(...))) {
 **Why this doesn't work:**
 
 - MicroHs's `SimpleReadline.hs` calls `tcgetattr()` to configure terminal mode
+
 - Pipes aren't terminals, so `tcgetattr()` fails with errno 25 (ENOTTY)
+
 - Results in "tcgetattr failed: errno=25" and "getRaw failed" errors
+
 - MicroHs crashes instead of starting the REPL
 
 #### Option B: Custom GETRAW Function
@@ -283,7 +314,9 @@ int custom_getraw(void) {
 **Why this doesn't work:**
 
 - MicroHs expects immediate character returns
+
 - Buffering breaks the character-by-character contract
+
 - Would need to intercept at line level, not char level
 
 #### Option C: PTY Wrapper (Implemented)
@@ -302,8 +335,7 @@ if (child == 0) {
 // Parent: intercepts I/O through master fd
 ```
 
-**Pros:** Full terminal emulation, MicroHs's tcgetattr works on PTY
-**Cons:** Requires fork (not threads), MIDI must be initialized after fork
+**Pros:** Full terminal emulation, MicroHs's tcgetattr works on PTY **Cons:** Requires fork (not threads), MIDI must be initialized after fork
 
 #### Option D: Modify MicroHs Haskell Code
 
@@ -313,42 +345,45 @@ Add FFI bindings to psnd's readline in `SimpleReadline.hs`:
 foreign import ccall "psnd_readline" c_readline :: CString -> IO CString
 ```
 
-**Pros:** Clean integration, full feature support
-**Cons:** Invasive, creates maintenance burden with upstream MicroHs
+**Pros:** Clean integration, full feature support **Cons:** Invasive, creates maintenance burden with upstream MicroHs
 
 ### Implemented Approach: PTY-based Interposition
 
 The MHS REPL uses Option C (PTY wrapper), implemented in `source/langs/mhs/repl.c`:
 
 1. Detects interactive mode via `isatty(STDIN_FILENO)`
+
 2. Creates PTY and forks child process using `forkpty()`
+
 3. Child process initializes MIDI after fork (libremidi handles don't survive fork)
+
 4. Child runs MicroHs with the PTY slave as its terminal
+
 5. Parent runs psnd's `repl_readline()` for syntax-highlighted input
+
 6. Processes psnd commands locally via `shared_process_command()`
+
 7. Forwards non-commands to MicroHs via PTY master fd
+
 8. Non-blocking read from PTY to display MicroHs output
 
-**Why PTY instead of pipe:** MicroHs's `SimpleReadline.hs` uses `tcgetattr()` for
-terminal mode configuration. Pipes fail this check (errno 25: ENOTTY), causing
-"tcgetattr failed" and "getRaw failed" errors. A PTY provides a real terminal
-that satisfies these requirements.
+**Why PTY instead of pipe:** MicroHs's `SimpleReadline.hs` uses `tcgetattr()` for terminal mode configuration. Pipes fail this check (errno 25: ENOTTY), causing "tcgetattr failed" and "getRaw failed" errors. A PTY provides a real terminal that satisfies these requirements.
 
-**Why MIDI after fork:** libremidi handles use internal state that doesn't survive
-`fork()`. Initializing MIDI before fork causes the child's MIDI operations to
-silently fail. Moving MIDI initialization to the child process ensures working
-MIDI output.
+**Why MIDI after fork:** libremidi handles use internal state that doesn't survive `fork()`. Initializing MIDI before fork causes the child's MIDI operations to silently fail. Moving MIDI initialization to the child process ensures working MIDI output.
 
 Features provided:
 
 - Shared REPL commands (`:help`, `:stop`, `:panic`, `:list`, `:sf`, etc.)
+
 - Syntax-highlighted input (Haskell keywords, types, MIDI primitives)
+
 - Tab completion (80+ Haskell keywords and MIDI functions)
+
 - History persistence (`~/.psnd/mhs_history`)
+
 - Ableton Link callback polling
 
-Trade-off: MicroHs's own line editing is bypassed, but psnd's
-`repl_readline()` provides equivalent functionality.
+Trade-off: MicroHs's own line editing is bypassed, but psnd's `repl_readline()` provides equivalent functionality.
 
 ## File Locations
 

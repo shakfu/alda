@@ -295,5 +295,5 @@ Every phase must keep the full suite green (currently 75 tests).
    of forwarded arguments and decide whether a psnd flag appearing *after* `--` is forwarded
    rather than consumed. Current behaviour has no `--` concept, so this is new surface.
 
-4. **Whether to adopt argtable3 instead of layer 1.** Layer 2 is the load-bearing part of this
+4. **Whether to adopt argtable3 instead of layer 1.** Layer 2 is the structural part of this
    design and is independent of that choice.
