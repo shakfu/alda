@@ -12,7 +12,14 @@
 
 /* Program identity */
 #define PSND_NAME           "psnd"
-#define PSND_VERSION        "0.1.3"
+
+/* Version. The build system defines this from project(VERSION ...) in the
+ * top-level CMakeLists.txt, which is the single source of truth. The literal
+ * below is only a fallback for compiling these sources outside CMake; keep it
+ * in sync with the project() version. */
+#ifndef PSND_VERSION
+#define PSND_VERSION        "0.2.1"
+#endif
 
 /* Configuration */
 #define PSND_CONFIG_DIR     ".psnd"

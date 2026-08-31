@@ -17,7 +17,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Security
+
+- **Web host bound to all interfaces without authentication**: `--web` now binds `127.0.0.1` by default and requires a random per-session token (printed in the startup URL) on `/ws` and the `/api` endpoints. Exposing the editor on the network is now an explicit opt-in via the new `--web-host ADDR` flag, which prints a warning. Previously the server listened on `0.0.0.0` with no authentication, giving any host on the network file access and code execution (`host_web.c`)
+- **Cross-site WebSocket hijacking**: WebSocket handshakes carrying a foreign `Origin` are now rejected. Any web page the user visited could previously connect to `ws://localhost:8080` and drive the editor (`host_web.c`)
+- **Lua sandbox off by default with the web host**: `LUA_SANDBOX` now defaults to `ON` whenever `BUILD_WEB_HOST=ON`, and configuring it `OFF` in that combination emits a warning. Unsandboxed Lua exposes `os.execute` to anything that reaches the server (`CMakeLists.txt`)
+
 ### Fixed
+
+- **Tracker MIDI Export Buffer Overflow**: deriving the `.mid` output path from a long file path wrote past the end of a 256-byte stack buffer via `strcat`/`strcpy` after `snprintf` had already filled it. Both the `Export MIDI` key action and the `:export` command now use a single bounds-checked `derive_midi_path()` helper and report an error instead of overflowing. The `:export <name>` path also no longer leaves the buffer unterminated on a 255+ byte argument (`tracker_view.c`)
+- **Parallel Build Race in MHS**: `make -j` failed nondeterministically because the `mhs-embed` tool, `base.pkg` and `music.pkg` custom commands were duplicated into every consuming target's makefile and run concurrently over the same output paths (`Error 126`, or a failed `copy_directory` into `build/mhs-base-src`). Each shared step now has a single owning target that consumers order behind (`source/langs/mhs/CMakeLists.txt`)
+- **REPL History Recall (remaining paths)**: the `ARROW_DOWN` branch in `repl_line_editor.c` and both branches of the fallback editor in `core/repl.c` still used unbounded `strcpy`; all are now bounded to `REPL_MAX_INPUT_LENGTH`, matching the `ARROW_UP` fix
+- **Themes, Languages and Scales Not Installed**: `install()` matched only `*.lua`, so `cmake --install` shipped none of the 17 `.psnd/themes/*.toml`, `.psnd/languages/*.toml` or `.psnd/scales/*.scl` files despite them being advertised features (`CMakeLists.txt`)
+- **Stale CMake Cache Across Build Variants**: each `configure-*` Makefile target now states the full option set, so switching variants in place (e.g. `make csound` then `make`) no longer silently inherits the previous variant's options. `configure-*` targets are also declared `.PHONY`
+- **Out-of-Tree Test Fixtures**: `alda_microtuning_tests` hardcoded a data path relative to an in-tree `./build`, and `test_csound_microtuning.c` pointed at the pre-reorganization `tests/alda/data`. `TEST_DATA_DIR` is now supplied by CMake as an absolute path
+
+### Changed
+
+- **CI runs on push and pull request again**: the Linux and macOS workflow had its `push`/`pull_request` triggers commented out, leaving Windows as the only gated platform, and it never ran `ctest`. Both jobs now configure with `-DBUILD_TESTING=ON` and run the suite; the full variant matrix runs nightly
+- **Version single source of truth**: `project(psnd_project VERSION ...)` now feeds `PSND_VERSION`, which had drifted to `0.1.3` while the newest tag was `0.2.1`. CPack picks it up as well
+- **`BUILD_FLUID_BACKEND` declared**: the option was used in five files and passed by CI and the Makefile, but never declared with `option()`, so it was invisible to `ccmake`/`cmake-gui`
+
+### Removed
+
+- **Seven dead CMake modules**: `psnd_alda_library.cmake`, `psnd_bog_library.cmake`, `psnd_joy_library.cmake`, `psnd_loki_library.cmake`, `psnd_shared_library.cmake`, `psnd_psnd_binary.cmake` and `psnd_tests.cmake` were never `include()`d — their contents had been inlined into `source/core/CMakeLists.txt` and the copies had begun to drift. `docs/new_lang.md` still instructed contributors to edit three of them
 
 - **Alda Parser EOF Safety**: `peek()` now returns a static EOF sentinel token instead of NULL, eliminating a class of NULL pointer dereference bugs when parsing truncated or malformed input (lines 288, 534 of `parser.c`)
 - **Joy Dictionary SEQ Leak**: `joy_dict_set()` now frees sequence (SEQ) definitions when replacing an existing word, matching the cleanup logic already present in `joy_dict_remove()`

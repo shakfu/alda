@@ -10,6 +10,11 @@ macro(add_alda_test TEST_NAME)
     target_include_directories(test_alda_${TEST_NAME} PRIVATE
         ${PSND_ROOT_DIR}/source/testing
     )
+    # Absolute path to the test fixtures, so tests work from any build
+    # directory rather than only an in-tree ./build.
+    target_compile_definitions(test_alda_${TEST_NAME} PRIVATE
+        TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
+    )
     add_test(
         NAME alda_${TEST_NAME}_tests
         COMMAND $<TARGET_FILE:test_alda_${TEST_NAME}>

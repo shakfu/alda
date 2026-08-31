@@ -1,5 +1,21 @@
 # Architecture Review – Replacing the Terminal Editor with a Web Editor
 
+> **HISTORICAL — describes the pre-`host.h` codebase. Superseded.**
+>
+> This review was written against the old `src/` layout (now `source/core/`) and
+> its central finding — that there was no abstraction a non-terminal front-end
+> could reuse — has since been addressed:
+>
+> - `source/core/loki/host.h` defines the `EditorHost` interface
+>   (`read_event` / `render` / `should_continue` / `destroy`).
+> - `source/core/loki/session.h` provides the headless session API the review
+>   asked for, with `editor_session_snapshot()` feeding a ViewModel to any host.
+> - Three hosts implement it today: terminal (`host.c`), web
+>   (`host_web.c`, mongoose + xterm.js) and native webview (`host_webview.cpp`).
+>
+> The file paths cited below no longer exist. Kept for the rationale that led to
+> the host abstraction; do not use it as a description of the current design.
+
 ## Context
 
 psnd combines a terminal-first modal editor (Loki), polyglot language runtimes, and a shared audio/MIDI backend. The request is to evaluate how the current architecture affects the feasibility of swapping the terminal UI with a web-based editor and to highlight code or structural changes that would improve decoupling.

@@ -34,6 +34,8 @@ void editor_cli_print_usage(void) {
     printf("\nWeb Server Mode:\n");
     printf("  --web               Run as web server (browser-based editing)\n");
     printf("  --web-port N        Web server port (default: 8080)\n");
+    printf("  --web-host ADDR     Web server bind address (default: 127.0.0.1)\n");
+    printf("                      Use 0.0.0.0 to expose on the network (unsafe)\n");
     printf("  --web-root PATH     Directory containing web UI files\n");
 #endif
 #ifdef LOKI_WEBVIEW_HOST
@@ -193,6 +195,16 @@ int editor_cli_parse(int argc, char **argv, EditorCliArgs *args) {
                 fprintf(stderr, "Error: --web-port must be between 1 and 65535\n");
                 return -1;
             }
+            continue;
+        }
+
+        /* Web server bind address */
+        if (strcmp(arg, "--web-host") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "Error: --web-host requires an address argument\n");
+                return -1;
+            }
+            args->web_host = argv[++i];
             continue;
         }
 

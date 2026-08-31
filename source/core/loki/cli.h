@@ -25,6 +25,7 @@ typedef struct {
     const char *plugin_path;    /* Path to VST3/AU plugin (--plugin) */
     const char *plugin_log;     /* Path to plugin debug log (--plugin-log) */
     const char *web_root;       /* Web UI directory for web mode (--web-root) */
+    const char *web_host;       /* Web server bind address (--web-host, default 127.0.0.1) */
     int show_help;              /* User requested help (-h, --help) */
     int show_version;           /* User requested version (-v, --version) */
     int line_numbers;           /* Enable line numbers (--line-numbers) */

@@ -4,14 +4,16 @@ This directory contains documentation for psnd, a polyglot editor and REPL for m
 
 ## Language Guides
 
-psnd supports four music programming languages, each with its own paradigm:
+psnd supports five music programming languages, each with its own paradigm.
+Each language's guide lives beside its source:
 
 | Language | Paradigm | Guide |
 |----------|----------|-------|
-| [Alda](alda/) | Declarative music notation | [alda/README.md](alda/README.md) |
-| [Joy](joy/) | Concatenative (stack-based) | [joy/README.md](joy/README.md) |
-| [TR7 Scheme](tr7/) | Functional (Lisp/Scheme) | [tr7/README.md](tr7/README.md) |
-| [Bog](bog/) | Logic programming (Prolog-based) | [bog/README.md](bog/README.md) |
+| Alda | Declarative music notation | [source/langs/alda/README.md](../source/langs/alda/README.md) |
+| Joy | Concatenative (stack-based) | [source/langs/joy/README.md](../source/langs/joy/README.md) |
+| TR7 Scheme | Functional (Lisp/Scheme) | [source/langs/tr7/README.md](../source/langs/tr7/README.md) |
+| Bog | Logic programming (Prolog-based) | [source/langs/bog/README.md](../source/langs/bog/README.md) |
+| MHS | Functional (Micro Haskell) | [source/langs/mhs/README.md](../source/langs/mhs/README.md) |
 
 ## Quick Comparison
 
@@ -78,19 +80,21 @@ All languages share:
 
 ```text
 docs/
-  README.md           # This file
-  alda/
-    README.md         # Alda language guide
-    examples.md       # Alda code examples
-    alda-language/    # Official Alda documentation reference
-  joy/
-    README.md         # Joy language guide
-  tr7/
-    README.md         # TR7 Scheme guide
-  bog/
-    README.md         # Bog language guide
-    overview.md       # Bog architecture details
-  _dev/               # Developer documentation
+  README.md                  # This file
+  cheatsheet.md              # Editor key bindings
+  cheatsheet-tracker.md      # Tracker key bindings
+  new_lang.md                # How to add a language
+  language-extension-api.md  # LokiLangOps / editor integration API
+  LANG_IMPL_COMPARISON.md    # How the languages are implemented
+  psnd_osc.md                # OSC control surface
+  scsynth.md                 # SuperCollider notes
+  refactor.md                # Refactoring notes
+  design_review.md           # Historical architecture review
+  unused.md                  # Dead code notes
+  csound/                    # Csound backend documentation
+  licenses/                  # Third-party license texts
+
+source/langs/<name>/README.md  # Per-language guides
 ```
 
 ## Getting Started

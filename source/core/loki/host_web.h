@@ -29,12 +29,18 @@ extern "C" {
  * - Translates JSON-RPC commands to EditorEvents
  * - Broadcasts ViewModel snapshots to connected clients
  *
+ * Access control: a random per-session token is generated at creation and
+ * required on /ws and on the /api endpoints; WebSocket handshakes must also be same-origin.
+ *
+ * @param bind_addr Address to bind (NULL or empty for "127.0.0.1"). Use
+ *                  "0.0.0.0" only to deliberately expose the editor.
  * @param port      Port to listen on (e.g., 8080)
  * @param web_root  Directory containing static web files (index.html, etc.)
  *                  If NULL, uses embedded minimal UI
  * @return Host instance, or NULL on error
  */
-EditorHost *editor_host_web_create(int port, const char *web_root);
+EditorHost *editor_host_web_create(const char *bind_addr, int port,
+                                   const char *web_root);
 
 /**
  * Get the port the web host is listening on.
@@ -52,12 +58,14 @@ int editor_host_web_get_port(EditorHost *host);
  * This is a convenience function that creates a session and runs until
  * the session quits or an error occurs. It prints the URL to stdout.
  *
+ * @param bind_addr Address to bind (NULL or empty for "127.0.0.1")
  * @param port      Port to listen on
  * @param web_root  Static file directory (NULL for embedded UI)
  * @param config    Session configuration
  * @return Exit code (0 on success)
  */
-int editor_host_web_run(int port, const char *web_root, const EditorConfig *config);
+int editor_host_web_run(const char *bind_addr, int port, const char *web_root,
+                        const EditorConfig *config);
 
 #endif /* LOKI_WEB_HOST */
 

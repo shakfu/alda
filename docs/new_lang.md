@@ -17,19 +17,24 @@ Use the generator script to create all boilerplate:
 ./scripts/new_lang.py baz --dry-run
 ```
 
-The script generates:
+The script generates everything under `source/langs/<name>/`:
 
-- `src/lang/<name>/` - Register, REPL, and dispatch files
-- `scripts/cmake/psnd_<name>_library.cmake` - CMake configuration
-- `tests/<name>/` - Test scaffolding
-- `docs/<name>/README.md` - Documentation template
-- `.psnd/languages/<name>.lua` - Syntax highlighting
+- `CMakeLists.txt` - build config, including the `psnd_register_language()` call
+- `register.c`, `repl.c`, `dispatch.c` - editor, REPL and CLI integration
+- `impl/` - parser and runtime skeletons
+- `tests/` - test scaffolding (`CMakeLists.txt`, `test_parser.c`)
+- `README.md` - documentation template
+- `examples/` - a sample program
 
-It also updates `lang_config.h`, `lang_dispatch.c`, and CMake files automatically.
+plus `.psnd/languages/<name>.lua` for syntax highlighting.
+
+No other file is modified: `lang_config_generated.h` and
+`lang_dispatch_generated.h` are produced at configure time by auto-discovery,
+and there is no central CMake list to update.
 
 After running the script:
 
-1. Implement your language in `src/lang/<name>/impl/`
+1. Implement your language in `source/langs/<name>/impl/`
 2. Update the CMake library file with your sources
 3. Run `make clean && make test` to verify
 
@@ -39,11 +44,11 @@ The rest of this document explains the generated code structure in detail.
 
 psnd uses a language bridge pattern that allows music languages to integrate with both the editor and standalone REPL without coupling core code to specific implementations. Each language:
 
-1. Lives in its own directory under `src/lang/<langname>/`
+1. Lives in its own directory under `source/langs/<langname>/`
 2. Implements the `LokiLangOps` interface for editor integration
 3. Provides a standalone REPL with shared command handling
 4. Uses `SharedContext` for MIDI, audio, and Link integration
-5. Registers itself via `src/lang_config.h` (single file for all language configuration)
+5. Registers itself via `source/core/lang_config.h` (single file for all language configuration)
 6. Optionally provides Lua API bindings for scripting
 
 ## Directory Structure
@@ -51,7 +56,7 @@ psnd uses a language bridge pattern that allows music languages to integrate wit
 For a language called "example", create:
 
 ```text
-src/lang/example/
+source/langs/example/
     register.c         # Editor integration (LokiLangOps)
     register.h         # Header declaring init function
     repl.c             # Standalone REPL implementation
@@ -76,10 +81,10 @@ docs/example/
 
 ### Core Implementation
 
-Create your language's core implementation in `src/lang/example/impl/`:
+Create your language's core implementation in `source/langs/example/impl/`:
 
 ```c
-/* src/lang/example/impl/example_runtime.c */
+/* source/langs/example/impl/example_runtime.c */
 
 #include "example_runtime.h"
 
@@ -111,30 +116,66 @@ int example_eval(ExampleContext *ctx, const char *code) {
 
 ### CMake Library
 
-Create `scripts/cmake/psnd_example_library.cmake`:
+Create `source/langs/example/CMakeLists.txt`. Languages are auto-discovered by
+`scripts/cmake/psnd_languages.cmake`, which globs `source/langs/*/CMakeLists.txt`
+and generates the dispatch and config headers. **No other build file needs to be
+touched** — there is no central list to register in.
 
 ```cmake
-include_guard(GLOBAL)
+# Example language
+#
+# This CMakeLists.txt is processed by psnd_languages.cmake auto-discovery.
+# No modifications to other files are needed to add/remove this language.
 
 set(EXAMPLE_SOURCES
-    ${PSND_ROOT_DIR}/src/lang/example/impl/example_runtime.c
-    ${PSND_ROOT_DIR}/src/lang/example/impl/example_parser.c
-    # Add more source files
+    ${CMAKE_CURRENT_SOURCE_DIR}/impl/example_runtime.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/impl/example_parser.c
 )
 
 add_library(example STATIC ${EXAMPLE_SOURCES})
+add_library(example::example ALIAS example)
 
-target_include_directories(example PUBLIC
-    ${PSND_ROOT_DIR}/src/lang/example/impl
-    ${PSND_ROOT_DIR}/src/lang/example/include
+target_include_directories(example
+    PUBLIC
+        ${PSND_ROOT_DIR}/source/core/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/impl
+    PRIVATE
+        ${PSND_ROOT_DIR}/source/core/shared
 )
 
-target_link_libraries(example PRIVATE shared)
+target_link_libraries(example PUBLIC shared)
+
+psnd_platform_add_math(example PUBLIC)
+psnd_platform_add_warnings(example)
+
+target_compile_definitions(example PUBLIC LANG_EXAMPLE)
+
+# Register with the psnd language system. This is what wires the language into
+# CLI dispatch, the editor, and the generated headers.
+psnd_register_language(
+    NAME example
+    DISPLAY_NAME "Example"
+    DESCRIPTION "Example music language"
+    COMMANDS example ex
+    EXTENSIONS .ex .example
+    SOURCES ${EXAMPLE_SOURCES}
+    INCLUDE_DIRS
+        ${CMAKE_CURRENT_SOURCE_DIR}/impl
+    REPL_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/repl.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/dispatch.c
+    REGISTER_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/register.c
+    LINK_LIBRARIES example
+)
 ```
+
+Auto-discovery also creates a `LANG_EXAMPLE` CMake option (default `ON`), so the
+language can be excluded with `-DLANG_EXAMPLE=OFF`.
 
 ## Step 2: Implement the REPL
 
-Create `src/lang/example/repl.c`:
+Create `source/langs/example/repl.c`:
 
 ```c
 /**
@@ -381,7 +422,7 @@ int example_repl_main(int argc, char **argv) {
 }
 ```
 
-Create `src/lang/example/repl.h`:
+Create `source/langs/example/repl.h`:
 
 ```c
 #ifndef EXAMPLE_REPL_H
@@ -394,7 +435,7 @@ int example_repl_main(int argc, char **argv);
 
 ## Step 3: Create the Dispatch Handler
 
-Create `src/lang/example/dispatch.c`:
+Create `source/langs/example/dispatch.c`:
 
 ```c
 /**
@@ -412,7 +453,7 @@ int example_dispatch(int argc, char **argv) {
 
 ## Step 4: Implement Editor Integration (LokiLangOps)
 
-Create `src/lang/example/register.h`:
+Create `source/langs/example/register.h`:
 
 ```c
 #ifndef EXAMPLE_REGISTER_H
@@ -427,7 +468,7 @@ void example_loki_lang_init(void);
 #endif
 ```
 
-Create `src/lang/example/register.c`:
+Create `source/langs/example/register.c`:
 
 ```c
 /**
@@ -684,10 +725,10 @@ void example_loki_lang_init(void) {
 
 ## Step 5: Add Language Configuration
 
-Add your language to `src/lang_config.h`. This file centralizes **all** language-specific declarations, so you only need to modify this one file:
+Add your language to `source/core/lang_config.h`. This file centralizes **all** language-specific declarations, so you only need to modify this one file:
 
 ```c
-/* In src/lang_config.h */
+/* In source/core/lang_config.h */
 
 /* 1. Add helper macro */
 #ifdef LANG_EXAMPLE
@@ -721,93 +762,104 @@ IF_LANG_EXAMPLE(void example_loki_lang_init(void);)
 
 No other core files need modification.
 
-## Step 6: Update CMake Build Files
+## Step 6: Build Integration
 
-### Add language option to CMakeLists.txt
+Nothing to do. `psnd_register_language()` in your `source/langs/example/CMakeLists.txt`
+(Step 1) is the whole of the build integration.
 
-```cmake
-option(LANG_EXAMPLE "Include the Example language" ON)
+At configure time `psnd_languages.cmake` discovers the directory, honours the
+`LANG_EXAMPLE` option, and generates:
 
-if(LANG_EXAMPLE)
-    include(psnd_example_library)
-endif()
+- `build/generated/lang_config_generated.h`
+- `build/generated/lang_dispatch_generated.h`
+
+Confirm your language was picked up:
+
+```console
+$ cmake -S . -B build
+-- Discovered language: example
+--   Registered: example (Example)
+-- Generated: .../build/generated/lang_config_generated.h
+-- Generated: .../build/generated/lang_dispatch_generated.h
 ```
 
-### Update psnd_loki_library.cmake
+## Step 7: CLI Dispatch
 
-Add to the language sources section:
+CLI dispatch is generated from the `COMMANDS` and `EXTENSIONS` you passed to
+`psnd_register_language()`. `source/core/main.c` walks the registry in
+`source/core/lang_dispatch.h` and never names individual languages, so there is
+no dispatch file to edit.
 
-```cmake
-if(LANG_EXAMPLE)
-    list(APPEND LOKI_LANG_SOURCES ${PSND_ROOT_DIR}/src/lang/example/register.c)
-endif()
-```
-
-Add to the library linking section:
-
-```cmake
-if(LANG_EXAMPLE)
-    list(APPEND LOKI_PUBLIC_LIBS example)
-    target_compile_definitions(libloki PUBLIC LANG_EXAMPLE=1)
-endif()
-```
-
-### Update psnd_psnd_binary.cmake
-
-Add to the REPL/dispatch sources:
-
-```cmake
-if(LANG_EXAMPLE)
-    list(APPEND PSND_LANG_SOURCES
-        ${PSND_ROOT_DIR}/src/lang/example/repl.c
-        ${PSND_ROOT_DIR}/src/lang/example/dispatch.c
-    )
-endif()
-```
-
-## Step 7: Add CLI Dispatch
-
-Update `src/lang_dispatch.c`:
+What you do provide is the entry point the registry calls. In
+`source/langs/example/dispatch.c`:
 
 ```c
-#ifdef LANG_EXAMPLE
-#include "lang/example/repl.h"
-#endif
+#include "lang_dispatch.h"
+#include "repl.h"
 
-int lang_dispatch(const char *lang, int argc, char **argv) {
-    /* ... existing dispatches ... */
+static const LangDispatchEntry example_entry = {
+    .commands     = { "example", "ex" },
+    .command_count = 2,
+    .extensions   = { ".ex", ".example" },
+    .extension_count = 2,
+    .display_name = "Example",
+    .description  = "Example music language",
+    .repl_main    = example_repl_main,
+    .play_main    = example_play_main,  /* optional; NULL if unsupported */
+};
 
-#ifdef LANG_EXAMPLE
-    if (strcmp(lang, "example") == 0 || strcmp(lang, "ex") == 0) {
-        return example_repl_main(argc, argv);
-    }
-#endif
-
-    return -1;  /* Unknown language */
+void lang_dispatch_init_example(void) {
+    lang_dispatch_register(&example_entry);
 }
 ```
 
+The generated `lang_dispatch_generated.h` declares and calls
+`lang_dispatch_init_example()` for you.
+
 ## Step 8: Add Tests
 
-Create `tests/example/CMakeLists.txt`:
+Create `source/langs/example/tests/CMakeLists.txt`. Test directories are
+auto-discovered too: `psnd_languages.cmake` adds `source/langs/<name>/tests/`
+for every registered language that has one, so there is no central test list to
+update.
 
 ```cmake
 # Example language tests
 
-add_executable(test_example_parser test_parser.c)
-target_link_libraries(test_example_parser PRIVATE example test_framework)
-target_include_directories(test_example_parser PRIVATE
-    ${PSND_ROOT_DIR}/src/lang/example/impl
-    ${PSND_ROOT_DIR}/tests
-)
-add_test(NAME example_parser COMMAND test_example_parser)
-set_tests_properties(example_parser PROPERTIES LABELS "unit")
+macro(add_example_test TEST_NAME)
+    add_executable(test_example_${TEST_NAME} test_${TEST_NAME}.c)
+    target_link_libraries(test_example_${TEST_NAME} PRIVATE example test_framework)
+    target_include_directories(test_example_${TEST_NAME} PRIVATE
+        ${PSND_ROOT_DIR}/source/langs/example/impl
+        ${PSND_ROOT_DIR}/source/testing
+    )
+    if(UNIX)
+        target_link_libraries(test_example_${TEST_NAME} PRIVATE m)
+    endif()
+    add_test(
+        NAME example_${TEST_NAME}
+        COMMAND $<TARGET_FILE:test_example_${TEST_NAME}>
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    set_tests_properties(example_${TEST_NAME} PROPERTIES LABELS "unit")
+endmacro()
+
+add_example_test(parser)
 ```
 
-Create `tests/example/test_parser.c`:
+If a test reads fixture files, pass their location as an absolute path from
+CMake rather than hardcoding a path relative to the build directory:
+
+```cmake
+target_compile_definitions(test_example_${TEST_NAME} PRIVATE
+    TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
+)
+```
+
+Create `source/langs/example/tests/test_parser.c`:
 
 ```c
-#include "../test_framework.h"
+#include "test_framework.h"
 #include "example_parser.h"
 
 TEST(test_parse_simple) {
@@ -815,22 +867,11 @@ TEST(test_parse_simple) {
     ASSERT_TRUE(1);
 }
 
-TEST_SUITE(example_parser_tests) {
-    RUN_TEST(test_parse_simple);
-}
-
 int main(void) {
-    RUN_SUITE(example_parser_tests);
-    return TEST_REPORT();
+    RUN_TEST(test_parse_simple);
+    TEST_SUMMARY();
+    return TEST_EXIT_CODE();
 }
-```
-
-Add to `scripts/cmake/psnd_tests.cmake`:
-
-```cmake
-if(LANG_EXAMPLE)
-    add_subdirectory(${PSND_ROOT_DIR}/tests/example ${CMAKE_BINARY_DIR}/tests/example)
-endif()
 ```
 
 ## Step 9: Add Documentation
@@ -848,7 +889,7 @@ See existing documentation in `docs/alda/`, `docs/joy/`, `docs/tr7/`, or `docs/b
 
 ## Step 10: Add Syntax Highlighting (Optional)
 
-Create `.psnd/languages/example.lua`:
+Create `.psnd/languages/example.toml`:
 
 ```lua
 loki.register_language({
@@ -903,7 +944,7 @@ typedef struct LokiLangOps {
 
 ### SharedContext
 
-The `SharedContext` from `src/shared/` provides unified MIDI, audio, and Link access:
+The `SharedContext` from `source/core/shared/` provides unified MIDI, audio, and Link access:
 
 ```c
 /* MIDI */
@@ -928,17 +969,17 @@ double shared_link_tempo(SharedContext *ctx);
 
 | File | Purpose |
 |------|---------|
-| `src/lang_config.h` | **Modify this for new languages** - state fields, forward decls, init calls |
-| `src/shared/context.h` | Shared MIDI/audio context |
-| `src/shared/repl_commands.h` | Common REPL command handling |
-| `src/lang/alda/register.c` | Reference: Alda integration |
-| `src/lang/joy/register.c` | Reference: Joy integration |
-| `src/lang/tr7/register.c` | Reference: TR7 integration |
-| `src/lang/bog/register.c` | Reference: Bog integration |
+| `source/core/lang_config.h` | **Modify this for new languages** - state fields, forward decls, init calls |
+| `source/core/shared/context.h` | Shared MIDI/audio context |
+| `source/core/shared/repl_commands.h` | Common REPL command handling |
+| `source/langs/alda/register.c` | Reference: Alda integration |
+| `source/langs/joy/register.c` | Reference: Joy integration |
+| `source/langs/tr7/impl/repl.c` | Reference: TR7 integration |
+| `source/langs/bog/register.c` | Reference: Bog integration |
 
 ## Tips
 
-1. **Use existing languages as reference** - Study `src/lang/joy/` or `src/lang/bog/` for well-structured examples
+1. **Use existing languages as reference** - Study `source/langs/joy/` or `source/langs/bog/` for well-structured examples
 
 2. **Keep state per-context** - Store language state in `ctx->model.<lang>_state`, not globals (except for REPL mode)
 

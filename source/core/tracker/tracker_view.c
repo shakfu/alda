@@ -24,6 +24,41 @@ static char* str_dup(const char* s) {
     return copy;
 }
 
+/**
+ * Derive a ".mid" output path from a source path.
+ *
+ * Replaces the source's extension with ".mid", or appends ".mid" when it has
+ * none. The whole result must fit in `out_sz` including the terminator; a
+ * source path that is too long is rejected rather than truncated, since a
+ * truncated path would silently name the wrong file.
+ *
+ * @param src    Source path (must not be NULL)
+ * @param out    Destination buffer
+ * @param out_sz Size of `out` in bytes
+ * @return       true if the path was written, false if it would not fit
+ */
+static bool derive_midi_path(const char* src, char* out, size_t out_sz) {
+    static const char kExt[] = ".mid";
+    const size_t kExtLen = sizeof(kExt) - 1;
+
+    if (!src || !out || out_sz == 0) return false;
+
+    /* Length of src up to (excluding) its extension, if any. Only a dot in the
+     * final path component counts, so "a.b/song" is not treated as having
+     * extension "b/song". */
+    size_t stem_len = strlen(src);
+    const char* dot = strrchr(src, '.');
+    if (dot && !strpbrk(dot, "/\\")) {
+        stem_len = (size_t)(dot - src);
+    }
+
+    if (stem_len + kExtLen + 1 > out_sz) return false;
+
+    memcpy(out, src, stem_len);
+    memcpy(out + stem_len, kExt, kExtLen + 1); /* includes terminator */
+    return true;
+}
+
 /*============================================================================
  * MIDI Export
  *============================================================================*/
@@ -1604,12 +1639,9 @@ bool tracker_view_handle_input(TrackerView* view, const TrackerInputEvent* event
             char filename[256];
             if (view->file_path) {
                 /* Replace extension with .mid */
-                snprintf(filename, sizeof(filename), "%s", view->file_path);
-                char* dot = strrchr(filename, '.');
-                if (dot) {
-                    strcpy(dot, ".mid");
-                } else {
-                    strcat(filename, ".mid");
+                if (!derive_midi_path(view->file_path, filename, sizeof(filename))) {
+                    tracker_view_show_error(view, "File path too long to export");
+                    break;
                 }
             } else if (view->song && view->song->name) {
                 snprintf(filename, sizeof(filename), "%s.mid", view->song->name);
@@ -2341,12 +2373,15 @@ static void execute_command(TrackerView* view, const char* cmd) {
         /* :export [filename.mid] - export MIDI */
         char filename[256];
         if (arg[0]) {
-            strncpy(filename, arg, sizeof(filename) - 1);
+            if (snprintf(filename, sizeof(filename), "%s", arg) >= (int)sizeof(filename)) {
+                tracker_view_show_error(view, "Filename too long");
+                return;
+            }
         } else if (view->file_path) {
-            snprintf(filename, sizeof(filename), "%s", view->file_path);
-            char* dot = strrchr(filename, '.');
-            if (dot) strcpy(dot, ".mid");
-            else strcat(filename, ".mid");
+            if (!derive_midi_path(view->file_path, filename, sizeof(filename))) {
+                tracker_view_show_error(view, "File path too long to export");
+                return;
+            }
         } else {
             snprintf(filename, sizeof(filename), "song.mid");
         }

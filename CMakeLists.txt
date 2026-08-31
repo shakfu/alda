@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(psnd_project C CXX)
+project(psnd_project VERSION 0.2.1 LANGUAGES C CXX)
 
 set(PSND_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 list(APPEND CMAKE_MODULE_PATH "${PSND_ROOT_DIR}/scripts/cmake")
@@ -14,6 +14,10 @@ set(CMAKE_C_EXTENSIONS OFF)
 # Enable POSIX functions (strdup, strndup, usleep, etc.)
 add_compile_definitions(_DEFAULT_SOURCE)
 
+# Single source of truth for the version: project(VERSION ...) above.
+# psnd.h picks this up and falls back to its own literal for non-CMake builds.
+add_compile_definitions(PSND_VERSION="${PROJECT_VERSION}")
+
 # C++ is needed for libremidi (alda dependency)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -25,10 +29,22 @@ endif()
 option(LOKI_BUILD_SHARED "Build libloki as a shared library" OFF)
 option(ENABLE_LTO_IPO "Enable Link-time interprocedural optimization" OFF)
 option(BUILD_CSOUND_BACKEND "Build with Csound synthesis backend (requires libsndfile)" OFF)
+option(BUILD_FLUID_BACKEND "Build with FluidSynth synthesis backend" OFF)
 option(BUILD_MINIHOST_BACKEND "Build with minihost VST/AU plugin support (fetches JUCE)" OFF)
 option(BUILD_TESTING "Build tests (default on)" ON)
 option(BUILD_WEB_HOST "Build web server host with mongoose" OFF)
-option(LUA_SANDBOX "Sandbox Lua: disable os, io, debug, load*" OFF)
+# Lua sandboxing. Unsandboxed Lua can run arbitrary shell commands, so it is
+# forced on when the web host is built: that host accepts input over a socket.
+if(BUILD_WEB_HOST)
+    option(LUA_SANDBOX "Sandbox Lua: disable os, io, debug, load*" ON)
+    if(NOT LUA_SANDBOX)
+        message(WARNING
+            "LUA_SANDBOX=OFF with BUILD_WEB_HOST=ON: network clients can run "
+            "arbitrary shell commands via Lua.")
+    endif()
+else()
+    option(LUA_SANDBOX "Sandbox Lua: disable os, io, debug, load*" OFF)
+endif()
 option(PSND_ENABLE_ASAN "Enable AddressSanitizer for memory error detection" OFF)
 option(PSND_ENABLE_COVERAGE "Enable code coverage instrumentation (gcov/lcov)" OFF)
 
@@ -99,14 +115,15 @@ install(TARGETS psnd_bin
 )
 
 # Install default configuration files
+# Ships init.lua, modules/, keybindings/, the 17 themes (*.toml),
+# languages/*.toml and the Scala scales (*.scl).
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/.psnd/
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psnd
     FILES_MATCHING
     PATTERN "*.lua"
-    PATTERN "languages/*.lua"
-    PATTERN "keybindings/*.lua"
-    PATTERN "modules/*.lua"
-    PATTERN "themes/*.lua"
+    PATTERN "*.toml"
+    PATTERN "*.scl"
+    PATTERN "*.md"
 )
 
 # Print install summary

@@ -1,6 +1,10 @@
 name: Build All Variants
 
 on:
+  schedule:
+    # Nightly at 04:00 UTC: covers the variant/platform combinations that the
+    # per-push workflows do not build.
+    - cron: '0 4 * * *'
   workflow_dispatch:
 
 jobs:

@@ -214,7 +214,7 @@ int main(int argc, char **argv) {
         };
 
         int port = args.web_port > 0 ? args.web_port : 8080;
-        return editor_host_web_run(port, args.web_root, &config);
+        return editor_host_web_run(args.web_host, port, args.web_root, &config);
     }
 #endif
 

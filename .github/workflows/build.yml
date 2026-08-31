@@ -1,12 +1,11 @@
 name: Build psnd
 
-on: [workflow_dispatch]
-  # push:
-  #   branches:
-  #     - main
-  #     - master
-  # pull_request:
-  # workflow_dispatch:
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch:
 
 jobs:
   build-unix:
@@ -32,10 +31,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure CMake
-        run: cmake -S . -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+        run: cmake -S . -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DBUILD_TESTING=ON
 
       - name: Build
         run: cmake --build ${{ env.BUILD_DIR }} --config ${{ env.BUILD_TYPE }}
+
+      - name: Run tests
+        run: ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure -C ${{ env.BUILD_TYPE }}
 
       - name: Collect artifact
         run: |
@@ -72,10 +74,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure CMake (with Csound)
-        run: cmake -S . -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DBUILD_CSOUND_BACKEND=ON
+        run: cmake -S . -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DBUILD_CSOUND_BACKEND=ON -DBUILD_TESTING=ON
 
       - name: Build
         run: cmake --build ${{ env.BUILD_DIR }} --config ${{ env.BUILD_TYPE }}
+
+      - name: Run tests
+        run: ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure -C ${{ env.BUILD_TYPE }}
 
       - name: Collect artifact
         run: |
