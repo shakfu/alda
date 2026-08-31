@@ -17,19 +17,23 @@ Use the generator script to create all boilerplate:
 ./scripts/new_lang.py baz --dry-run
 ```
 
-The script generates:
+The script generates everything under `source/langs/<name>/`:
 
-- `source/langs/<name>/` - Register, REPL, dispatch, `impl/`, and `tests/` files
+- `CMakeLists.txt` - Build config, including the `psnd_register_language()` call, auto-discovered
 
-- `source/langs/<name>/CMakeLists.txt` - Build and registration, auto-discovered
+- `register.c`, `repl.c`, `dispatch.c` - Editor, REPL, and CLI integration
 
-- `source/langs/<name>/tests/` - Test scaffolding (also auto-discovered)
+- `impl/` - Parser and runtime skeletons
 
-- `source/langs/<name>/docs/README.md` - Documentation template
+- `tests/` - Test scaffolding (`CMakeLists.txt`, `test_parser.c`), also auto-discovered
 
-- `.psnd/languages/<name>.lua` - Syntax highlighting
+- `README.md` - Documentation template
 
-No parent CMake file, `lang_config.h`, or `lang_dispatch.c` edit is needed: the build discovers the language directory and generates those declarations.
+- `examples/` - A sample program
+
+It also writes `.psnd/languages/<name>.lua` for syntax highlighting.
+
+No parent CMake file, `lang_config.h`, or `lang_dispatch.c` edit is needed: `lang_config_generated.h` and `lang_dispatch_generated.h` are produced at configure time by auto-discovery, and there is no central CMake list to update.
 
 After running the script:
 
@@ -122,26 +126,62 @@ int example_eval(ExampleContext *ctx, const char *code) {
 
 ### CMake Library
 
-Create `source/langs/example/CMakeLists.txt`. It is discovered automatically - no parent CMake file references it:
+Create `source/langs/example/CMakeLists.txt`. Languages are auto-discovered by
+`scripts/cmake/psnd_languages.cmake`, which globs `source/langs/*/CMakeLists.txt`
+and generates the dispatch and config headers. **No other build file needs to be
+touched** — there is no central list to register in.
 
 ```cmake
-include_guard(GLOBAL)
+# Example language
+#
+# This CMakeLists.txt is processed by psnd_languages.cmake auto-discovery.
+# No modifications to other files are needed to add/remove this language.
 
 set(EXAMPLE_SOURCES
-    ${PSND_ROOT_DIR}/source/langs/example/impl/example_runtime.c
-    ${PSND_ROOT_DIR}/source/langs/example/impl/example_parser.c
-    # Add more source files
+    ${CMAKE_CURRENT_SOURCE_DIR}/impl/example_runtime.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/impl/example_parser.c
 )
 
 add_library(example STATIC ${EXAMPLE_SOURCES})
+add_library(example::example ALIAS example)
 
-target_include_directories(example PUBLIC
-    ${PSND_ROOT_DIR}/source/langs/example/impl
-    ${PSND_ROOT_DIR}/source/langs/example/include
+target_include_directories(example
+    PUBLIC
+        ${PSND_ROOT_DIR}/source/core/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/impl
+    PRIVATE
+        ${PSND_ROOT_DIR}/source/core/shared
 )
 
-target_link_libraries(example PRIVATE shared)
+target_link_libraries(example PUBLIC shared)
+
+psnd_platform_add_math(example PUBLIC)
+psnd_platform_add_warnings(example)
+
+target_compile_definitions(example PUBLIC LANG_EXAMPLE)
+
+# Register with the psnd language system. This is what wires the language into
+# CLI dispatch, the editor, and the generated headers.
+psnd_register_language(
+    NAME example
+    DISPLAY_NAME "Example"
+    DESCRIPTION "Example music language"
+    COMMANDS example ex
+    EXTENSIONS .ex .example
+    SOURCES ${EXAMPLE_SOURCES}
+    INCLUDE_DIRS
+        ${CMAKE_CURRENT_SOURCE_DIR}/impl
+    REPL_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/repl.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/dispatch.c
+    REGISTER_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/register.c
+    LINK_LIBRARIES example
+)
 ```
+
+Auto-discovery also creates a `LANG_EXAMPLE` CMake option (default `ON`), so the
+language can be excluded with `-DLANG_EXAMPLE=OFF`.
 
 ## Step 2: Implement the REPL
 
@@ -741,6 +781,7 @@ cmake -B build -DLANG_EXAMPLE=OFF
 
 Confirm discovery worked by looking for these lines in the configure output:
 
+
 ```
 -- Discovered language: example
 --   Registered: example (Example)
@@ -752,19 +793,29 @@ Confirm discovery worked by looking for these lines in the configure output:
 
 ```c
 /* source/langs/example/dispatch.c */
+#include "lang_dispatch.h"
+
+/* Entry points from repl.c */
+extern int example_repl_main(int argc, char **argv);
+extern int example_play_main(int argc, char **argv);
+
+static const LangDispatchEntry example_entry = {
+    .commands        = { "example", "ex" },
+    .command_count   = 2,
+    .extensions      = { ".ex", ".example" },
+    .extension_count = 2,
+    .display_name    = "Example",
+    .description     = "Example music language",
+    .repl_main       = example_repl_main,
+    .play_main       = example_play_main,  /* optional; NULL if unsupported */
+};
+
 void example_dispatch_init(void) {
-    static const LangDispatchEntry entry = {
-        .name       = "example",
-        .commands   = (const char *[]){ "example", "ex", NULL },
-        .extensions = (const char *[]){ ".ex", NULL },
-        .repl_main  = example_repl_main,
-        .play_main  = example_play_main,
-    };
-    lang_dispatch_register(&entry);
+    lang_dispatch_register(&example_entry);
 }
 ```
 
-The commands and extensions you pass to `psnd_register_language()` are what the build advertises; keep them in sync with this table.
+The generated `lang_dispatch_generated.h` declares `example_dispatch_init()` and calls it for you. The commands and extensions you pass to `psnd_register_language()` are what the build advertises; keep them in sync with this table.
 
 ## Step 8: Add Tests
 
@@ -773,20 +824,40 @@ Create `source/langs/example/tests/CMakeLists.txt`. Any language directory with 
 ```cmake
 # Example language tests
 
-add_executable(test_example_parser test_parser.c)
-target_link_libraries(test_example_parser PRIVATE example test_framework)
-target_include_directories(test_example_parser PRIVATE
-    ${PSND_ROOT_DIR}/source/langs/example/impl
-    ${PSND_ROOT_DIR}/tests
-)
-add_test(NAME example_parser COMMAND test_example_parser)
-set_tests_properties(example_parser PROPERTIES LABELS "unit")
+macro(add_example_test TEST_NAME)
+    add_executable(test_example_${TEST_NAME} test_${TEST_NAME}.c)
+    target_link_libraries(test_example_${TEST_NAME} PRIVATE example test_framework)
+    target_include_directories(test_example_${TEST_NAME} PRIVATE
+        ${PSND_ROOT_DIR}/source/langs/example/impl
+        ${PSND_ROOT_DIR}/source/testing
+    )
+    if(UNIX)
+        target_link_libraries(test_example_${TEST_NAME} PRIVATE m)
+    endif()
+    add_test(
+        NAME example_${TEST_NAME}
+        COMMAND $<TARGET_FILE:test_example_${TEST_NAME}>
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    set_tests_properties(example_${TEST_NAME} PROPERTIES LABELS "unit")
+endmacro()
+
+add_example_test(parser)
 ```
 
-Create `tests/example/test_parser.c`:
+If a test reads fixture files, pass their location as an absolute path from
+CMake rather than hardcoding a path relative to the build directory:
+
+```cmake
+target_compile_definitions(test_example_${TEST_NAME} PRIVATE
+    TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
+)
+```
+
+Create `source/langs/example/tests/test_parser.c`:
 
 ```c
-#include "../test_framework.h"
+#include "test_framework.h"
 #include "example_parser.h"
 
 TEST(test_parse_simple) {
@@ -794,13 +865,10 @@ TEST(test_parse_simple) {
     ASSERT_TRUE(1);
 }
 
-TEST_SUITE(example_parser_tests) {
-    RUN_TEST(test_parse_simple);
-}
-
 int main(void) {
-    RUN_SUITE(example_parser_tests);
-    return TEST_REPORT();
+    RUN_TEST(test_parse_simple);
+    TEST_SUMMARY();
+    return TEST_EXIT_CODE();
 }
 ```
 
@@ -826,7 +894,7 @@ See existing documentation in `docs/alda/`, `docs/joy/`, `docs/tr7/`, or `docs/b
 
 ## Step 10: Add Syntax Highlighting (Optional)
 
-Create `.psnd/languages/example.lua`:
+Create `.psnd/languages/example.toml`:
 
 ```lua
 loki.register_language({
@@ -914,7 +982,7 @@ double shared_link_tempo(SharedContext *ctx);
 | `source/core/shared/repl_commands.h` | Common REPL command handling |
 | `source/langs/alda/register.c` | Reference: Alda integration |
 | `source/langs/joy/register.c` | Reference: Joy integration |
-| `source/langs/tr7/register.c` | Reference: TR7 integration |
+| `source/langs/tr7/impl/register.c` | Reference: TR7 integration |
 | `source/langs/bog/register.c` | Reference: Bog integration |
 
 ## Tips

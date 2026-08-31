@@ -125,7 +125,8 @@ function(psnd_platform_link_audio_midi target)
         endif()
         target_link_libraries(${target} ${visibility} pthread dl m)
     elseif(PSND_PLATFORM_WINDOWS)
-        target_link_libraries(${target} ${visibility} winmm ws2_32)
+        # shell32: ShellExecuteA, used to open the browser for --web-open
+        target_link_libraries(${target} ${visibility} winmm ws2_32 shell32)
     endif()
 endfunction()
 

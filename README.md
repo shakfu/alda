@@ -422,11 +422,17 @@ Run psnd as a web server and access the editor through a browser using xterm.js 
 ```bash
 psnd --web                           # Start web server on port 8080
 psnd --web --web-port 3000           # Use custom port
+psnd --web --web-host 0.0.0.0        # Expose to the network (opt-in)
+psnd --web --web-open                # Also open the URL in the default browser
 psnd --web song.alda                 # Open file in web editor
 psnd --web -sf gm.sf2 song.joy       # Web editor with soundfont
 ```
 
-Then open `http://localhost:8080` in your browser.
+Open the URL printed at startup, or pass `--web-open` to have psnd hand it to
+the default browser. It carries a random per-session token that the WebSocket
+and `/api` endpoints require, so `http://localhost:8080` without it loads the
+page but cannot connect. The server binds `127.0.0.1` unless `--web-host` says
+otherwise.
 
 **Features:**
 
@@ -1627,11 +1633,12 @@ Feedback and experiments are welcome - polyglot support will be guided by real-w
 ```text
 source/
   core/
+    main.c          # Entry point and CLI dispatch
+    lang_dispatch.c # Language registry (commands, extensions, entry points)
     loki/           # Editor components (core, modal, syntax, lua, hosts)
-      host_terminal.c  # Terminal-based host
+      host.c           # Host abstraction + terminal host
       host_web.c       # Web server host (mongoose + xterm.js)
       host_webview.cpp # Native webview host (WebKit/WebKitGTK)
-      host_headless.c  # Headless playback host
     tracker/        # MIDI tracker/step sequencer
       tracker_model.c    # Data structures (song, pattern, track, cell)
       tracker_plugin.c   # Plugin system for notation languages
@@ -1639,24 +1646,29 @@ source/
       tracker_audio.c    # Audio integration with SharedContext
       tracker_view.c     # View layer (theme, undo, clipboard)
       tracker_view_terminal.c  # Terminal UI with VT100 rendering
-    shared/         # Language-agnostic backend (audio, MIDI, Link)
+    shared/         # Language-agnostic backend (audio, MIDI, Link, OSC, params)
+    compat/         # Platform shims (platform.h, thread.h)
     include/        # Public headers
+    tests/          # Core tests (loki/, shared/, cli/, tracker/)
   langs/
     alda/           # Alda music language (parser, interpreter, backends)
     joy/            # Joy language runtime (parser, primitives, MIDI)
     tr7/            # TR7 Scheme (R7RS-small + music extensions)
     bog/            # Bog language (Prolog-based live coding)
     mhs/            # MHS (Micro Haskell with MIDI support)
-  main.c            # Entry point and CLI dispatch
+    <name>/tests/   # Per-language tests, auto-discovered by CMake
+  plugins/          # Optional plugins (sqlite FTS5 full-text search)
+  testing/          # Test framework and leak checker
   thirdparty/       # External dependencies (lua, libremidi, TinySoundFont, mongoose, xterm.js)
-tests/
-  loki/             # Editor unit tests
-  alda/             # Alda parser tests
-  joy/              # Joy parser and MIDI tests
-  bog/              # Bog parser and runtime tests
-  tracker/          # Tracker unit tests
-  shared/           # Shared backend tests
+  web/              # Browser UI assets
+scripts/
+  cmake/            # psnd_platform.cmake, psnd_languages.cmake
+  new_lang.py       # Language scaffolding generator
 ```
+
+Tests live beside the code they cover (`source/core/tests/` and
+`source/langs/<name>/tests/`) and are discovered automatically; run them with
+`ctest --test-dir build`.
 
 ## Documentation
 

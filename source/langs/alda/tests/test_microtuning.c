@@ -18,7 +18,11 @@
 #include <string.h>
 
 /* Test data paths - relative to build directory */
+/* Supplied by CMake as an absolute path; the fallback assumes an in-tree
+ * ./build directory. */
+#ifndef TEST_DATA_DIR
 #define TEST_DATA_DIR "../source/langs/alda/tests/data"
+#endif
 #define JUST_MAJOR_SCL TEST_DATA_DIR "/just_major.scl"
 #define JUST_12_SCL TEST_DATA_DIR "/just_12.scl"
 

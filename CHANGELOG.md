@@ -22,6 +22,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Security
+
+- **Web Host Access Control Reworked**: the bind address moved from the `PSND_WEB_BIND` environment variable to a `--web-host ADDR` flag, which warns when given anything but loopback. The token is now accepted as an `X-Psnd-Token` header as well as a `?token=` query parameter, is compared in constant time, and also gates static files served from `--web-root`. Cross-origin WebSocket handshakes are rejected on the `Origin` header, closing cross-site WebSocket hijacking: any page the user visited could previously connect to `ws://localhost:8080` and drive the editor (`host_web.c`, `host_web_ui.h`, `cli.c`)
+
+- **`LUA_SANDBOX` Warns When Disabled With The Web Host**: configuring `-DLUA_SANDBOX=OFF -DBUILD_WEB_HOST=ON` now emits a CMake warning. Unsandboxed Lua exposes `os.execute` to anything that reaches the server (`CMakeLists.txt`)
+
+### Added
+
+- **`--web-open`**: hands the tokenized startup URL to the default browser (`open`, `xdg-open`, or `ShellExecuteA`) once the listener is bound. Off by default, since opening a browser is wrong for a headless or SSH session. The URL is passed as an argument vector rather than a shell string, and the POSIX path double-forks so the opener is never left as a zombie in a server that never waits (`host_web.c`, `cli.c`)
+
+### Removed
+
+- **`PSND_WEB_BIND`, `PSND_WEB_TOKEN` and `PSND_WEB_NO_AUTH` Environment Variables**: replaced by `--web-host ADDR`; the session token is always generated and cannot be disabled or fixed. Scripts that set these must pass `--web-host` and read the token from the startup URL instead (`host_web.c`)
+
+### Fixed
+
+- **Tracker MIDI Export Truncated Paths Silently**: the bounded `snprintf` strip-then-append introduced in 0.2.0 still produced a wrong output path rather than an error when the source path did not fit, and could strip at a dot inside a directory name. Both call sites now share `derive_midi_path()`, which rejects an over-long path and only treats a dot in the final component as an extension (`tracker_view.c`)
+
+- **Parallel Build Race in MHS**: `make -j` failed nondeterministically because the `mhs-embed` tool, `base.pkg` and `music.pkg` custom commands were duplicated into every consuming target's makefile and run concurrently over the same output paths (`Error 126`, or a failed `copy_directory` into `build/mhs-base-src`). Each shared step now has a single owning target that consumers order behind. This is the same hazard as the embedded-header race fixed in 0.2.1, on the steps feeding those generators (`source/langs/mhs/CMakeLists.txt`)
+
+- **REPL History Recall (remaining paths)**: the `ARROW_DOWN` branch in `repl_line_editor.c` and both branches of the fallback editor in `core/repl.c` still used unbounded `strcpy`; all are now bounded to `REPL_MAX_INPUT_LENGTH`, matching the `ARROW_UP` fix
+
+- **Themes, Languages and Scales Not Installed**: `install()` matched only `*.lua`, so `cmake --install` shipped none of the 17 `.psnd/themes/*.toml`, `.psnd/languages/*.toml` or `.psnd/scales/*.scl` files despite them being advertised features (`CMakeLists.txt`)
+
+- **Stale CMake Cache Across Build Variants**: each `configure-*` Makefile target now states the full option set, so switching variants in place (e.g. `make csound` then `make`) no longer silently inherits the previous variant's options. `configure-*` targets are also declared `.PHONY`
+
+- **Out-of-Tree Test Fixtures**: `alda_microtuning_tests` hardcoded a data path relative to an in-tree `./build`, and `test_csound_microtuning.c` pointed at the pre-reorganization `tests/alda/data`. `TEST_DATA_DIR` is now supplied by CMake as an absolute path
+
+### Changed
+
+- **Variant Matrix Runs Nightly**: `build-matrix.yml` gains a 04:00 UTC schedule, covering the variant and platform combinations the per-push `ci` workflow does not build (`.github/workflows/build-matrix.yml`)
+
+- **`BUILD_FLUID_BACKEND` Declared**: the option was used in five files and passed by CI and the Makefile, but never declared with `option()`, so it was invisible to `ccmake`/`cmake-gui` (`CMakeLists.txt`)
+
 ## [0.2.1]
 
 ### Fixed

@@ -18,6 +18,24 @@ ctx = buffer_get_current();  /* Refresh stale pointer */
 
 ---
 
+### Phrase arrays leaked on tracker engine teardown
+
+**Status:** Open
+
+`tracker_engine.c:659` frees `engine->recent_by_track` but not the phrase arrays
+each entry owns:
+
+```c
+if (engine->recent_by_track) {
+    /* TODO: free phrase arrays */
+    free(engine->recent_by_track);
+```
+
+Bounded per engine instance, so it does not grow during a session, but it does
+leak on every engine create/destroy cycle and shows up under ASan.
+
+---
+
 ## High Priority
 
 ### Security Hardening
@@ -40,7 +58,7 @@ Findings from `REVIEW.md` (2026-08-24), re-verified against the tree. Ordered by
 
   - `handle_api_save` / `handle_api_load` and the WebSocket `load` command `fopen` a caller-supplied `filename` verbatim - no traversal, absolute-path, or symlink check. With `/api/run` and `/api/repl` evaluating arbitrary language code this is a full host-compromise primitive.
 
-  - Mitigated by default, not fixed: `/api/*` and `/ws` require a random 128-bit token (`web_host_authorized`) and the listener binds `127.0.0.1`. It becomes remotely reachable under `PSND_WEB_NO_AUTH=1` or `PSND_WEB_BIND=0.0.0.0`.
+  - Mitigated by default, not fixed: `/api/*` and `/ws` require a random per-session token (`web_host_token_ok`) and the listener binds `127.0.0.1`. It becomes remotely reachable under `--web-host ADDR`, which the token still gates.
 
   - Fix: resolve against a configured root, reject `..`, absolute paths, and symlinks escaping it. Do this before the multi-client work below.
 
@@ -138,11 +156,36 @@ Findings from `REVIEW.md` (2026-08-24), re-verified against the tree. Ordered by
     `FTW_PHYS` keeps it from following symlinks out of the temp directory. The
     Windows branch still uses `rmdir /s /q`, matching the same precedent.
 
-- [ ] **P4 - Web host auth hygiene**
+- [x] ~~**P4 - Web host auth hygiene**~~ **DONE**
 
-  - The token travels as a `?token=` query parameter, so it lands in browser history and any intermediary log. Prefer a header or cookie for the API.
+  - `/api/*` accepts the token as an `X-Psnd-Token` header, so it need not land in browser history or an intermediary log. `/ws` still takes it as a query parameter because a browser cannot set headers on a WebSocket handshake.
 
-  - `web_host_authorized` compares with `mg_strcmp` (not constant-time). Low impact while loopback-bound; worth fixing alongside any bind-address change.
+  - `web_host_token_ok` compares in constant time (`web_host_secret_eq`).
+
+  - Cross-origin WebSocket handshakes are rejected on the `Origin` header, and the bind address moved from the `PSND_WEB_BIND` environment variable to the `--web-host ADDR` flag.
+### Licensing & Third-Party Attribution
+
+- [ ] **Resolve the mongoose license conflict before distributing web builds**
+  - psnd is GPL-3.0. Mongoose (`source/thirdparty/mongoose-7.20/`) is
+    **GPL-2.0-only or commercial** — GPL-2.0-only is incompatible with
+    distributing a combined GPL-3.0 work.
+  - Affects the `web`, `tsf-web`, `fluid-web` and `fluid-csound-web` variants,
+    which CI now builds and uploads as artifacts.
+  - Options: obtain a commercial mongoose license, relicense psnd to
+    GPL-2.0-or-later, or replace mongoose with a permissively licensed HTTP/WS
+    server for the web host.
+  - This is a legal question, not a technical one — get a definitive answer
+    before publishing binaries of those variants.
+
+- [ ] Add license texts for all vendored dependencies
+  - `docs/licenses/` currently contains only `KILO-LICENSE`; there are 23
+    dependencies under `source/thirdparty/`.
+  - Several are LGPL (Csound, FluidSynth, libsndfile, liblo) or GPL-2.0+
+    (Ableton Link), so attribution is an obligation, not a courtesy.
+
+- [ ] Add `THIRD-PARTY.md` recording each dependency's upstream URL and pinned version
+  - 67 MB is vendored with no submodules, so there is currently no way to tell
+    what version anything is or to audit for upstream security fixes.
 
 ### Cross-Platform Support
 
@@ -190,15 +233,29 @@ Findings from `REVIEW.md` (2026-08-24), re-verified against the tree. Ordered by
 
   - Already functional with xterm.js terminal emulator
 
-  - [x] ~~Authentication~~ **DONE** - random 128-bit token gates `/api/*` and `/ws` (`web_host_authorized`), listener binds `127.0.0.1` by default. Escape hatches: `PSND_WEB_NO_AUTH`, `PSND_WEB_TOKEN`, `PSND_WEB_BIND`. See "Web host auth hygiene" under Security Hardening for the remaining nits.
+  - [x] ~~Authentication (required before exposing to network)~~ **DONE**
+
+    - Binds `127.0.0.1` by default; `--web-host ADDR` is an explicit opt-in
+
+    - Random per-session token required on `/ws` and the `/api` endpoints
+
+    - Cross-origin WebSocket handshakes rejected (`Origin` check)
+
+    - `LUA_SANDBOX` defaults ON, and warns if turned off with `BUILD_WEB_HOST=ON`
 
   - [ ] Path sandbox for `/api/save`, `/api/load`, and the WebSocket `load` command
 
-    - Blocks network exposure regardless of auth; tracked as P1 above
+    - Blocks network exposure regardless of auth; tracked as P3 above
 
   - [ ] Multiple client support (currently single WebSocket connection)
 
+    - `WebHostData.ws_conn` is one pointer; a second client overwrites it
+
+    - See "Support multiple editor sessions in one process" under Low Priority
+
   - [ ] Session persistence (save/restore editor state across restarts)
+
+  - [ ] Test coverage for the access-control logic (see Code Coverage)
 
 ### Stability & Robustness
 
@@ -247,6 +304,51 @@ Findings from `REVIEW.md` (2026-08-24), re-verified against the tree. Ordered by
   - Deleted all seven (`psnd_shared_library`, `psnd_loki_library`, `psnd_psnd_binary`, `psnd_tests`, `psnd_alda_library`, `psnd_joy_library`, `psnd_bog_library`). Only `psnd_platform` and `psnd_languages` remain, and both are live. Verified with a clean `cmake -B` configure.
 
   - Follow-on found while pruning: `docs/new_lang.md` documented the whole add-a-language workflow against those dead files, and also had contributors hand-editing `lang_config.h` and `lang_dispatch.c`. Both are now generated (`lang_config_generated.h`, `lang_dispatch_generated.h`) and marked DO NOT EDIT, so that guide would have produced a language that silently did not build. Steps 5-8 and the Key Files table rewritten against the real `psnd_register_language()` auto-discovery. `scripts/new_lang.py` was already correct - only the prose was stale.
+- [ ] **Merge the duplicated REPL line editors**
+  - `source/core/repl.c` (648 lines) and `source/core/loki/repl_line_editor.c`
+    (823 lines) are near-identical implementations of the same line editor;
+    `source/core/CMakeLists.txt:334-337` picks `repl.c` as the fallback when
+    loki is not built.
+  - The duplication has already caused a divergent fix: the `strcpy` hardening
+    was applied to one copy's `ARROW_UP` path only, and the other copy had
+    neither branch fixed (both are now bounded, but the asymmetry will recur).
+  - Extract the shared core into one file with the linenoise-backed path behind
+    `#ifdef LOKI_USE_LINENOISE` — the mechanism `repl_line_editor.c` already
+    uses internally — and delete the duplicate.
+  - Also collapses the duplicate headers `source/core/repl.h` (126 lines) and
+    `source/core/loki/repl.h` (125 lines).
+
+- [ ] Define `MAX_INPUT_LENGTH` exactly once
+  - `source/core/repl.h:20` defines it as **1024**;
+    `source/core/loki/repl_helpers.c:31` defines it as **4096** behind an
+    `#ifndef`, so the effective value depends on include order per translation
+    unit. Folds into the REPL merge above.
+
+- [ ] Add checked-allocation wrappers and migrate incrementally
+  - A heuristic scan (allocation whose next line is not a NULL check) flags
+    ~255 sites across `source/core` and `source/langs`. Many are false
+    positives, but the discipline is not uniform outside `loki/core.c`.
+  - Add `psnd_xmalloc`/`psnd_xcalloc`/`psnd_xstrdup` to `shared/` rather than
+    auditing every site by hand.
+
+- [ ] Reconsider `exit(1)` on allocation failure in `loki/core.c`
+  - Sites at `core.c:252, 282, 293, 368, 380, 396` and elsewhere call
+    `perror("Out of memory"); exit(1);` (inherited from kilo).
+  - Two problems: unsaved buffer contents are lost with no recovery attempt,
+    and `libloki` is buildable as a shared library (`LOKI_BUILD_SHARED`), where
+    calling `exit()` from library code is not acceptable.
+  - The overflow guards preceding these allocations are correct — only the
+    failure response needs changing.
+
+- [ ] Give `tracker_notes_to_string()` a buffer-size parameter
+  - `tracker_plugin_notes.h:86` takes a bare `char* buffer` and
+    `tracker_plugin_notes.c:186` writes into it with `sprintf`. Bounded in
+    practice (max output `"A#-1"`), but the API invites a future overflow.
+
+- [ ] Replace `atoi` with `strtol` in config and command parsing
+  - 29 call sites. `atoi` silently returns 0 on garbage and is undefined on
+    overflow, so malformed user input becomes a valid-looking 0 instead of an
+    error.
 
 ### Code Coverage
 
@@ -312,6 +414,8 @@ Current state (recounted 2026-08-24): **77 first-party test files** (90 tree-wid
 
   - `host.h` already defines the `EditorHost` / `EditorSession` seam these need, so a queue-backed test host is the natural harness. Nothing exercises it today.
 
+  - `host_web.c` is the only network-facing file in the project and now carries access-control logic that should not regress silently: cover token accept/reject, cross-origin rejection, and the loopback-by-default bind.
+
 - [ ] Smaller uncovered modules: `export.c`, `live_loop.c`, `cli.c`, `lang_toml.c`, `repl_helpers.c`, `repl_launcher.c`, `repl_line_editor.c`, `terminal_win.c`
 
   - `repl_line_editor.c` should get its test alongside the P0 overflow fix
@@ -319,6 +423,35 @@ Current state (recounted 2026-08-24): **77 first-party test files** (90 tree-wid
   - `keybind.c` and `theme_toml.c` are covered transitively via `test_config.c`; `midi_input.c` via `test_midi.c`. Not gaps.
 
   - `editor.c` is **not** a meaningful gap despite `REVIEW.md` calling it the largest untested module. It is 697 lines of CLI entry point, Lua highlight glue, and teardown. The editor logic it appears to own actually lives in `core.c`, `modal.c`, `renderer.c`, `undo.c`, and `search.c` - all tested.
+- [ ] `host_webview.cpp` - no tests
+
+- [ ] `tr7/impl/repl.c` (975 lines) - no tests
+  - TR7 coverage is `test_reader.c` and `test_music.c` only.
+
+- [ ] `mhs/vfs.c` (1107 lines) - no tests
+
+- [ ] Make disabled-backend tests visibly skip rather than silently pass
+  - `shared_csound_backend_tests`, `shared_fluid_backend_tests` and
+    `shared_minihost_backend_tests` compile to stubs and pass in ~0.02s when
+    their backend is off, so a green local run says nothing about them.
+  - Report them as skipped (`ctest` `SKIP_RETURN_CODE`) so the gap is legible.
+
+**CI hardening:**
+
+- [ ] Add an AddressSanitizer job
+  - `-DPSND_ENABLE_ASAN=ON` is already wired and the suite runs in ~2.5s, so
+    this is nearly free. Would likely surface more of the allocation issues
+    listed under Stability & Robustness.
+
+- [ ] Add a `-Werror` job over first-party targets only
+  - `-Wall -Wextra -Wpedantic` is on for every first-party target but nothing
+    is `-Werror`, so warnings can accumulate unnoticed. Keep it to one
+    dedicated job so local builds do not break on new compiler versions, and
+    so the 23 vendored dependencies stay exempt.
+
+- [ ] Add a coverage job
+  - `-DPSND_ENABLE_COVERAGE=ON` is wired but never exercised; would replace the
+    hand-maintained coverage estimates in this section with real numbers.
 
 - [ ] `lua.c` - Lua integration (extend existing `test_lua_api.c`)
 
@@ -398,6 +531,22 @@ Current state (recounted 2026-08-24): **77 first-party test files** (90 tree-wid
 ## Medium Priority
 
 ### Documentation
+
+- [ ] Fix remaining stale path references in docs
+  - The source tree moved from `src/` to `source/core/`; `new_lang.md` and
+    `docs/README.md` have been corrected, these have not:
+  - `docs/refactor.md` - ~30 dead `src/...` paths (whole document predates the
+    reorganization; consider marking historical like `design_review.md`)
+  - `docs/scsynth.md` - `src/supercollider/...`, `.psnd/synthdefs/`, `.psnd/config`
+  - `docs/LANG_IMPL_COMPARISON.md` - `source/langs/tr7/dispatch.c`,
+    `.psnd/mhs_history`, `source/core/loki/syntax/lang_*`
+  - `docs/language-extension-api.md` - refers to `.psnd/languages/alda.lua`;
+    the real file is `.psnd/languages/alda.toml`
+
+- [ ] Document the threading contract for the audio backend globals
+  - `g_tsf`, `g_fluid`, `g_cs`, `g_link`, `g_async`, `g_queue` are reachable
+    from both the async playback thread and the UI thread. The locking
+    discipline works but is undocumented, which makes it easy to break.
 
 - [ ] API reference generation
 
@@ -528,6 +677,27 @@ Current state (recounted 2026-08-24): **77 first-party test files** (90 tree-wid
 - [ ] JACK backend
 
   - For pro audio workflows on Linux
+
+- [ ] Split the largest first-party files
+  - `loki/lua.c` (3644 lines) mixes binding registration, sandbox policy
+    (`:2923`) and UI output — separate registration from implementation.
+  - `tracker/tracker_view.c` (3059 lines) already has `_terminal`, `_json`,
+    `_undo`, `_clipboard` and `_theme` siblings; the remaining candidate is the
+    `strcmp` command-dispatch chain around `:2340`, which wants a table.
+  - `joy/impl/joy_primitives.c` (5173 lines) is a primitive table and is
+    arguably fine as-is.
+
+- [ ] Reduce the vendored dependency footprint
+  - 67 MB across 23 dependencies with no submodules; `.git` is 16 MB.
+  - `tree-sitter-grammars` alone is 23 MB and is the obvious candidate for
+    `FetchContent` instead of vendoring.
+  - Depends on `THIRD-PARTY.md` (High Priority) to know what versions are pinned.
+
+- [ ] Support multiple editor sessions in one process
+  - Blocked by ~25 file-scope globals in `loki/` and `shared/` (`g_config`,
+    `g_commands`, `g_current_lang`, the audio singletons, ...).
+  - Prerequisite for the web host's "multiple client support" item, since
+    `WebHostData.ws_conn` is a single connection pointer today.
 
 ### Editor Features
 

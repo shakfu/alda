@@ -1,5 +1,9 @@
 .DEFAULT_GOAL := all
-.PHONY: all build clean reset test show-config rebuild remake docs \
+.PHONY: all build clean reset test show-config rebuild remake docs library psnd \
+		configure-tsf configure-tsf-csound configure-fluid configure-fluid-csound \
+		configure-tsf-web configure-fluid-web configure-fluid-csound-web \
+		configure-minihost configure-minihost-csound \
+		configure-mhs-small configure-mhs-src configure-mhs-src-small configure-no-mhs \
 		psnd-tsf default psnd-tsf-csound csound psnd-fluid psnd-fluid-csound \
 		psnd-tsf-web web psnd-fluid-web psnd-fluid-csound-web full \
 		psnd-minihost minihost psnd-minihost-csound \
@@ -16,47 +20,54 @@ all: build
 # Configure targets
 # ============================================================================
 
+# CMake caches options, so a configure that simply omits -DBUILD_X=ON inherits
+# whatever the previous variant set. Every variant therefore states the full
+# option set explicitly, and switching variants in place is safe.
+PSND_ALL_OPTS = -DBUILD_CSOUND_BACKEND=OFF -DBUILD_FLUID_BACKEND=OFF \
+                -DBUILD_WEB_HOST=OFF -DBUILD_MINIHOST_BACKEND=OFF
+PSND_CONFIGURE = $(CMAKE) -S . -B $(BUILD_DIR) -DBUILD_TESTING=ON $(PSND_ALL_OPTS)
+
 configure-tsf:
-	@mkdir -p $(BUILD_DIR) && $(CMAKE) -S . -B $(BUILD_DIR) -DBUILD_TESTING=ON
+	@mkdir -p $(BUILD_DIR) && $(PSND_CONFIGURE)
 
 configure-tsf-csound:
-	@mkdir -p $(BUILD_DIR) && $(CMAKE) -S . -B $(BUILD_DIR) -DBUILD_CSOUND_BACKEND=ON -DBUILD_TESTING=ON
+	@mkdir -p $(BUILD_DIR) && $(PSND_CONFIGURE) -DBUILD_CSOUND_BACKEND=ON
 
 configure-fluid:
-	@mkdir -p $(BUILD_DIR) && $(CMAKE) -S . -B $(BUILD_DIR) -DBUILD_FLUID_BACKEND=ON -DBUILD_TESTING=ON
+	@mkdir -p $(BUILD_DIR) && $(PSND_CONFIGURE) -DBUILD_FLUID_BACKEND=ON
 
 configure-fluid-csound:
-	@mkdir -p $(BUILD_DIR) && $(CMAKE) -S . -B $(BUILD_DIR) -DBUILD_FLUID_BACKEND=ON -DBUILD_CSOUND_BACKEND=ON -DBUILD_TESTING=ON
+	@mkdir -p $(BUILD_DIR) && $(PSND_CONFIGURE) -DBUILD_FLUID_BACKEND=ON -DBUILD_CSOUND_BACKEND=ON
 
 configure-tsf-web:
-	@mkdir -p $(BUILD_DIR) && $(CMAKE) -S . -B $(BUILD_DIR) -DBUILD_WEB_HOST=ON -DBUILD_TESTING=ON
+	@mkdir -p $(BUILD_DIR) && $(PSND_CONFIGURE) -DBUILD_WEB_HOST=ON
 
 configure-fluid-web:
-	@mkdir -p $(BUILD_DIR) && $(CMAKE) -S . -B $(BUILD_DIR) -DBUILD_FLUID_BACKEND=ON -DBUILD_WEB_HOST=ON -DBUILD_TESTING=ON
+	@mkdir -p $(BUILD_DIR) && $(PSND_CONFIGURE) -DBUILD_FLUID_BACKEND=ON -DBUILD_WEB_HOST=ON
 
 configure-fluid-csound-web:
-	@mkdir -p $(BUILD_DIR) && $(CMAKE) -S . -B $(BUILD_DIR) -DBUILD_FLUID_BACKEND=ON -DBUILD_CSOUND_BACKEND=ON -DBUILD_WEB_HOST=ON -DBUILD_TESTING=ON
+	@mkdir -p $(BUILD_DIR) && $(PSND_CONFIGURE) -DBUILD_FLUID_BACKEND=ON -DBUILD_CSOUND_BACKEND=ON -DBUILD_WEB_HOST=ON
 
 # Minihost (VST/AU plugin) variants
 # Note: JUCE is fetched automatically during configure (first build takes longer)
 configure-minihost:
-	@mkdir -p $(BUILD_DIR) && $(CMAKE) -S . -B $(BUILD_DIR) -DBUILD_MINIHOST_BACKEND=ON -DBUILD_TESTING=ON
+	@mkdir -p $(BUILD_DIR) && $(PSND_CONFIGURE) -DBUILD_MINIHOST_BACKEND=ON
 
 configure-minihost-csound:
-	@mkdir -p $(BUILD_DIR) && $(CMAKE) -S . -B $(BUILD_DIR) -DBUILD_MINIHOST_BACKEND=ON -DBUILD_CSOUND_BACKEND=ON -DBUILD_TESTING=ON
+	@mkdir -p $(BUILD_DIR) && $(PSND_CONFIGURE) -DBUILD_MINIHOST_BACKEND=ON -DBUILD_CSOUND_BACKEND=ON
 
 # MHS variants
 configure-mhs-small:
-	@mkdir -p $(BUILD_DIR) && $(CMAKE) -S . -B $(BUILD_DIR) -DMHS_ENABLE_COMPILATION=OFF -DBUILD_TESTING=ON
+	@mkdir -p $(BUILD_DIR) && $(PSND_CONFIGURE) -DMHS_ENABLE_COMPILATION=OFF
 
 configure-mhs-src:
-	@mkdir -p $(BUILD_DIR) && $(CMAKE) -S . -B $(BUILD_DIR) -DMHS_EMBED_MODE=SRC_ZSTD -DBUILD_TESTING=ON
+	@mkdir -p $(BUILD_DIR) && $(PSND_CONFIGURE) -DMHS_EMBED_MODE=SRC_ZSTD
 
 configure-mhs-src-small:
-	@mkdir -p $(BUILD_DIR) && $(CMAKE) -S . -B $(BUILD_DIR) -DMHS_EMBED_MODE=SRC_ZSTD -DMHS_ENABLE_COMPILATION=OFF -DBUILD_TESTING=ON
+	@mkdir -p $(BUILD_DIR) && $(PSND_CONFIGURE) -DMHS_EMBED_MODE=SRC_ZSTD -DMHS_ENABLE_COMPILATION=OFF
 
 configure-no-mhs:
-	@mkdir -p $(BUILD_DIR) && $(CMAKE) -S . -B $(BUILD_DIR) -DENABLE_MHS_INTEGRATION=OFF -DBUILD_TESTING=ON
+	@mkdir -p $(BUILD_DIR) && $(PSND_CONFIGURE) -DENABLE_MHS_INTEGRATION=OFF
 
 # ============================================================================
 # Build presets

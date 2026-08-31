@@ -35,6 +35,16 @@
 #include <string.h>
 #include "compat/thread.h"
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shellapi.h>
+#else
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#endif
+
 /* Optional embedded xterm - include host_web_xterm.h to enable */
 #if defined(LOKI_EMBED_XTERM) && !defined(XTERM_CSS)
 #include "host_web_xterm.h"
@@ -49,6 +59,16 @@
 #define WEB_HOST_DEFAULT_PORT 8080
 #define WEB_HOST_POLL_MS 50
 #define MAX_POST_SIZE (1024 * 1024)  /* 1MB max POST body */
+
+/* Default bind address. Loopback only: the editor exposes file access and code
+ * evaluation, so it must not be reachable from the network unless the user
+ * explicitly opts in with --web-host. */
+#define WEB_HOST_DEFAULT_BIND "127.0.0.1"
+
+/* Session token: 32 random alphanumeric chars + NUL. Required on /ws and
+ * the /api endpoints to stop other local users and cross-site requests from driving the
+ * editor. */
+#define WEB_HOST_TOKEN_LEN 33
 
 /* ======================= Web Host Data ===================================== */
 
@@ -66,18 +86,18 @@ typedef struct {
 
     /* Configuration */
     char *web_root;                 /* Static file directory (owned, may be NULL) */
+    char bind_addr[64];             /* Bind address (default 127.0.0.1) */
     int port;                       /* Listening port */
     int running;                    /* Continue running flag */
+
+    /* Access control */
+    char token[WEB_HOST_TOKEN_LEN]; /* Per-session auth token */
 
     /* Render state */
     int needs_render;               /* Flag to push update to client */
 
     /* REPL state */
     char current_lang[32];          /* Current language for REPL (e.g., "alda", "joy") */
-
-    /* Access control: a random token required on /ws and /api/* requests as a
-     * ?token= query var. Empty string means auth is disabled. */
-    char token[33];
 } WebHostData;
 
 /* ======================= Event Queue ======================================= */
@@ -675,46 +695,74 @@ static void web_host_send_snapshot(WebHostData *data) {
     free(vm_json);
 }
 
+/* ======================= Access Control ==================================== */
+
+/* Constant-time string compare, so a caller cannot recover the token by
+ * timing successive guesses. */
+static int web_host_secret_eq(const char *a, const char *b, size_t len) {
+    unsigned char diff = 0;
+    for (size_t i = 0; i < len; i++) {
+        diff |= (unsigned char)a[i] ^ (unsigned char)b[i];
+    }
+    return diff == 0;
+}
+
+/* Check the session token, supplied either as an "X-Psnd-Token" header or as a
+ * "token" query parameter (browsers cannot set headers on a WebSocket
+ * handshake, so the query form is required for /ws). */
+static int web_host_token_ok(WebHostData *data, struct mg_http_message *hm) {
+    char supplied[WEB_HOST_TOKEN_LEN];
+    size_t want = strlen(data->token);
+
+    struct mg_str *hdr = mg_http_get_header(hm, "X-Psnd-Token");
+    if (hdr && hdr->len == want &&
+        web_host_secret_eq(hdr->buf, data->token, want)) {
+        return 1;
+    }
+
+    int n = mg_http_get_var(&hm->query, "token", supplied, sizeof(supplied));
+    if (n == (int)want && web_host_secret_eq(supplied, data->token, want)) {
+        return 1;
+    }
+
+    return 0;
+}
+
+/* Reject cross-origin WebSocket handshakes.
+ *
+ * A browser always sends Origin on a WebSocket handshake, so any request
+ * carrying an Origin that is not our own is a page on another site trying to
+ * drive this editor (cross-site WebSocket hijacking). Requests with no Origin
+ * are non-browser clients, which cannot be used for that attack and are still
+ * gated by the token. */
+static int web_host_origin_ok(struct mg_http_message *hm) {
+    struct mg_str *origin = mg_http_get_header(hm, "Origin");
+    if (!origin) return 1; /* Non-browser client; token check still applies */
+
+    struct mg_str *host = mg_http_get_header(hm, "Host");
+    if (!host) return 0;
+
+    /* Compare the authority portion of Origin ("scheme://authority") against
+     * the Host header. */
+    size_t prefix = 0;
+    for (size_t i = 0; i + 3 <= origin->len; i++) {
+        if (memcmp(origin->buf + i, "://", 3) == 0) {
+            prefix = i + 3;
+            break;
+        }
+    }
+    if (prefix == 0) return 0; /* Malformed or opaque origin ("null") */
+
+    struct mg_str authority = mg_str_n(origin->buf + prefix, origin->len - prefix);
+    return mg_strcasecmp(authority, *host) == 0;
+}
+
+static void send_forbidden(struct mg_connection *c) {
+    mg_http_reply(c, 403, "Content-Type: application/json\r\n",
+                  "{\"error\":\"forbidden\"}");
+}
+
 /* ======================= Mongoose Event Handler ============================ */
-
-/* Populate data->token. Honors PSND_WEB_NO_AUTH (disable, empty token) and
- * PSND_WEB_TOKEN (fixed token, e.g. for automation); otherwise generates a
- * random 128-bit hex token. */
-static void web_host_init_token(WebHostData *data) {
-    const char *no_auth = getenv("PSND_WEB_NO_AUTH");
-    if (no_auth && no_auth[0] && no_auth[0] != '0') {
-        data->token[0] = '\0';
-        return;
-    }
-    const char *fixed = getenv("PSND_WEB_TOKEN");
-    if (fixed && fixed[0]) {
-        snprintf(data->token, sizeof(data->token), "%s", fixed);
-        return;
-    }
-    unsigned char raw[16];
-    static const char hex[] = "0123456789abcdef";
-    if (!mg_random(raw, sizeof(raw))) {
-        /* Should not happen; fail closed by leaving auth enabled with a
-         * non-empty (if weak) token rather than disabling it. */
-        memset(raw, 0xA5, sizeof(raw));
-    }
-    for (size_t i = 0; i < sizeof(raw); i++) {
-        data->token[i * 2]     = hex[raw[i] >> 4];
-        data->token[i * 2 + 1] = hex[raw[i] & 0x0f];
-    }
-    data->token[sizeof(raw) * 2] = '\0';
-}
-
-/* Returns 1 if the request is authorized (auth disabled, or correct ?token=). */
-static int web_host_authorized(const WebHostData *data,
-                               struct mg_http_message *hm) {
-    if (data->token[0] == '\0') return 1; /* auth disabled */
-    char tok[64];
-    int n = mg_http_get_var(&hm->query, "token", tok, sizeof(tok));
-    if (n <= 0) return 0;
-    if ((size_t)n != strlen(data->token)) return 0;
-    return mg_strcmp(mg_str(tok), mg_str(data->token)) == 0 ? 1 : 0;
-}
 
 static void web_host_handler(struct mg_connection *c, int ev, void *ev_data) {
     WebHostData *data = (WebHostData *)c->fn_data;
@@ -722,23 +770,24 @@ static void web_host_handler(struct mg_connection *c, int ev, void *ev_data) {
     if (ev == MG_EV_HTTP_MSG) {
         struct mg_http_message *hm = (struct mg_http_message *)ev_data;
 
-        /* Require a valid token on the sensitive endpoints (WebSocket control
-         * channel and the REST API that runs code / reads & writes files). The
-         * HTML page and static assets are served freely so the browser can load
-         * them; the page forwards its ?token= to /ws. */
-        int is_ws = mg_match(hm->uri, mg_str("/ws"), NULL);
-        int is_api = hm->uri.len >= 5 && memcmp(hm->uri.buf, "/api/", 5) == 0;
-        if ((is_ws || is_api) && !web_host_authorized(data, hm)) {
-            mg_http_reply(c, 401, "Content-Type: text/plain\r\n",
-                          "Unauthorized: missing or invalid token\n");
-            return;
-        }
-
-        /* WebSocket upgrade */
+        /* WebSocket upgrade. Requires both a same-origin handshake and the
+         * session token: this connection can drive the whole editor. */
         if (mg_match(hm->uri, mg_str("/ws"), NULL)) {
+            if (!web_host_origin_ok(hm) || !web_host_token_ok(data, hm)) {
+                send_forbidden(c);
+                return;
+            }
             mg_ws_upgrade(c, hm, NULL);
             data->ws_conn = c;
             data->needs_render = 1; /* Send initial state */
+            return;
+        }
+
+        /* Everything under /api/ evaluates code or touches the filesystem, so
+         * it is token-gated too. */
+        if (mg_match(hm->uri, mg_str("/api/#"), NULL) &&
+            !web_host_token_ok(data, hm)) {
+            send_forbidden(c);
             return;
         }
 
@@ -786,7 +835,12 @@ static void web_host_handler(struct mg_connection *c, int ev, void *ev_data) {
         }
 #endif
 
-        /* Serve static files from web_root */
+        /* Serve static files from web_root. Token-gated: web_root is an
+         * arbitrary user-chosen directory. */
+        if (data->web_root && !web_host_token_ok(data, hm)) {
+            send_forbidden(c);
+            return;
+        }
         if (data->web_root) {
             struct mg_http_serve_opts opts = {
                 .root_dir = data->web_root,
@@ -864,7 +918,8 @@ static void web_host_destroy(EditorHost *host) {
 
 /* ======================= Public API ======================================== */
 
-EditorHost *editor_host_web_create(int port, const char *web_root) {
+EditorHost *editor_host_web_create(const char *bind_addr, int port,
+                                   const char *web_root) {
     EditorHost *host = calloc(1, sizeof(EditorHost));
     if (!host) return NULL;
 
@@ -883,7 +938,23 @@ EditorHost *editor_host_web_create(int port, const char *web_root) {
 
     data->port = port > 0 ? port : WEB_HOST_DEFAULT_PORT;
     data->running = 1;
-    web_host_init_token(data);
+
+    snprintf(data->bind_addr, sizeof(data->bind_addr), "%s",
+             (bind_addr && bind_addr[0]) ? bind_addr : WEB_HOST_DEFAULT_BIND);
+
+    /* Generate the per-session token before the listener starts accepting.
+     * mg_random_str() returns its own buffer and so reports nothing about
+     * entropy; mg_random() is the call that does, and it falls back to rand()
+     * when /dev/urandom cannot be read. Probe it first and refuse to start,
+     * rather than serving on a predictable token. */
+    if (!mg_random(data->token, sizeof(data->token))) {
+        fprintf(stderr, "Error: no secure RNG for the session token\n");
+        psnd_mutex_destroy(&data->queue_mutex);
+        free(data);
+        free(host);
+        return NULL;
+    }
+    mg_random_str(data->token, sizeof(data->token));
 
     if (web_root) {
         data->web_root = strdup(web_root);
@@ -898,14 +969,9 @@ EditorHost *editor_host_web_create(int port, const char *web_root) {
     /* Initialize mongoose */
     mg_mgr_init(&data->mgr);
 
-    /* Build listen URL.
-     * Default to loopback (127.0.0.1) so the editor, which has full filesystem
-     * access and no authentication, is NOT exposed to the local network.
-     * Set PSND_WEB_BIND=0.0.0.0 to deliberately expose it to other hosts. */
-    const char* bind_addr = getenv("PSND_WEB_BIND");
-    if (!bind_addr || !bind_addr[0]) bind_addr = "127.0.0.1";
-    char url[64];
-    snprintf(url, sizeof(url), "http://%s:%d", bind_addr, data->port);
+    /* Build listen URL */
+    char url[96];
+    snprintf(url, sizeof(url), "http://%s:%d", data->bind_addr, data->port);
 
     /* Start HTTP listener */
     data->listener = mg_http_listen(&data->mgr, url, web_host_handler, data);
@@ -935,28 +1001,83 @@ int editor_host_web_get_port(EditorHost *host) {
     return data->port;
 }
 
-int editor_host_web_run(int port, const char *web_root, const EditorConfig *config) {
+/* Hand `url` to the platform's default browser, without a shell: the URL
+ * carries the session token and the bind address comes from the command line,
+ * so nothing here is interpolated into a command string. Failure is silent
+ * beyond a note - the URL has already been printed for the user to open. */
+static void web_host_open_url(const char *url) {
+#ifdef _WIN32
+    if ((INT_PTR)ShellExecuteA(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL) <= 32) {
+        fprintf(stderr, "Note: could not open a browser; open the URL above.\n");
+    }
+#else
+#ifdef __APPLE__
+    char *const argv[] = { (char *)"/usr/bin/open", (char *)url, NULL };
+#else
+    char *const argv[] = { (char *)"xdg-open", (char *)url, NULL };
+#endif
+    /* Double fork: the grandchild is reparented to init, so the opener is
+     * never a zombie in a server that runs for hours and never waits. */
+    pid_t pid = fork();
+    if (pid < 0) {
+        fprintf(stderr, "Note: could not open a browser; open the URL above.\n");
+        return;
+    }
+    if (pid == 0) {
+        if (fork() == 0) {
+            /* xdg-open is chatty and would corrupt the terminal UI. */
+            int devnull = open("/dev/null", O_WRONLY);
+            if (devnull >= 0) {
+                dup2(devnull, STDOUT_FILENO);
+                dup2(devnull, STDERR_FILENO);
+                if (devnull > STDERR_FILENO) close(devnull);
+            }
+            setsid();
+            execvp(argv[0], argv);
+            _exit(127);
+        }
+        _exit(0);
+    }
+    /* Returns as soon as the intermediate exits, not when the browser does. */
+    waitpid(pid, NULL, 0);
+#endif
+}
+
+int editor_host_web_run(const char *bind_addr, int port, const char *web_root,
+                        int open_browser, const EditorConfig *config) {
     /* Register all languages before creating session */
     loki_lang_init();
 
-    EditorHost *host = editor_host_web_create(port, web_root);
+    EditorHost *host = editor_host_web_create(bind_addr, port, web_root);
     if (!host) {
         return 1;
     }
 
     WebHostData *data = (WebHostData *)host->data;
-    if (data->token[0]) {
-        fprintf(stderr, "Web editor running. Open this URL (includes access token):\n");
-        fprintf(stderr, "  http://localhost:%d/?token=%s\n", data->port, data->token);
-    } else {
-        fprintf(stderr, "Web editor running at http://localhost:%d "
-                        "(token auth disabled)\n", data->port);
+
+    /* One URL for both the message and the browser: the token is only useful
+     * to the client when it arrives with the address. */
+    char url[160];
+    snprintf(url, sizeof(url), "http://%s:%d/?token=%s",
+             data->bind_addr, data->port, data->token);
+
+    fprintf(stderr, "Web editor running at %s\n", url);
+    if (strcmp(data->bind_addr, "127.0.0.1") != 0 &&
+        strcmp(data->bind_addr, "localhost") != 0) {
+        fprintf(stderr,
+                "WARNING: bound to %s - reachable from the network. Anyone who\n"
+                "         obtains the token above can run code as you.\n",
+                data->bind_addr);
     }
     if (data->web_root) {
         fprintf(stderr, "Serving static files from: %s\n", data->web_root);
     }
     fprintf(stderr, "Press Ctrl-C to stop\n");
     fflush(stderr);
+
+    /* After the listener is bound, so the browser cannot beat the server to
+     * the port. */
+    if (open_browser) web_host_open_url(url);
 
     int result = editor_host_run(host, config);
 

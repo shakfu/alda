@@ -30,6 +30,7 @@ endif()
 option(LOKI_BUILD_SHARED "Build libloki as a shared library" OFF)
 option(ENABLE_LTO_IPO "Enable Link-time interprocedural optimization" OFF)
 option(BUILD_CSOUND_BACKEND "Build with Csound synthesis backend (requires libsndfile)" OFF)
+option(BUILD_FLUID_BACKEND "Build with FluidSynth synthesis backend" OFF)
 option(BUILD_MINIHOST_BACKEND "Build with minihost VST/AU plugin support (fetches JUCE)" OFF)
 option(BUILD_TESTING "Build tests (default on)" ON)
 option(BUILD_WEB_HOST "Build web server host with mongoose" OFF)
@@ -37,6 +38,11 @@ option(BUILD_WEB_HOST "Build web server host with mongoose" OFF)
 # project Lua, so an unsandboxed interpreter would make opening any file/repo
 # arbitrary code execution. Set -DLUA_SANDBOX=OFF to restore full os/io/debug.
 option(LUA_SANDBOX "Sandbox Lua: disable os, io, debug, load*" ON)
+if(BUILD_WEB_HOST AND NOT LUA_SANDBOX)
+    message(WARNING
+        "LUA_SANDBOX=OFF with BUILD_WEB_HOST=ON: network clients can run "
+        "arbitrary shell commands via Lua.")
+endif()
 # Shell-exec primitives (e.g. Joy's `system`) are OFF by default; they let a
 # music script run arbitrary shell commands. Opt in explicitly to enable them.
 option(PSND_ENABLE_SHELL "Allow language-level shell execution primitives" OFF)
@@ -115,14 +121,15 @@ install(TARGETS psnd_bin
 )
 
 # Install default configuration files
+# Ships init.lua, modules/, keybindings/, the 17 themes (*.toml),
+# languages/*.toml and the Scala scales (*.scl).
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/.psnd/
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psnd
     FILES_MATCHING
     PATTERN "*.lua"
-    PATTERN "languages/*.lua"
-    PATTERN "keybindings/*.lua"
-    PATTERN "modules/*.lua"
-    PATTERN "themes/*.lua"
+    PATTERN "*.toml"
+    PATTERN "*.scl"
+    PATTERN "*.md"
 )
 
 # Print install summary

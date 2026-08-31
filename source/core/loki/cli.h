@@ -25,6 +25,7 @@ typedef struct {
     const char *plugin_path;    /* Path to VST3/AU plugin (--plugin) */
     const char *plugin_log;     /* Path to plugin debug log (--plugin-log) */
     const char *web_root;       /* Web UI directory for web mode (--web-root) */
+    const char *web_host;       /* Web server bind address (--web-host, default 127.0.0.1) */
     int show_help;              /* User requested help (-h, --help) */
     int show_version;           /* User requested version (-v, --version) */
     int line_numbers;           /* Enable line numbers (--line-numbers) */
@@ -33,6 +34,7 @@ typedef struct {
     int json_rpc_single;        /* Single-shot JSON-RPC (--json-rpc-single) */
     int web_mode;               /* Run as web server (--web) */
     int web_port;               /* Web server port (--web-port, default 8080) */
+    int web_open;               /* Open the tokenized URL in a browser (--web-open) */
     int native_mode;            /* Run with native webview (--native) */
     int rows;                   /* Screen rows for headless mode (--rows) */
     int cols;                   /* Screen cols for headless mode (--cols) */

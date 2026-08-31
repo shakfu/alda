@@ -708,6 +708,12 @@ else()
     )
 endif()
 
+# mhs-embed is used by every embedded-header generator. Without an owning
+# target the Makefile generator duplicates the compile rule into each consuming
+# target, and `make -j` then compiles several copies over the same output path
+# at once - a consumer exec'ing the half-written binary fails with error 126.
+add_custom_target(mhs-embed-tool DEPENDS ${MHS_EMBED})
+
 # ============================================
 # Generate embedded headers for source-based variants
 # ============================================
@@ -796,6 +802,14 @@ add_custom_command(
     VERBATIM
 )
 
+# This package is consumed by several targets (the standalone variants and the
+# psnd embedded header). The Makefile generator copies a shared custom command
+# into every consuming target's build.make, so under `make -j` two targets would
+# run the copy_directory/mcabal step concurrently in the same directory and one
+# would fail. Giving the command a single owning target, and ordering every
+# consumer behind it via add_dependencies(), keeps it to one execution.
+add_custom_target(mhs-base-pkg DEPENDS ${DIST_BASE_PKG})
+
 # Install base.pkg locally and copy runtime files
 set(MHS_DATA_DIR "${BASE_DIR}/packages/mhs-${MHS_VERSION}/data")
 add_custom_command(
@@ -816,6 +830,7 @@ add_custom_command(
     VERBATIM
 )
 add_custom_target(mhs-local-install DEPENDS ${LOCAL_MCABAL_STAMP})
+add_dependencies(mhs-local-install mhs-base-pkg)
 
 # Generate music.pkg
 set(MUSIC_PKG ${CMAKE_CURRENT_BINARY_DIR}/music-0.1.0.pkg)
@@ -835,6 +850,7 @@ add_custom_command(
     COMMENT "Building music-0.1.0.pkg"
     VERBATIM
 )
+add_custom_target(mhs-music-pkg DEPENDS ${MUSIC_PKG})
 
 # mhs-midi-pkg: uncompressed package embedding
 # Uses mhs_embedded_pkgs.h (expected by vfs.c VFS_USE_PKG mode)
@@ -899,6 +915,11 @@ add_custom_command(
 
 add_custom_target(mhs-embedded-pkg-zstd-header DEPENDS ${EMBEDDED_PKG_ZSTD_HEADER})
 
+# Single handle for everything the embedded-header generators need. Consumers
+# depend on this target so the shared steps above run exactly once.
+add_custom_target(mhs-embed-prereqs)
+add_dependencies(mhs-embed-prereqs mhs-embed-tool mhs-local-install mhs-music-pkg)
+
 endif() # BUILD_MHS_PKG_VARIANTS
 
 # ============================================
@@ -928,6 +949,10 @@ function(add_mhs_standalone_variant TARGET_NAME HEADER_TARGET)
     # Ordering only - the header's own rule lives in HEADER_TARGET. Rebuilds on
     # header change still come from CMake's dependency scan of vfs.c.
     add_dependencies(${TARGET_NAME} ${HEADER_TARGET})
+    add_dependencies(${TARGET_NAME} mhs-embed-tool)
+    if(TARGET mhs-embed-prereqs)
+        add_dependencies(${TARGET_NAME} mhs-embed-prereqs)
+    endif()
 
     target_include_directories(${TARGET_NAME} PRIVATE
         ${MHS_RUNTIME}
@@ -1118,6 +1143,10 @@ if(ENABLE_MHS_INTEGRATION AND NOT WIN32)
         # makes a parallel build run the generator twice.
         add_custom_target(mhs-psnd-embedded-header)
         add_dependencies(mhs-psnd-embedded-header ${PSND_HEADER_GEN_TARGET})
+        add_dependencies(mhs-psnd-embedded-header mhs-embed-tool)
+        if(TARGET mhs-embed-prereqs)
+            add_dependencies(mhs-psnd-embedded-header mhs-embed-prereqs)
+        endif()
     else()
         # Generate psnd-specific headers without libraries
         # This reduces binary size by ~1.3MB (no libremidi.a)
@@ -1196,6 +1225,10 @@ if(ENABLE_MHS_INTEGRATION AND NOT WIN32)
 
         # Create a custom target for the embedded header
         add_custom_target(mhs-psnd-embedded-header DEPENDS ${PSND_HEADER_TARGET})
+        add_dependencies(mhs-psnd-embedded-header mhs-embed-tool)
+        if(TARGET mhs-embed-prereqs)
+            add_dependencies(mhs-psnd-embedded-header mhs-embed-prereqs)
+        endif()
     endif()
 
     # mhs_runtime depends on the embedded header being generated

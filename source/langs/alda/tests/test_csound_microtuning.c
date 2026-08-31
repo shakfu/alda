@@ -26,7 +26,11 @@
 #include <alda/scala.h>
 #include <alda/csound_backend.h>
 
-#define TEST_DATA_DIR "../tests/alda/data"
+/* Supplied by CMake as an absolute path; the fallback assumes an in-tree
+ * ./build directory. */
+#ifndef TEST_DATA_DIR
+#define TEST_DATA_DIR "../source/langs/alda/tests/data"
+#endif
 #define JUST_12_SCL TEST_DATA_DIR "/just_12.scl"
 #define MICROTUNING_CSD TEST_DATA_DIR "/microtuning_test.csd"
 

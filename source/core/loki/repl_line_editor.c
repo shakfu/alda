@@ -808,7 +808,8 @@ char *repl_readline(editor_ctx_t *syntax_ctx, ReplLineEditor *ed, const char *pr
 
             if (ed->history_idx < ed->history_len - 1) {
                 ed->history_idx++;
-                strcpy(ed->buf, ed->history[ed->history_idx]);
+                strncpy(ed->buf, ed->history[ed->history_idx], REPL_MAX_INPUT_LENGTH - 1);
+                ed->buf[REPL_MAX_INPUT_LENGTH - 1] = '\0';
                 ed->len = strlen(ed->buf);
                 ed->pos = ed->len;
             } else {
