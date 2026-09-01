@@ -239,16 +239,25 @@ TEST(lang_file_does_not_open_editor_tr7) {
 
 TEST(lang_flag_taking_file_reaches_language_mhs) {
     /* The form mhs documents: -r runs the file. Under the regression the
-       editor consumed it and reported "Unknown option: -r". */
+       editor consumed it and reported "Unknown option: -r".
+
+       Reaching the language is the contract under test, and that holds on every
+       platform. Running the module does not: MHS integration needs fmemopen, so
+       Windows registers mhs with stub entry points that dispatch reaches and
+       then fails. Asserting success there tests the backend, not the routing. */
     char output[8192] = {0};
     int result = run_lang_with_file(
         "mhs", "-r", "Delegate.hs",
         "module Delegate(main) where\nmain :: IO ()\n"
         "main = putStrLn \"psnd-dispatch-ok\"\n",
         output, sizeof(output));
-    ASSERT_EQ(result, 0);
     ASSERT_FALSE(landed_in_editor(output));
+#ifdef PSND_MHS_ENABLED
+    ASSERT_EQ(result, 0);
     ASSERT_NOT_NULL(strstr(output, "psnd-dispatch-ok"));
+#else
+    (void)result;
+#endif
 }
 
 TEST(lang_file_of_another_language_still_delegates) {

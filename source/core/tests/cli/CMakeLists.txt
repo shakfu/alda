@@ -82,7 +82,8 @@ add_test(
     COMMAND $<TARGET_FILE:test_main_dispatch>
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
-# lang_flag_taking_file_reaches_language_mhs compiles a Haskell module through
-# the embedded MicroHs runtime, which is ~90s on macOS and slower on Windows.
-# Well above the ctest default the CI workflows pass.
+# Runs psnd ~30 times, one of them through the embedded MicroHs runtime. Warm,
+# that is 4-9s across the three CI platforms; against a cold .mhscache the MHS
+# case alone compiles the base packages and reaches ~90s. The ceiling covers the
+# cold path, which the 120s default the CI workflows pass would not.
 set_tests_properties(cli_main_dispatch_tests PROPERTIES LABELS "integration" TIMEOUT 300)
