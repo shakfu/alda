@@ -22,6 +22,7 @@ jobs:
   build-unix:
     name: Build ${{ inputs.variant }} (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -106,6 +107,7 @@ jobs:
   build-windows:
     name: Build ${{ inputs.variant }} (Windows MSVC)
     runs-on: windows-latest
+    timeout-minutes: 45
     env:
       BUILD_DIR: build
       BUILD_TYPE: Release
@@ -160,7 +162,7 @@ jobs:
       - name: Run tests
         run: |
           cd ${{ env.BUILD_DIR }}
-          ctest --output-on-failure -C ${{ env.BUILD_TYPE }}
+          ctest --output-on-failure --timeout 120 -C ${{ env.BUILD_TYPE }}
 
       - name: Collect artifact
         run: |
@@ -177,6 +179,7 @@ jobs:
   bundle:
     name: Bundle artifacts
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: [build-unix, build-windows]
     if: always() && (needs.build-unix.result == 'success' || needs.build-windows.result == 'success')
     steps:

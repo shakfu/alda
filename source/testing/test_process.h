@@ -50,6 +50,28 @@
  * =============================================================================
  */
 
+#ifdef _WIN32
+/**
+ * Open an inheritable handle to the null device, the Windows spelling of
+ * /dev/null.
+ *
+ * STARTF_USESTDHANDLES with a NULL member does not give the child an empty
+ * stream: the CRT falls back to the console CREATE_NO_WINDOW allocated for it,
+ * so isatty() reports a terminal and a child that reads stdin blocks forever.
+ * A real NUL handle reports non-tty and reads EOF, matching the POSIX branch.
+ *
+ * @param access  GENERIC_READ for stdin, GENERIC_WRITE for stdout/stderr
+ * @return        Handle, or INVALID_HANDLE_VALUE on failure
+ */
+static inline HANDLE test_proc_open_nul(DWORD access) {
+    SECURITY_ATTRIBUTES sa = {0};
+    sa.nLength = sizeof(sa);
+    sa.bInheritHandle = TRUE;
+    return CreateFileA("NUL", access, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                       &sa, OPEN_EXISTING, 0, NULL);
+}
+#endif
+
 /**
  * Execute a binary with arguments using fork/exec.
  *
@@ -71,18 +93,33 @@ static inline int test_exec(const char *binary_path, char *const args[]) {
         pos += snprintf(cmdline + pos, sizeof(cmdline) - pos, "\"%s\"", args[i]);
     }
 
+    /* stdin, stdout and stderr all to NUL, as the POSIX branch does. */
+    HANDLE nul_in = test_proc_open_nul(GENERIC_READ);
+    HANDLE nul_out = test_proc_open_nul(GENERIC_WRITE);
+    if (nul_in == INVALID_HANDLE_VALUE || nul_out == INVALID_HANDLE_VALUE) {
+        if (nul_in != INVALID_HANDLE_VALUE) CloseHandle(nul_in);
+        if (nul_out != INVALID_HANDLE_VALUE) CloseHandle(nul_out);
+        return -1;
+    }
+
     STARTUPINFOA si = {0};
     PROCESS_INFORMATION pi = {0};
     si.cb = sizeof(si);
     si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdInput = NULL;
-    si.hStdOutput = NULL;
-    si.hStdError = NULL;
+    si.hStdInput = nul_in;
+    si.hStdOutput = nul_out;
+    si.hStdError = nul_out;
 
-    if (!CreateProcessA(binary_path, cmdline, NULL, NULL, FALSE,
+    /* STARTF_USESTDHANDLES requires bInheritHandles TRUE; with FALSE the child
+       does not receive the handles above. */
+    if (!CreateProcessA(binary_path, cmdline, NULL, NULL, TRUE,
                         CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+        CloseHandle(nul_in);
+        CloseHandle(nul_out);
         return -1;
     }
+    CloseHandle(nul_in);
+    CloseHandle(nul_out);
 
     WaitForSingleObject(pi.hProcess, INFINITE);
     DWORD exit_code;
@@ -160,30 +197,58 @@ static inline int test_exec_capture(const char *binary_path, char *const args[],
     }
     SetHandleInformation(hReadPipe, HANDLE_FLAG_INHERIT, 0);
 
-    STARTUPINFOA si = {0};
-    PROCESS_INFORMATION pi = {0};
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdInput = NULL;
-    si.hStdOutput = hWritePipe;
-    si.hStdError = NULL;
-
-    if (!CreateProcessA(binary_path, cmdline, NULL, NULL, TRUE,
-                        CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+    /* stdin and stderr to NUL (see test_proc_open_nul); stdout to the pipe. */
+    HANDLE nul_in = test_proc_open_nul(GENERIC_READ);
+    HANDLE nul_err = test_proc_open_nul(GENERIC_WRITE);
+    if (nul_in == INVALID_HANDLE_VALUE || nul_err == INVALID_HANDLE_VALUE) {
+        if (nul_in != INVALID_HANDLE_VALUE) CloseHandle(nul_in);
+        if (nul_err != INVALID_HANDLE_VALUE) CloseHandle(nul_err);
         CloseHandle(hReadPipe);
         CloseHandle(hWritePipe);
         return -1;
     }
+
+    STARTUPINFOA si = {0};
+    PROCESS_INFORMATION pi = {0};
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = nul_in;
+    si.hStdOutput = hWritePipe;
+    si.hStdError = nul_err;
+
+    if (!CreateProcessA(binary_path, cmdline, NULL, NULL, TRUE,
+                        CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+        CloseHandle(nul_in);
+        CloseHandle(nul_err);
+        CloseHandle(hReadPipe);
+        CloseHandle(hWritePipe);
+        return -1;
+    }
+    CloseHandle(nul_in);
+    CloseHandle(nul_err);
     CloseHandle(hWritePipe);
 
-    /* Read output */
-    if (output && output_size > 0) {
+    /* Drain to EOF. ReadFile returns as soon as any bytes are available, so a
+       single call truncates output that arrives in more than one chunk. Reads
+       past output_size are discarded rather than left in the pipe, so a child
+       writing more than the pipe buffer holds does not block on write. */
+    {
+        size_t total = 0;
+        char scratch[4096];
         DWORD bytes_read;
-        if (ReadFile(hReadPipe, output, (DWORD)(output_size - 1), &bytes_read, NULL)) {
-            output[bytes_read] = '\0';
-        } else {
-            output[0] = '\0';
+        for (;;) {
+            char *dst = scratch;
+            DWORD want = (DWORD)sizeof(scratch);
+            if (output && output_size > 0 && total < output_size - 1) {
+                dst = output + total;
+                want = (DWORD)(output_size - 1 - total);
+            }
+            if (!ReadFile(hReadPipe, dst, want, &bytes_read, NULL) || bytes_read == 0) {
+                break;
+            }
+            if (dst != scratch) total += bytes_read;
         }
+        if (output && output_size > 0) output[total] = '\0';
     }
     CloseHandle(hReadPipe);
 
@@ -224,13 +289,23 @@ static inline int test_exec_capture(const char *binary_path, char *const args[],
     /* Parent process */
     close(pipefd[1]);  /* Close write end */
 
-    if (output && output_size > 0) {
-        ssize_t bytes_read = read(pipefd[0], output, output_size - 1);
-        if (bytes_read >= 0) {
-            output[bytes_read] = '\0';
-        } else {
-            output[0] = '\0';
+    /* Drain to EOF; see the Windows branch on why one read() is not enough. */
+    {
+        size_t total = 0;
+        char scratch[4096];
+        for (;;) {
+            char *dst = scratch;
+            size_t want = sizeof(scratch);
+            if (output && output_size > 0 && total < output_size - 1) {
+                dst = output + total;
+                want = output_size - 1 - total;
+            }
+            ssize_t bytes_read = read(pipefd[0], dst, want);
+            if (bytes_read < 0 && errno == EINTR) continue;
+            if (bytes_read <= 0) break;
+            if (dst != scratch) total += (size_t)bytes_read;
         }
+        if (output && output_size > 0) output[total] = '\0';
     }
     close(pipefd[0]);
 

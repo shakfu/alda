@@ -82,4 +82,7 @@ add_test(
     COMMAND $<TARGET_FILE:test_main_dispatch>
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
-set_tests_properties(cli_main_dispatch_tests PROPERTIES LABELS "integration")
+# lang_flag_taking_file_reaches_language_mhs compiles a Haskell module through
+# the embedded MicroHs runtime, which is ~90s on macOS and slower on Windows.
+# Well above the ctest default the CI workflows pass.
+set_tests_properties(cli_main_dispatch_tests PROPERTIES LABELS "integration" TIMEOUT 300)

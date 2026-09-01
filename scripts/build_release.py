@@ -150,6 +150,11 @@ def run_tests(build_dir: Path) -> None:
             "--build-config",
             "Release",
             "--output-on-failure",
+            # Default per-test ceiling. Tests carrying their own TIMEOUT
+            # property keep it. Without this a test that blocks on stdin hangs
+            # the whole job until the runner's 6-hour limit.
+            "--timeout",
+            "120",
         ]
     )
 

@@ -17,6 +17,7 @@ jobs:
   build:
     name: build (${{ matrix.target }}, ${{ matrix.variant }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     strategy:
       # No fail-fast: a single bad variant should not cancel the others. The
       # whole `build` job still reports failure if any leg fails, which gates
@@ -113,6 +114,7 @@ jobs:
     # only when EVERY matrix leg (all 7 variants x 3 platforms) succeeded.
     # Any failure blocks the release -- no partial publishes.
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: write
     steps:

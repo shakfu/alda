@@ -12,6 +12,7 @@ jobs:
   build-windows-mingw:
     name: Windows MinGW
     runs-on: windows-latest
+    timeout-minutes: 45
     defaults:
       run:
         shell: msys2 {0}
@@ -50,7 +51,7 @@ jobs:
       - name: Run tests
         run: |
           cd ${{ env.BUILD_DIR }}
-          ctest --output-on-failure -C ${{ env.BUILD_TYPE }}
+          ctest --output-on-failure --timeout 120 -C ${{ env.BUILD_TYPE }}
 
       - name: Collect artifact
         shell: pwsh
@@ -70,6 +71,7 @@ jobs:
   build-windows-msvc:
     name: Windows MSVC ${{ matrix.variant }}
     runs-on: windows-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -125,7 +127,7 @@ jobs:
       - name: Run tests
         run: |
           cd ${{ env.BUILD_DIR }}
-          ctest --output-on-failure -C ${{ env.BUILD_TYPE }}
+          ctest --output-on-failure --timeout 120 -C ${{ env.BUILD_TYPE }}
 
       - name: Collect artifact
         run: |
@@ -142,6 +144,7 @@ jobs:
   bundle-windows:
     name: Bundle Windows binaries
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: [build-windows-mingw, build-windows-msvc]
     if: always() && (needs.build-windows-mingw.result == 'success' || needs.build-windows-msvc.result == 'success')
     steps:

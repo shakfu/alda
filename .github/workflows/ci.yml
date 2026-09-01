@@ -11,6 +11,7 @@ jobs:
   build:
     name: build + test (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
