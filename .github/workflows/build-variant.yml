@@ -40,7 +40,7 @@ jobs:
       BUILD_TYPE: Release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Extract version from CMakeLists.txt
         id: version
@@ -95,7 +95,7 @@ jobs:
           cmake -E copy "${{ matrix.binary_path }}" "artifacts/psnd-${{ steps.version.outputs.version }}-${{ inputs.variant }}-${{ matrix.artifact_suffix }}"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: psnd-${{ steps.version.outputs.version }}-${{ inputs.variant }}-${{ matrix.artifact_suffix }}
           path: artifacts/*
@@ -113,7 +113,7 @@ jobs:
       BUILD_TYPE: Release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Extract version from CMakeLists.txt
         id: version
@@ -170,7 +170,7 @@ jobs:
           Copy-Item "build/${{ env.BUILD_TYPE }}/psnd.exe" "artifacts/psnd-${{ steps.version.outputs.version }}-${{ inputs.variant }}-windows.exe"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: psnd-${{ steps.version.outputs.version }}-${{ inputs.variant }}-windows
           path: artifacts/*
@@ -184,7 +184,7 @@ jobs:
     if: always() && (needs.build-unix.result == 'success' || needs.build-windows.result == 'success')
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Extract version from CMakeLists.txt
         id: version
@@ -193,7 +193,7 @@ jobs:
           echo "version=$ver" >> "$GITHUB_OUTPUT"
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: psnd-${{ steps.version.outputs.version }}-${{ inputs.variant }}-*
           path: dist
@@ -207,7 +207,7 @@ jobs:
           tar -czf psnd-${{ steps.version.outputs.version }}-${{ inputs.variant }}-all-platforms.tar.gz -C dist .
 
       - name: Upload bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: psnd-${{ steps.version.outputs.version }}-${{ inputs.variant }}-cross-platform
           path: psnd-${{ steps.version.outputs.version }}-${{ inputs.variant }}-all-platforms.tar.gz

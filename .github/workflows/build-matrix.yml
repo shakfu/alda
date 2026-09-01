@@ -59,7 +59,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -127,7 +127,7 @@ jobs:
           Compress-Archive -Path "${name}.exe" -DestinationPath "artifacts/${name}.zip"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: psnd-${{ steps.version.outputs.version }}-${{ matrix.variant }}-${{ matrix.platform }}
           path: artifacts/*
@@ -141,7 +141,7 @@ jobs:
     if: ${{ !cancelled() }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Extract version from CMakeLists.txt
         id: version
@@ -150,7 +150,7 @@ jobs:
           echo "version=$ver" >> "$GITHUB_OUTPUT"
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: psnd-${{ steps.version.outputs.version }}-*
           path: dist
@@ -163,7 +163,7 @@ jobs:
         run: tar -czf psnd-${{ steps.version.outputs.version }}-all-variants.tar.gz -C dist .
 
       - name: Upload bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: psnd-${{ steps.version.outputs.version }}-all-variants-bundle
           path: psnd-${{ steps.version.outputs.version }}-all-variants.tar.gz
