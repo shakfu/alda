@@ -30,6 +30,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 
+- **MHS End-To-End Smoke Test**: `mhs_smoke_tests` runs a Haskell module through the psnd binary and checks its output, covering VFS init, the embedded `base` and `music` packages, compilation and evaluation. The two existing MHS tests exercise C entry points without ever starting the interpreter, so nothing verified that path (`source/langs/mhs/tests/smoke_test.cmake`, `Smoke.hs`)
+
 - **`--web-open`**: hands the tokenized startup URL to the default browser (`open`, `xdg-open`, or `ShellExecuteA`) once the listener is bound. Off by default, since opening a browser is wrong for a headless or SSH session. The URL is passed as an argument vector rather than a shell string, and the POSIX path double-forks so the opener is never left as a zombie in a server that never waits (`host_web.c`, `cli.c`)
 
 ### Removed
@@ -37,6 +39,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **`PSND_WEB_BIND`, `PSND_WEB_TOKEN` and `PSND_WEB_NO_AUTH` Environment Variables**: replaced by `--web-host ADDR`; the session token is always generated and cannot be disabled or fixed. Scripts that set these must pass `--web-host` and read the token from the startup URL instead (`host_web.c`)
 
 ### Fixed
+
+- **`psnd <lang>` Stopped Delegating Its Arguments**: `85739c8` added a scan to the language-command branch of `main.c` that diverted the whole command line to the editor whenever any argument carried a registered extension. Every documented execute form -- `psnd alda song.alda`, `psnd bog song.bog`, `psnd joy song.joy`, `psnd tr7 song.scm` -- silently became an edit, and `psnd mhs -r file.hs` failed with `Unknown option: -r` because `-r` reached the editor's parser instead of MicroHs. The scan also matched any language's extensions, so `psnd joy song.alda` opened an Alda file under the `joy` subcommand. The branch delegates again: the language owns its flags and is the only thing that knows which take a file operand, and the editor is still reached by `psnd <file>` (`main.c`)
+
+- **Test Harness Leaked Its stdin Into Child Processes**: `test_exec` and `test_exec_capture` redirected the child's stdout and stderr but not its stdin, so a test running a binary that reads stdin -- psnd enters a REPL after loading a file -- either hung or consumed the runner's input, depending on what stdin happened to be. Both now give the child `/dev/null` (`test_process.h`)
 
 - **Tracker MIDI Export Truncated Paths Silently**: the bounded `snprintf` strip-then-append introduced in 0.2.0 still produced a wrong output path rather than an error when the source path did not fit, and could strip at a dot inside a directory name. Both call sites now share `derive_midi_path()`, which rejects an over-long path and only treats a dot in the final component as an extension (`tracker_view.c`)
 
@@ -51,6 +57,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **Out-of-Tree Test Fixtures**: `alda_microtuning_tests` hardcoded a data path relative to an in-tree `./build`, and `test_csound_microtuning.c` pointed at the pre-reorganization `tests/alda/data`. `TEST_DATA_DIR` is now supplied by CMake as an absolute path
 
 ### Changed
+
+- **MicroHs Runtime No Longer Forked Into The Tree**: `source/langs/mhs/impl/` held 13 files copied from `source/thirdparty/MicroHs/src/runtime/`, of which 12 were byte-identical to upstream. Only `eval.c` differed, solely by renaming `mmalloc`/`mrealloc`/`mcalloc` to `mhs_*` to avoid a clash with Csound, which exports the same names. That rename moved into `mhs-patch-eval.py --rename-malloc`, beside the VFS patch the same script already applied at build time, and the copies are gone. The generated `eval_psnd.c` was diffed against the fork's output and is byte-identical, so no compiled code changed. The fork had to be re-synced by hand on every upstream bump; a bump is now a matter of replacing the vendored tree (`source/langs/mhs/CMakeLists.txt`, `scripts/mhs-patch-eval.py`)
+
+- **MicroHs Version Read From `MicroHs.cabal`**: the version was pinned as a literal `0.15.0.0` in two places, and package paths (`base-<version>.pkg`, the mcabal install layout) are derived from it, so a bump meant editing both and finding out at link time if one was missed. It is now parsed once with a format check that fails configuration. A third pin, `MHS_VERSION_PSND`, was set and never read (`source/langs/mhs/CMakeLists.txt`)
 
 - **Variant Matrix Runs Nightly**: `build-matrix.yml` gains a 04:00 UTC schedule, covering the variant and platform combinations the per-push `ci` workflow does not build (`.github/workflows/build-matrix.yml`)
 

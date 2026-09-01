@@ -147,7 +147,7 @@ Findings from `REVIEW.md` (2026-08-24), re-verified against the tree. Ordered by
 
   - `vfs_cleanup_temp` (`langs/mhs/vfs.c:829-836`) shells out via `system("rm -rf ...")`. The path comes from `mkdtemp`, so it is not directly injectable, but it should be `nftw`-based like the CLI test harness already is.
 
-  - The `system` primitive at `langs/mhs/impl/eval.c:6765` is the real exposure. Two caveats the review missed: that file is vendored MicroHs upstream (Augustsson, 7,288 lines), so gating it means carrying a patch; and the adjacent `mhs_fopen`, `mhs_open`, and `mhs_unlink` grant equivalent filesystem access, so gating `system` alone does not sandbox anything.
+  - The `system` primitive at `source/thirdparty/MicroHs/src/runtime/eval.c:6765` is the real exposure. Two caveats the review missed: that file is vendored MicroHs upstream (Augustsson, 7,288 lines), so gating it means carrying a patch; and the adjacent `mhs_fopen`, `mhs_open`, and `mhs_unlink` grant equivalent filesystem access, so gating `system` alone does not sandbox anything.
 
   - Gating `system` alone would buy nothing regardless, and a `WANT_STDIO`-scoped build variant is a large change against vendored upstream. Joy's `PSND_ENABLE_SHELL` gate (`joy_primitives.c:4755-4764`) already exists and can stay as-is; it is not worth mirroring in MHS.
 

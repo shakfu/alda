@@ -103,6 +103,11 @@ static inline int test_exec(const char *binary_path, char *const args[]) {
         /* Redirect stdout and stderr to /dev/null for quiet tests */
         if (freopen("/dev/null", "w", stdout) == NULL) _exit(127);
         if (freopen("/dev/null", "w", stderr) == NULL) _exit(127);
+        /* Give the child an empty stdin. Inheriting the runner's stdin makes a
+           child that reads it (psnd drops into a REPL after loading a file)
+           either hang or steal the runner's input, depending on what stdin
+           happens to be when the suite runs. */
+        if (freopen("/dev/null", "r", stdin) == NULL) _exit(127);
 
         execv(binary_path, args);
 
@@ -208,8 +213,9 @@ static inline int test_exec_capture(const char *binary_path, char *const args[],
         dup2(pipefd[1], STDOUT_FILENO);
         close(pipefd[1]);
 
-        /* Redirect stderr to /dev/null */
+        /* Redirect stderr and stdin to /dev/null (see test_exec on stdin) */
         if (freopen("/dev/null", "w", stderr) == NULL) _exit(127);
+        if (freopen("/dev/null", "r", stdin) == NULL) _exit(127);
 
         execv(binary_path, args);
         _exit(127);

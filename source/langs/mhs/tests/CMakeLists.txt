@@ -35,3 +35,16 @@ endmacro()
 # Add MHS tests
 add_mhs_test(midi_ffi)
 add_mhs_test(context)
+
+# End-to-end smoke test: runs Smoke.hs through the psnd binary, exercising the
+# VFS and the embedded base and music packages. The unit tests above never
+# start the interpreter, so this is the only coverage of that path.
+add_test(
+    NAME mhs_smoke_tests
+    COMMAND ${CMAKE_COMMAND}
+        -DPSND=$<TARGET_FILE:psnd_bin>
+        -DFIXTURE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/smoke_test.cmake
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+set_tests_properties(mhs_smoke_tests PROPERTIES LABELS "integration" TIMEOUT 180)

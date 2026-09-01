@@ -168,6 +168,100 @@ TEST(joy_list_ports) {
 }
 
 /*============================================================================
+ * Language Delegation Tests
+ *
+ * `psnd <lang> ...` must hand every remaining argument to the language. The
+ * editor is reached by `psnd <file>`, so routing `psnd <lang> <file>` there is
+ * a redundant spelling that costs the language its arguments.
+ *
+ * Regression: between 85739c8 (2026-01-30) and the fix, main.c scanned for an
+ * argument carrying any registered extension and diverted the whole command to
+ * the editor. That silently turned every documented `psnd <lang> <file>`
+ * execute form into an edit, and made `psnd mhs -r f.hs` fail outright because
+ * the editor rejects -r. The editor writes terminal escapes even through a
+ * pipe, so its presence is what these tests detect.
+ *============================================================================*/
+
+/* Run `psnd <args>` on a file written into the temp dir, capturing stdout. */
+static int run_lang_with_file(const char *lang, const char *flag,
+                              const char *filename, const char *content,
+                              char *output, size_t output_size) {
+    char filepath[TEST_PROC_MAX_PATH];
+    test_build_path(temp_dir, filename, filepath);
+
+    if (test_write_file(temp_dir, filename, content) != 0) {
+        return -1;
+    }
+
+    if (flag) {
+        char *args[] = {"psnd", (char *)lang, (char *)flag, filepath, NULL};
+        return test_exec_capture(PSND_BINARY, args, output, output_size);
+    }
+    char *args[] = {"psnd", (char *)lang, filepath, NULL};
+    return test_exec_capture(PSND_BINARY, args, output, output_size);
+}
+
+static int landed_in_editor(const char *output) {
+    return strstr(output, "\033[") != NULL;
+}
+
+TEST(lang_file_does_not_open_editor_alda) {
+    char output[8192] = {0};
+    int result = run_lang_with_file("alda", NULL, "delegate.alda", "piano: c\n",
+                                   output, sizeof(output));
+    ASSERT_EQ(result, 0);
+    ASSERT_FALSE(landed_in_editor(output));
+}
+
+TEST(lang_file_does_not_open_editor_joy) {
+    char output[8192] = {0};
+    int result = run_lang_with_file("joy", NULL, "delegate.joy", "42\n",
+                                   output, sizeof(output));
+    ASSERT_EQ(result, 0);
+    ASSERT_FALSE(landed_in_editor(output));
+}
+
+TEST(lang_file_does_not_open_editor_bog) {
+    char output[8192] = {0};
+    int result = run_lang_with_file("bog", NULL, "delegate.bog",
+                                   "event(kick, 0).\n", output, sizeof(output));
+    ASSERT_EQ(result, 0);
+    ASSERT_FALSE(landed_in_editor(output));
+}
+
+TEST(lang_file_does_not_open_editor_tr7) {
+    char output[8192] = {0};
+    int result = run_lang_with_file("tr7", NULL, "delegate.scm", "(+ 1 2)\n",
+                                   output, sizeof(output));
+    ASSERT_EQ(result, 0);
+    ASSERT_FALSE(landed_in_editor(output));
+}
+
+TEST(lang_flag_taking_file_reaches_language_mhs) {
+    /* The form mhs documents: -r runs the file. Under the regression the
+       editor consumed it and reported "Unknown option: -r". */
+    char output[8192] = {0};
+    int result = run_lang_with_file(
+        "mhs", "-r", "Delegate.hs",
+        "module Delegate(main) where\nmain :: IO ()\n"
+        "main = putStrLn \"psnd-dispatch-ok\"\n",
+        output, sizeof(output));
+    ASSERT_EQ(result, 0);
+    ASSERT_FALSE(landed_in_editor(output));
+    ASSERT_NOT_NULL(strstr(output, "psnd-dispatch-ok"));
+}
+
+TEST(lang_file_of_another_language_still_delegates) {
+    /* The extension test matched any registered extension, so `psnd joy x.alda`
+       opened an Alda file in the editor under the joy subcommand. */
+    char output[8192] = {0};
+    int result = run_lang_with_file("joy", NULL, "cross.alda", "piano: c\n",
+                                   output, sizeof(output));
+    (void)result;  /* joy may reject the file; it must not be edited */
+    ASSERT_FALSE(landed_in_editor(output));
+}
+
+/*============================================================================
  * Unknown Command Tests
  *============================================================================*/
 
@@ -261,18 +355,6 @@ TEST(soundfont_option_needs_file) {
  * Language Command with File Tests
  *============================================================================*/
 
-TEST(alda_command_with_file_routes_to_editor) {
-    /* When language command is followed by a file, it should route to editor */
-    /* This is tested via play command since editor is interactive */
-    char filepath[TEST_PROC_MAX_PATH];
-    test_build_path(temp_dir, "song.alda", filepath);
-    test_write_file(temp_dir, "song.alda", "piano: c d e\n");
-
-    char *args[] = {"psnd", "play", filepath, NULL};
-    int result = run_psnd(args);
-    ASSERT_EQ(result, 0);
-}
-
 /*============================================================================
  * Multiple Extension Support Tests
  *============================================================================*/
@@ -336,6 +418,14 @@ BEGIN_TEST_SUITE_WITH_FIXTURE("Main Dispatch Tests", main_dispatch_tests)
     RUN_TEST(alda_list_ports);
     RUN_TEST(joy_list_ports);
 
+    /* Language delegation (regression: editor swallowed lang arguments) */
+    RUN_TEST(lang_file_does_not_open_editor_alda);
+    RUN_TEST(lang_file_does_not_open_editor_joy);
+    RUN_TEST(lang_file_does_not_open_editor_bog);
+    RUN_TEST(lang_file_does_not_open_editor_tr7);
+    RUN_TEST(lang_flag_taking_file_reaches_language_mhs);
+    RUN_TEST(lang_file_of_another_language_still_delegates);
+
     /* Unknown command tests */
     /* NOTE: unknown_command_fallback skipped - it opens editor in interactive mode */
     /* RUN_TEST(unknown_command_fallback); */
@@ -352,8 +442,6 @@ BEGIN_TEST_SUITE_WITH_FIXTURE("Main Dispatch Tests", main_dispatch_tests)
     RUN_TEST(soundfont_option_needs_file);
 
     /* Language command with file tests */
-    RUN_TEST(alda_command_with_file_routes_to_editor);
-
     /* Multiple extension tests */
     RUN_TEST(ss_extension_routes_to_tr7);
     /* bog_extension_if_supported removed - Bog doesn't support headless playback */

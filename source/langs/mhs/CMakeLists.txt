@@ -5,9 +5,10 @@
 # 1. MHS language integration for psnd (via psnd_register_language)
 # 2. Standalone mhs-midi REPL and example executables
 #
-# The MicroHs runtime files are copied to source/langs/mhs/impl/ with modified
-# symbol names to avoid conflicts with Csound (mmalloc->mhs_mmalloc) and
-# Joy (midi_init->mhs_midi_init).
+# The MicroHs runtime is compiled straight from source/thirdparty/MicroHs.
+# For the in-process psnd build, mhs-patch-eval.py rewrites eval.c at build time:
+# it renames mmalloc/mrealloc/mcalloc to mhs_* to avoid a clash with Csound, and
+# redirects the file and directory FFI entries to the VFS overrides.
 
 # MHS integration requires fmemopen() which is not available on Windows
 # Disable on Windows - the embedding system doesn't work without fmemopen
@@ -63,6 +64,17 @@ else()
 endif()
 set(MHS_RUNTIME ${MHS_DIR}/src/runtime)
 set(MHS_LIB ${MHS_DIR}/lib)
+
+# Single source of truth for the vendored MicroHs version. Package file names
+# (base-<version>.pkg) and the mcabal install layout are derived from it, so a
+# version bump must not require editing this file.
+file(STRINGS ${MHS_DIR}/MicroHs.cabal MHS_VERSION_LINE REGEX "^version:")
+string(REGEX REPLACE "^version:[ \t]*" "" MHS_VERSION "${MHS_VERSION_LINE}")
+string(STRIP "${MHS_VERSION}" MHS_VERSION)
+if(NOT MHS_VERSION MATCHES "^[0-9]+(\\.[0-9]+)+$")
+    message(FATAL_ERROR "MHS: cannot parse version from ${MHS_DIR}/MicroHs.cabal (got '${MHS_VERSION}')")
+endif()
+message(STATUS "MHS: vendored MicroHs version ${MHS_VERSION}")
 set(MIDI_LIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 set(EXAMPLES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/examples)
 
@@ -118,10 +130,8 @@ set_property(CACHE MHS_EMBED_MODE PROPERTY STRINGS "PKG_ZSTD" "PKG" "SRC_ZSTD" "
 
 option(MHS_ENABLE_COMPILATION "Enable MHS compilation to executable (embeds MIDI libraries)" ON)
 
-set(MHS_IMPL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/impl)
 set(ZSTD_DIR ${CMAKE_SOURCE_DIR}/source/thirdparty/zstd-1.5.7)
 set(MHS_SCRIPTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/scripts)
-set(MHS_VERSION_PSND "0.15.0.0")
 
 # Parse embedding mode
 if(MHS_EMBED_MODE STREQUAL "PKG_ZSTD")
@@ -174,9 +184,9 @@ endif()
 
 # Platform-specific config.h location
 if(WIN32)
-    set(MHS_CONFIG_DIR ${MHS_IMPL_DIR}/windows)
+    set(MHS_CONFIG_DIR ${MHS_RUNTIME}/windows)
 else()
-    set(MHS_CONFIG_DIR ${MHS_IMPL_DIR}/unix)
+    set(MHS_CONFIG_DIR ${MHS_RUNTIME}/unix)
 endif()
 
 # ==============================================================================
@@ -187,20 +197,21 @@ endif()
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/mhs_psnd.c
     COMMAND ${Python3_EXECUTABLE} ${MHS_SCRIPTS_DIR}/mhs-patch-xffi.py
-            ${MHS_IMPL_DIR}/mhs.c
+            ${MHS_DIR}/generated/mhs.c
             ${CMAKE_CURRENT_BINARY_DIR}/mhs_psnd.c
-    DEPENDS ${MHS_IMPL_DIR}/mhs.c ${MHS_SCRIPTS_DIR}/mhs-patch-xffi.py
+    DEPENDS ${MHS_DIR}/generated/mhs.c ${MHS_SCRIPTS_DIR}/mhs-patch-xffi.py
     COMMENT "Creating mhs_psnd.c with xffi_table removed"
     VERBATIM
 )
 
-# Create patched eval.c (renames mhs_fopen etc. for VFS override)
+# Create patched eval.c (VFS override plus the mmalloc rename Csound requires)
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/eval_psnd.c
     COMMAND ${Python3_EXECUTABLE} ${MHS_SCRIPTS_DIR}/mhs-patch-eval.py
-            ${MHS_IMPL_DIR}/eval.c
+            --rename-malloc
+            ${MHS_RUNTIME}/eval.c
             ${CMAKE_CURRENT_BINARY_DIR}/eval_psnd.c
-    DEPENDS ${MHS_IMPL_DIR}/eval.c ${MHS_SCRIPTS_DIR}/mhs-patch-eval.py
+    DEPENDS ${MHS_RUNTIME}/eval.c ${MHS_SCRIPTS_DIR}/mhs-patch-eval.py
     COMMENT "Creating eval_psnd.c with VFS function renames"
     VERBATIM
 )
@@ -232,7 +243,7 @@ add_library(mhs_runtime STATIC ${MHS_RUNTIME_SOURCES})
 
 target_include_directories(mhs_runtime PRIVATE
     ${MHS_CONFIG_DIR}
-    ${MHS_IMPL_DIR}
+    ${MHS_RUNTIME}
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}/source/thirdparty/libremidi/include
@@ -373,7 +384,7 @@ target_include_directories(mhs
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
     PRIVATE
-        ${MHS_IMPL_DIR}
+        ${MHS_RUNTIME}
         ${PSND_ROOT_DIR}/source/core
         ${PSND_ROOT_DIR}/source/core/include
         ${PSND_ROOT_DIR}/source/core/shared
@@ -410,7 +421,7 @@ psnd_register_language(
     SOURCES ${MHS_IMPL_SOURCES}
     INCLUDE_DIRS
         ${CMAKE_CURRENT_SOURCE_DIR}
-        ${MHS_IMPL_DIR}
+        ${MHS_RUNTIME}
     REPL_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/repl.c
         ${CMAKE_CURRENT_SOURCE_DIR}/dispatch.c
@@ -642,7 +653,6 @@ if(NOT WIN32)
 #   - mhs-midi-pkg:       precompiled .pkg embedding (fast startup)
 
 set(ZSTD_DIR ${CMAKE_SOURCE_DIR}/source/thirdparty/zstd-1.5.7)
-set(MHS_VERSION "0.15.0.0")
 
 # Check if zstd is available for compressed standalone builds
 if(EXISTS "${ZSTD_DIR}/zstd.c")

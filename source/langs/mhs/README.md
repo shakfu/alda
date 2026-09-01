@@ -189,12 +189,12 @@ source/langs/mhs/
     mhs-patch-xffi.py      # Remove xffi_table from mhs.c
     mhs-pkg.sh             # Build music.pkg
 
-  # MicroHs Runtime (copied from thirdparty)
-  impl/
-    mhs.c                  # MicroHs compiler (generated)
-    eval.c                 # Evaluator
-    mhsffi.h               # FFI header
-    config.h               # Platform config
+  # Tests
+  tests/
+    test_context.c         # Context lifecycle and null safety
+    test_midi_ffi.c        # MIDI FFI unit tests
+    smoke_test.cmake       # End-to-end: run Smoke.hs through the embedded runtime
+    Smoke.hs               # Smoke test fixture
 ```
 
 ## VFS (Virtual File System)
