@@ -812,12 +812,16 @@ add_custom_command(
     VERBATIM
 )
 
-# This package is consumed by several targets (the standalone variants and the
-# psnd embedded header). The Makefile generator copies a shared custom command
-# into every consuming target's build.make, so under `make -j` two targets would
-# run the copy_directory/mcabal step concurrently in the same directory and one
-# would fail. Giving the command a single owning target, and ordering every
-# consumer behind it via add_dependencies(), keeps it to one execution.
+# The packages below are consumed by several targets (the standalone variants
+# and the psnd embedded headers). The Makefile generator copies a shared custom
+# command into every consuming target's build.make, so a consumer that names the
+# output file gets its own copy of the recipe and `make -j` can run it a second
+# time -- GNU make caches the stat from before the owning target wrote the file,
+# so ordering the consumer later does not stop it. A consumer must therefore
+# depend on the owning target and on the package's own inputs, never on the .pkg
+# path. v0.2.2 built music-0.1.0.pkg twice; the zstd header read the file mid
+# rewrite and embedded 0 bytes, and every MHS test failed at run time with
+# "/mhs-embedded/packages/music-0.1.0.pkg: openBinaryFile: does not exist".
 add_custom_target(mhs-base-pkg DEPENDS ${DIST_BASE_PKG})
 
 # Install base.pkg locally and copy runtime files
@@ -835,7 +839,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${MHS_RUNTIME} ${MHS_DATA_DIR}/src/runtime
     COMMAND ${CMAKE_COMMAND} -E copy ${MHS_DIR}/targets.conf ${MHS_DATA_DIR}/
     COMMAND ${CMAKE_COMMAND} -E touch ${LOCAL_MCABAL_STAMP}
-    DEPENDS ${MHS_COMPILER} ${DIST_BASE_PKG}
+    DEPENDS ${MHS_COMPILER}
     COMMENT "Installing MicroHs packages to build/mcabal"
     VERBATIM
 )
@@ -844,18 +848,20 @@ add_dependencies(mhs-local-install mhs-base-pkg)
 
 # Generate music.pkg
 set(MUSIC_PKG ${CMAKE_CURRENT_BINARY_DIR}/music-0.1.0.pkg)
+set(MUSIC_PKG_SOURCES
+    ${MIDI_LIB_DIR}/Async.hs
+    ${MIDI_LIB_DIR}/Midi.hs
+    ${MIDI_LIB_DIR}/MidiPerform.hs
+    ${MIDI_LIB_DIR}/Music.hs
+    ${MIDI_LIB_DIR}/MusicPerform.hs
+)
 add_custom_command(
     OUTPUT ${MUSIC_PKG}
     COMMAND ${CMAKE_COMMAND} -E env "MHSDIR=${MHS_DIR}"
         ${MHS_COMPILER} -Pmusic-0.1.0 -i${MIDI_LIB_DIR}
         Async Midi MidiPerform Music MusicPerform
         -o ${MUSIC_PKG}
-    DEPENDS
-        ${MIDI_LIB_DIR}/Async.hs
-        ${MIDI_LIB_DIR}/Midi.hs
-        ${MIDI_LIB_DIR}/MidiPerform.hs
-        ${MIDI_LIB_DIR}/Music.hs
-        ${MIDI_LIB_DIR}/MusicPerform.hs
+    DEPENDS ${MUSIC_PKG_SOURCES}
     WORKING_DIRECTORY ${MHS_DIR}
     COMMENT "Building music-0.1.0.pkg"
     VERBATIM
@@ -882,8 +888,8 @@ add_custom_command(
         --header ${CMAKE_CURRENT_SOURCE_DIR}/midi_ffi.h
     DEPENDS
         ${MHS_EMBED}
-        ${LOCAL_MCABAL_STAMP}
-        ${MUSIC_PKG}
+        ${MHS_COMPILER}
+        ${MUSIC_PKG_SOURCES}
         ${CMAKE_CURRENT_SOURCE_DIR}/midi_ffi.h
         libremidi
         midi_ffi
@@ -913,8 +919,8 @@ add_custom_command(
         --header ${CMAKE_CURRENT_SOURCE_DIR}/midi_ffi.h
     DEPENDS
         ${MHS_EMBED}
-        ${LOCAL_MCABAL_STAMP}
-        ${MUSIC_PKG}
+        ${MHS_COMPILER}
+        ${MUSIC_PKG_SOURCES}
         ${CMAKE_CURRENT_SOURCE_DIR}/midi_ffi.h
         libremidi
         midi_ffi
@@ -929,6 +935,8 @@ add_custom_target(mhs-embedded-pkg-zstd-header DEPENDS ${EMBEDDED_PKG_ZSTD_HEADE
 # depend on this target so the shared steps above run exactly once.
 add_custom_target(mhs-embed-prereqs)
 add_dependencies(mhs-embed-prereqs mhs-embed-tool mhs-local-install mhs-music-pkg)
+add_dependencies(mhs-embedded-pkg-header mhs-embed-prereqs)
+add_dependencies(mhs-embedded-pkg-zstd-header mhs-embed-prereqs)
 
 endif() # BUILD_MHS_PKG_VARIANTS
 
@@ -1176,7 +1184,7 @@ if(ENABLE_MHS_INTEGRATION AND NOT WIN32)
                         --music-modules music-0.1.0.pkg:Async,Midi,MidiPerform,Music,MusicPerform
                         --runtime ${MHS_DATA_DIR}/src/runtime
                         --header ${CMAKE_CURRENT_SOURCE_DIR}/midi_ffi.h
-                    DEPENDS ${MHS_EMBED} ${LOCAL_MCABAL_STAMP} ${MUSIC_PKG} ${CMAKE_CURRENT_SOURCE_DIR}/midi_ffi.h
+                    DEPENDS ${MHS_EMBED} ${MHS_COMPILER} ${MUSIC_PKG_SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/midi_ffi.h
                     COMMENT "Generating mhs_psnd_pkg_zstd.h (packages, no libs)"
                     VERBATIM
                 )
@@ -1194,7 +1202,7 @@ if(ENABLE_MHS_INTEGRATION AND NOT WIN32)
                         --music-modules music-0.1.0.pkg:Async,Midi,MidiPerform,Music,MusicPerform
                         --runtime ${MHS_DATA_DIR}/src/runtime
                         --header ${CMAKE_CURRENT_SOURCE_DIR}/midi_ffi.h
-                    DEPENDS ${MHS_EMBED} ${LOCAL_MCABAL_STAMP} ${MUSIC_PKG} ${CMAKE_CURRENT_SOURCE_DIR}/midi_ffi.h
+                    DEPENDS ${MHS_EMBED} ${MHS_COMPILER} ${MUSIC_PKG_SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/midi_ffi.h
                     COMMENT "Generating mhs_psnd_pkg.h (packages, no libs)"
                     VERBATIM
                 )

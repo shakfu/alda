@@ -349,10 +349,20 @@ static int add_pkg_file(const char* spec) {
 
     const char* file_path = eq + 1;
 
+    /* A package is never legitimately empty. Embedding a truncated one yields a
+       binary that only fails at run time, inside the interpreter, reporting the
+       VFS path as missing. Fail the build instead. */
     struct stat st;
-    if (stat(file_path, &st) == 0) {
-        printf("  %s (%ld bytes)\n", vfs_path, (long)st.st_size);
+    if (stat(file_path, &st) != 0) {
+        fprintf(stderr, "Error: cannot stat package %s: %s\n", file_path,
+                strerror(errno));
+        return -1;
     }
+    if (st.st_size == 0) {
+        fprintf(stderr, "Error: package %s is empty\n", file_path);
+        return -1;
+    }
+    printf("  %s (%ld bytes)\n", vfs_path, (long)st.st_size);
 
     return add_file_with_type(vfs_path, file_path, FILE_TYPE_PKG);
 }
@@ -1211,7 +1221,9 @@ int main(int argc, char** argv) {
     if (pkg_count > 0) {
         printf("Embedding packages:\n");
         for (int i = 0; i < pkg_count; i++) {
-            add_pkg_file(pkg_files[i]);
+            if (add_pkg_file(pkg_files[i]) != 0) {
+                return 1;
+            }
         }
     }
 
