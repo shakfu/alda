@@ -192,7 +192,7 @@ runs:
 
     - if: (inputs.upload-package-artifacts != '' && fromJson(inputs.upload-package-artifacts)) && ((inputs.package != '' && fromJson(inputs.package)) || (inputs.package-source != '' && fromJson(inputs.package-source)))
       name: Upload package artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: package_${{ inputs.artifacts-name }}
         path: |
@@ -203,7 +203,7 @@ runs:
 
     - if: (inputs.upload-coverage-artifacts != '' && fromJson(inputs.upload-coverage-artifacts)) && (inputs.coverage != '' && fromJson(inputs.coverage))
       name: Upload coverage artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: test_coverage_data_${{ inputs.artifacts-name }}
         path: ${{ steps.prepare-coverage-artifacts.outputs.upload-dir }}

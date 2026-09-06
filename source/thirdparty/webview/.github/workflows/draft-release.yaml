@@ -15,7 +15,7 @@ jobs:
       release-tag: ${{ steps.vars.outputs.release-tag }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - id: vars
         run: |
@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Merge package artifacts
-        uses: actions/upload-artifact/merge@v4
+        uses: actions/upload-artifact/merge@v7
         with:
           name: package
           pattern: package_*
@@ -48,7 +48,7 @@ jobs:
           retention-days: 1
 
       - name: Download package artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: package
           path: dist
@@ -59,7 +59,7 @@ jobs:
         shell: bash
 
       - name: Upload checksum artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: package_checksum
           path: dist/*SUMS
@@ -75,10 +75,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download package artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: package*
           path: dist

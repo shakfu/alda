@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Merge package artifacts
-        uses: actions/upload-artifact/merge@v4
+        uses: actions/upload-artifact/merge@v7
         with:
           name: package
           pattern: package_*
@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Python
         run: >
@@ -67,7 +67,7 @@ jobs:
         run: pip install "gcovr==${{ needs.init.outputs.gcovr-version }}"
 
       - name: Merge test coverage artifacts
-        uses: actions/upload-artifact/merge@v4
+        uses: actions/upload-artifact/merge@v7
         with:
           name: test_coverage_data
           pattern: test_coverage_data_*
@@ -76,7 +76,7 @@ jobs:
           separate-directories: true
 
       - name: Download merged test coverage artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: test_coverage_data
 
@@ -99,7 +99,7 @@ jobs:
           echo "upload-dir=${artifact_dir}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload report artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test_coverage_report
           path: ${{ steps.generate-report.outputs.upload-dir }}

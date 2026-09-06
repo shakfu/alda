@@ -5,7 +5,7 @@ jobs:
   format:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: sudo apt-get update
       - run: sudo apt-get install --no-install-recommends -y clang-format-15
       - run: cmake -B build -S . -D WEBVIEW_BUILD=OFF -D WEBVIEW_CLANG_FORMAT_EXE=clang-format-15
@@ -38,7 +38,7 @@ jobs:
           - image: windows-2022
             clang-format-exe: clang-format
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up environment
         uses: ./.github/actions/setup-env
@@ -56,7 +56,7 @@ jobs:
         run: brew install clang-format
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 

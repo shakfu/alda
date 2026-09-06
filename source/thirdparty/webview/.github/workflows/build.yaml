@@ -23,7 +23,7 @@ jobs:
       matrix: ${{ steps.load-matrix.outputs.result }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Load matrix file
         id: load-matrix
@@ -59,7 +59,7 @@ jobs:
       matrix: ${{ fromJson(needs.load-matrix.outputs.matrix) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up environment
         uses: ./.github/actions/setup-env
